@@ -1,0 +1,6 @@
+{
+  "name": "Clinical AI Reasoning Lab",
+  "description": "A research simulation for evaluating AI-assisted clinical decision-making, automation bias, cognitive offloading, and independent clinical reasoning among doctors.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
