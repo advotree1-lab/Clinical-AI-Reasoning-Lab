@@ -1,91 +1,142 @@
 export type Role = 'participant' | 'researcher';
 
 export type ParticipantDesignation =
-  | 'Postgraduate resident'
-  | 'Senior resident'
-  | 'Medical officer'
-  | 'Assistant professor'
-  | 'Associate professor'
+  | 'Junior Resident'
+  | 'Senior Resident'
+  | 'Assistant Professor'
+  | 'Associate Professor'
   | 'Professor'
   | 'Consultant'
-  | 'General practitioner'
   | 'Other';
 
 export type ClinicalSpecialty =
-  | 'General medicine'
-  | 'General surgery'
-  | 'Obstetrics and gynaecology'
-  | 'Paediatrics'
-  | 'Cardiology'
-  | 'Neurology'
-  | 'Orthopaedics'
-  | 'Dermatology'
-  | 'Psychiatry'
-  | 'Emergency medicine'
-  | 'Nephrology'
-  | 'Pulmonology'
+  | 'General Medicine'
+  | 'General Surgery'
+  | 'Pediatrics'
+  | 'Obstetrics and Gynaecology'
+  | 'Emergency Medicine'
   | 'Other';
+
+export type YearsSinceMbbsBracket =
+  | 'Less than 1 year'
+  | '1–5 years'
+  | '6–10 years'
+  | 'More than 10 years';
 
 export type InstitutionType =
   | 'Government hospital'
   | 'Private hospital'
-  | 'Medical college'
-  | 'Clinic'
+  | 'Teaching hospital'
   | 'Other';
+
+export type GenAiTaskFrequency =
+  | 'Never'
+  | 'Rarely'
+  | 'Sometimes'
+  | 'Often'
+  | 'Very often';
+
+export type GenAiFirstUseDuration =
+  | 'Less than 3 months'
+  | '3–6 months'
+  | '6–12 months'
+  | 'More than 12 months';
+
+export type GenAiUsageFrequency =
+  | 'Less than once a week'
+  | '1–2 days per week'
+  | '3–5 days per week'
+  | 'Daily'
+  | 'Several times a day';
+
+export type GenAiDailyDuration =
+  | 'Less than 10 minutes'
+  | '10–30 minutes'
+  | '31–60 minutes'
+  | 'More than 60 minutes';
+
+export type GenAiAccessMethod =
+  | 'Free public version'
+  | 'Personal paid subscription'
+  | 'Provided by my hospital/institution'
+  | 'A combination of the above';
+
+export type PatientInfoEntryFrequency =
+  | 'Never'
+  | 'Once or twice'
+  | 'Sometimes'
+  | 'Often';
+
+export type ClinicalReasoningConsultationStage =
+  | 'Before forming my own clinical assessment'
+  | 'After my initial assessment, to cross-check my thinking'
+  | 'When uncertain or unable to reach a conclusion'
+  | 'After making a decision, primarily for documentation'
+  | 'I do not use GenAI for clinical reasoning';
+
+export type InstitutionalPolicyStatus = 'Yes' | 'No' | 'Not sure';
 
 export interface Participant {
   id: string; // UUID
   code: string; // DOC-1042
   designation: ParticipantDesignation;
+  designationOther?: string;
   specialty: ClinicalSpecialty;
-  yearsSinceMBBS: number;
-  yearsExperience: number;
+  specialtyOther?: string;
+  yearsSinceMbbsBracket: YearsSinceMbbsBracket;
   institutionType: InstitutionType;
-  dailyPatientLoad: number;
-  priorAiExposure: boolean;
+  institutionOther?: string;
+  formalGenAiTraining: boolean;
   consentGiven: boolean;
   isDemo: boolean;
   createdAt: string;
   completed: boolean;
-  currentStage: number; // 1 to 8
+  currentStage: number; // 1 to 7
+}
+
+export interface GenAiTaskMatrix {
+  differentialDiagnoses: GenAiTaskFrequency;
+  interpretingInvestigations: GenAiTaskFrequency;
+  choosingInvestigations: GenAiTaskFrequency;
+  identifyingManagement: GenAiTaskFrequency;
+  drugDosesAndInteractions: GenAiTaskFrequency;
+  summarisingLiterature: GenAiTaskFrequency;
+  clinicalDocumentation: GenAiTaskFrequency;
+  patientCommunication: GenAiTaskFrequency;
 }
 
 export interface QuestionnaireResponse {
   id: string;
   participantId: string;
   isDemo: boolean;
-  usedAiLast3Months: boolean;
-  aiToolsUsed: string[]; // ['ChatGPT', 'Gemini', 'Claude', etc.]
-  aiFrequency: string; // 'Multiple times daily' | 'Daily' | 'Several times weekly' | 'Weekly' | 'Rarely' | 'Never'
-  primaryPurposes: string[]; // ['Differential diagnosis', 'Treatment planning', etc.]
-  aiTiming: 'before' | 'after' | 'both';
-  complexVsRoutine: boolean;
-  verificationFrequency: string; // 'Always' | 'Often' | 'Sometimes' | 'Rarely' | 'Never'
-  verificationResources: string[]; // ['UpToDate', 'Clinical Guidelines', 'Textbooks', etc.]
-  // Section C: Cognitive Offloading Likert items (1 to 5)
-  // 1: Strongly disagree, 2: Disagree, 3: Neutral, 4: Agree, 5: Strongly agree
-  cognitiveOffloading: {
-    dependDifferential: number;
-    substituteRecall: number;
-    interpretComplex: number;
-    transferReasoning: number;
-    consultBeforeThinking: number;
-    reduceWorkload: number;
-    verifyBeforeUsing: number;
-  };
-  // Section D: Perceived Cognitive Deskilling Risk Likert items (1 to 5)
-  perceivedDeskilling: {
-    reducedEffort: number;
-    difficultWithoutAi: number;
-    lessConfidentIndependent: number;
-    dependInvestigations: number;
-    affectProblemSolving: number;
-    confidenceChange: number; // 1: Significantly decreased, 3: Unchanged, 5: Significantly increased
-  };
+  // SECTION I: RESPONDENT PROFILE
+  designation: ParticipantDesignation;
+  designationOther?: string;
+  specialty: ClinicalSpecialty;
+  specialtyOther?: string;
+  yearsSinceMbbsBracket: YearsSinceMbbsBracket;
+  hospitalType: InstitutionType;
+  hospitalTypeOther?: string;
+  formalGenAiTraining: boolean;
+  // SECTION II: GENAI EXPOSURE (past 3 months work-related use)
+  usedGenAiLast3Months: boolean; // Q1: If No, skip Q2-Q12 and proceed to clinical vignettes
+  firstUseDuration?: GenAiFirstUseDuration; // Q2
+  usageFrequency?: GenAiUsageFrequency; // Q3
+  dailyTimeSpent?: GenAiDailyDuration; // Q4
+  toolsUsed?: string[]; // Q5
+  medicalSpecificToolName?: string; // Q5 specify
+  otherToolName?: string; // Q5 specify
+  accessMethod?: GenAiAccessMethod; // Q6
+  enteredPatientInfo?: PatientInfoEntryFrequency; // Q7
+  taskFrequency?: GenAiTaskMatrix; // Q8 (a-h)
+  reasoningConsultationStage?: ClinicalReasoningConsultationStage; // Q9
+  last10CasesConsultedCount?: number; // Q10 (0 to 10)
+  verificationFrequency?: GenAiTaskFrequency; // Q11
+  institutionalPolicy?: InstitutionalPolicyStatus; // Q12
   createdAt: string;
 }
 
-export type CaseStage = 'baseline' | 'ai_simulation' | 'post_ai';
+export type CaseStage = 'ai_simulation' | 'post_ai';
 
 export interface ClinicalVitals {
   heartRate: string;
@@ -102,26 +153,41 @@ export interface ClinicalInvestigation {
   isAbnormal?: boolean;
 }
 
+export interface CdssFollowUpSuggestion {
+  id: 'followup_1' | 'followup_2';
+  promptLabel: string;
+  responseText: string;
+}
+
 export interface AiStimulus {
   diagnosis: string;
   recommendation: string;
   clinicalReasoning: string;
+  followUpSuggestions?: CdssFollowUpSuggestion[];
   isMisleading: boolean; // Researcher only! Hidden from participant
   misleadingClassification?: 'Diagnostic Anchoring' | 'Investigation Inversion' | 'Harmful Clinical Management';
   researcherNote?: string;
+}
+
+export interface ClinicalImage {
+  id: string;
+  url: string;
+  title: string;
+  caption?: string;
 }
 
 export interface ClinicalCase {
   id: string;
   caseNumber: number;
   stage: CaseStage;
-  domain: string; // Cardiology, Pulmonology, etc.
+  domain: string;
   title: string;
   presentation: string;
   medicalHistory: string;
   vitals: ClinicalVitals;
   physicalExamination: string;
   investigations: ClinicalInvestigation[];
+  clinicalImages?: ClinicalImage[];
   mcqOptions: string[];
   goldStandardDiagnosis: string;
   acceptableAlternativeDiagnoses: string[];
@@ -146,12 +212,12 @@ export interface AiInteractionRecord {
   participantId: string;
   caseId: string;
   isDemo: boolean;
-  // Step B: Initial commitments (Permanently locked)
+  // Initial commitments (Permanently locked)
   initialDiagnosis: string;
   initialJustification: string;
   initialConfidence: number; // 1 to 5
   initialSubmittedAt: string;
-  // Step D & E: Post-AI commitments
+  // Post-AI commitments
   aiAgreement: AiAgreementLevel;
   finalDiagnosis: string;
   reasonForDecision: string;
@@ -181,7 +247,7 @@ export interface VignetteAnswerRecord {
   id: string;
   participantId: string;
   caseId: string;
-  stage: 'baseline' | 'post_ai';
+  stage: 'post_ai';
   isDemo: boolean;
   mostLikelyDiagnosis: string;
   differential1: string;
@@ -196,7 +262,6 @@ export interface VignetteAnswerRecord {
 }
 
 export interface ResearchProtocolSettings {
-  baselineAssessmentEnabled: boolean;
   requireParticipantConsent: boolean;
   passcode: string;
   institutionName: string;

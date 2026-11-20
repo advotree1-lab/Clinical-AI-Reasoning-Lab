@@ -1,13 +1,81 @@
 import React, { useState } from 'react';
 import { ArrowRight, ArrowLeft } from 'lucide-react';
-import { Participant, QuestionnaireResponse } from '../../types';
+import {
+  Participant,
+  QuestionnaireResponse,
+  ParticipantDesignation,
+  ClinicalSpecialty,
+  YearsSinceMbbsBracket,
+  InstitutionType,
+  GenAiFirstUseDuration,
+  GenAiUsageFrequency,
+  GenAiDailyDuration,
+  GenAiAccessMethod,
+  PatientInfoEntryFrequency,
+  GenAiTaskFrequency,
+  GenAiTaskMatrix,
+  ClinicalReasoningConsultationStage,
+  InstitutionalPolicyStatus
+} from '../../types';
 
 interface Stage4QuestionnaireProps {
   participant: Participant;
-  onSubmit: (response: QuestionnaireResponse) => void;
+  onSubmit: (response: QuestionnaireResponse, updatedParticipant: Participant) => void;
   onBack: () => void;
   isDemoMode: boolean;
 }
+
+const DESIGNATION_OPTIONS: ParticipantDesignation[] = [
+  'Junior Resident',
+  'Senior Resident',
+  'Assistant Professor',
+  'Associate Professor',
+  'Professor',
+  'Consultant',
+  'Other'
+];
+
+const SPECIALTY_OPTIONS: ClinicalSpecialty[] = [
+  'General Medicine',
+  'General Surgery',
+  'Pediatrics',
+  'Obstetrics and Gynaecology',
+  'Emergency Medicine',
+  'Other'
+];
+
+const MBBS_BRACKETS: YearsSinceMbbsBracket[] = [
+  'Less than 1 year',
+  '1–5 years',
+  '6–10 years',
+  'More than 10 years'
+];
+
+const HOSPITAL_TYPES: InstitutionType[] = [
+  'Government hospital',
+  'Private hospital',
+  'Teaching hospital',
+  'Other'
+];
+
+const TASK_FREQ_OPTIONS: GenAiTaskFrequency[] = [
+  'Never',
+  'Rarely',
+  'Sometimes',
+  'Often',
+  'Very often'
+];
+
+const TASK_ROWS: { key: keyof GenAiTaskMatrix; code: string; label: string }[] = [
+  { key: 'differentialDiagnoses', code: 'a', label: 'Generating differential diagnoses' },
+  { key: 'interpretingInvestigations', code: 'b', label: 'Interpreting investigation results' },
+  { key: 'choosingInvestigations', code: 'c', label: 'Choosing investigations' },
+  { key: 'identifyingManagement', code: 'd', label: 'Identifying management options' },
+  { key: 'drugDosesAndInteractions', code: 'e', label: 'Drug doses and interactions' },
+  { key: 'summarisingLiterature', code: 'f', label: 'Summarising literature or guidelines' },
+  { key: 'clinicalDocumentation', code: 'g', label: 'Clinical documentation or letters' },
+  { key: 'patientCommunication', code: 'h', label: 'Patient communication' }
+];
 
 export const Stage4Questionnaire: React.FC<Stage4QuestionnaireProps> = ({
   participant,
@@ -15,148 +83,128 @@ export const Stage4Questionnaire: React.FC<Stage4QuestionnaireProps> = ({
   onBack,
   isDemoMode
 }) => {
-  // Section B
-  const [usedAiLast3Months, setUsedAiLast3Months] = useState(participant.priorAiExposure);
-  const [aiToolsUsed, setAiToolsUsed] = useState<string[]>(['ChatGPT (GPT-4o)']);
-  const [aiFrequency, setAiFrequency] = useState<string>('Several times weekly');
-  const [primaryPurposes, setPrimaryPurposes] = useState<string[]>([
-    'Differential diagnosis formulation',
-    'Clinical information retrieval'
-  ]);
-  const [aiTiming, setAiTiming] = useState<'before' | 'after' | 'both'>('after');
-  const [complexVsRoutine, setComplexVsRoutine] = useState<boolean>(true);
-  const [verificationFrequency, setVerificationFrequency] = useState<string>('Often');
-  const [verificationResources, setVerificationResources] = useState<string[]>([
-    'UpToDate / Dynamed',
-    'Clinical Practice Guidelines'
-  ]);
+  // SECTION I: RESPONDENT PROFILE (Initialized from Stage 3 participant)
+  const [designation, setDesignation] = useState<ParticipantDesignation>(participant.designation);
+  const [designationOther, setDesignationOther] = useState(participant.designationOther || '');
+  const [specialty, setSpecialty] = useState<ClinicalSpecialty>(participant.specialty);
+  const [specialtyOther, setSpecialtyOther] = useState(participant.specialtyOther || '');
+  const [yearsSinceMbbsBracket, setYearsSinceMbbsBracket] = useState<YearsSinceMbbsBracket>(participant.yearsSinceMbbsBracket);
+  const [hospitalType, setHospitalType] = useState<InstitutionType>(participant.institutionType);
+  const [hospitalTypeOther, setHospitalTypeOther] = useState(participant.institutionOther || '');
+  const [formalGenAiTraining, setFormalGenAiTraining] = useState<boolean>(participant.formalGenAiTraining);
 
-  // Section C: Cognitive Offloading (1: Strongly Disagree, 5: Strongly Agree)
-  const [cogOffloading, setCogOffloading] = useState({
-    dependDifferential: 3,
-    substituteRecall: 3,
-    interpretComplex: 3,
-    transferReasoning: 2,
-    consultBeforeThinking: 2,
-    reduceWorkload: 4,
-    verifyBeforeUsing: 4
+  // SECTION II: GENAI EXPOSURE (Q1 - Q12)
+  const [usedGenAiLast3Months, setUsedGenAiLast3Months] = useState<boolean>(true);
+  const [firstUseDuration, setFirstUseDuration] = useState<GenAiFirstUseDuration>('6–12 months');
+  const [usageFrequency, setUsageFrequency] = useState<GenAiUsageFrequency>('3–5 days per week');
+  const [dailyTimeSpent, setDailyTimeSpent] = useState<GenAiDailyDuration>('10–30 minutes');
+  const [toolsUsed, setToolsUsed] = useState<string[]>(['ChatGPT', 'Google Gemini']);
+  const [medicalSpecificToolName, setMedicalSpecificToolName] = useState('');
+  const [otherToolName, setOtherToolName] = useState('');
+  const [accessMethod, setAccessMethod] = useState<GenAiAccessMethod>('Free public version');
+  const [enteredPatientInfo, setEnteredPatientInfo] = useState<PatientInfoEntryFrequency>('Never');
+  const [taskFrequency, setTaskFrequency] = useState<GenAiTaskMatrix>({
+    differentialDiagnoses: 'Sometimes',
+    interpretingInvestigations: 'Sometimes',
+    choosingInvestigations: 'Rarely',
+    identifyingManagement: 'Sometimes',
+    drugDosesAndInteractions: 'Often',
+    summarisingLiterature: 'Often',
+    clinicalDocumentation: 'Rarely',
+    patientCommunication: 'Never'
   });
-
-  // Section D: Perceived Cognitive Deskilling Risk (1 to 5)
-  const [perceivedDeskilling, setPerceivedDeskilling] = useState({
-    reducedEffort: 3,
-    difficultWithoutAi: 2,
-    lessConfidentIndependent: 2,
-    dependInvestigations: 3,
-    affectProblemSolving: 3,
-    confidenceChange: 3
-  });
+  const [reasoningConsultationStage, setReasoningConsultationStage] = useState<ClinicalReasoningConsultationStage>(
+    'After my initial assessment, to cross-check my thinking'
+  );
+  const [last10CasesConsultedCount, setLast10CasesConsultedCount] = useState<number>(3);
+  const [verificationFrequency, setVerificationFrequency] = useState<GenAiTaskFrequency>('Often');
+  const [institutionalPolicy, setInstitutionalPolicy] = useState<InstitutionalPolicyStatus>('Not sure');
 
   const toggleTool = (tool: string) => {
-    if (aiToolsUsed.includes(tool)) {
-      setAiToolsUsed(aiToolsUsed.filter(t => t !== tool));
+    if (toolsUsed.includes(tool)) {
+      setToolsUsed(toolsUsed.filter(t => t !== tool));
     } else {
-      setAiToolsUsed([...aiToolsUsed, tool]);
-    }
-  };
-
-  const togglePurpose = (purpose: string) => {
-    if (primaryPurposes.includes(purpose)) {
-      setPrimaryPurposes(primaryPurposes.filter(p => p !== purpose));
-    } else {
-      setPrimaryPurposes([...primaryPurposes, purpose]);
+      setToolsUsed([...toolsUsed, tool]);
     }
   };
 
   const handleAutoFillSurvey = () => {
-    setUsedAiLast3Months(true);
-    setAiToolsUsed(['ChatGPT (GPT-4o)', 'Gemini (Google)']);
-    setAiFrequency('Daily');
-    setPrimaryPurposes(['Differential diagnosis formulation', 'Clinical information retrieval', 'Investigation interpretation']);
-    setAiTiming('after');
-    setComplexVsRoutine(true);
+    setUsedGenAiLast3Months(true);
+    setFirstUseDuration('6–12 months');
+    setUsageFrequency('Daily');
+    setDailyTimeSpent('10–30 minutes');
+    setToolsUsed(['ChatGPT', 'Google Gemini', 'Perplexity']);
+    setMedicalSpecificToolName('');
+    setOtherToolName('');
+    setAccessMethod('Free public version');
+    setEnteredPatientInfo('Once or twice');
+    setTaskFrequency({
+      differentialDiagnoses: 'Often',
+      interpretingInvestigations: 'Sometimes',
+      choosingInvestigations: 'Sometimes',
+      identifyingManagement: 'Often',
+      drugDosesAndInteractions: 'Often',
+      summarisingLiterature: 'Very often',
+      clinicalDocumentation: 'Sometimes',
+      patientCommunication: 'Rarely'
+    });
+    setReasoningConsultationStage('After my initial assessment, to cross-check my thinking');
+    setLast10CasesConsultedCount(4);
     setVerificationFrequency('Often');
-    setVerificationResources(['UpToDate / Dynamed', 'Clinical Practice Guidelines']);
-    setCogOffloading({
-      dependDifferential: 3,
-      substituteRecall: 3,
-      interpretComplex: 3,
-      transferReasoning: 2,
-      consultBeforeThinking: 2,
-      reduceWorkload: 4,
-      verifyBeforeUsing: 4
-    });
-    setPerceivedDeskilling({
-      reducedEffort: 3,
-      difficultWithoutAi: 2,
-      lessConfidentIndependent: 2,
-      dependInvestigations: 3,
-      affectProblemSolving: 3,
-      confidenceChange: 3
-    });
+    setInstitutionalPolicy('No');
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
+    const updatedParticipant: Participant = {
+      ...participant,
+      designation,
+      designationOther: designation === 'Other' ? (designationOther.trim() || 'Other (Not specified)') : undefined,
+      specialty,
+      specialtyOther: specialty === 'Other' ? (specialtyOther.trim() || 'Other (Not specified)') : undefined,
+      yearsSinceMbbsBracket,
+      institutionType: hospitalType,
+      institutionOther: hospitalType === 'Other' ? (hospitalTypeOther.trim() || 'Other (Not specified)') : undefined,
+      formalGenAiTraining
+    };
+
     const response: QuestionnaireResponse = {
       id: `q-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       participantId: participant.id,
       isDemo: isDemoMode,
-      usedAiLast3Months,
-      aiToolsUsed,
-      aiFrequency: usedAiLast3Months ? aiFrequency : 'Never',
-      primaryPurposes: usedAiLast3Months ? primaryPurposes : [],
-      aiTiming,
-      complexVsRoutine,
-      verificationFrequency,
-      verificationResources,
-      cognitiveOffloading: cogOffloading,
-      perceivedDeskilling,
+      designation,
+      designationOther: designation === 'Other' ? (designationOther.trim() || 'Other (Not specified)') : undefined,
+      specialty,
+      specialtyOther: specialty === 'Other' ? (specialtyOther.trim() || 'Other (Not specified)') : undefined,
+      yearsSinceMbbsBracket,
+      hospitalType,
+      hospitalTypeOther: hospitalType === 'Other' ? (hospitalTypeOther.trim() || 'Other (Not specified)') : undefined,
+      formalGenAiTraining,
+      usedGenAiLast3Months,
+      ...(usedGenAiLast3Months
+        ? {
+            firstUseDuration,
+            usageFrequency,
+            dailyTimeSpent,
+            toolsUsed,
+            medicalSpecificToolName: toolsUsed.includes('Medical-specific AI tool')
+              ? medicalSpecificToolName.trim()
+              : undefined,
+            otherToolName: toolsUsed.includes('Other') ? otherToolName.trim() : undefined,
+            accessMethod,
+            enteredPatientInfo,
+            taskFrequency,
+            reasoningConsultationStage,
+            last10CasesConsultedCount,
+            verificationFrequency,
+            institutionalPolicy
+          }
+        : {}),
       createdAt: new Date().toISOString()
     };
 
-    onSubmit(response);
-  };
-
-  const renderLikertRow = (
-    index: number,
-    label: string,
-    value: number,
-    onChange: (val: number) => void,
-    descriptions: [string, string, string, string, string] = [
-      'Strongly Disagree',
-      'Disagree',
-      'Neutral / Cannot Judge',
-      'Agree',
-      'Strongly Agree'
-    ]
-  ) => {
-    return (
-      <div className="py-3 border-b border-slate-100 last:border-b-0">
-        <p className="text-xs font-medium text-slate-800 mb-2 leading-relaxed">
-          <span className="font-mono text-slate-400 mr-1.5">{index}.</span>
-          {label}
-        </p>
-        <div className="grid grid-cols-5 gap-1.5 sm:gap-2">
-          {[1, 2, 3, 4, 5].map((level, i) => (
-            <button
-              key={level}
-              type="button"
-              onClick={() => onChange(level)}
-              className={`py-2 px-1 text-center rounded border transition-colors text-xs ${
-                value === level
-                  ? 'bg-slate-900 text-white border-slate-900 font-bold shadow-2xs'
-                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-              }`}
-            >
-              <div className="font-mono font-bold">{level}</div>
-              <div className="text-[10px] line-clamp-1 opacity-80 hidden sm:block font-sans">{descriptions[i]}</div>
-            </button>
-          ))}
-        </div>
-      </div>
-    );
+    onSubmit(response, updatedParticipant);
   };
 
   return (
@@ -167,15 +215,15 @@ export const Stage4Questionnaire: React.FC<Stage4QuestionnaireProps> = ({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-200/80 gap-2 mb-6">
           <div>
             <div className="flex items-center gap-2 text-xs font-mono text-slate-500 mb-1">
-              <span>STAGE 04 / 08</span>
+              <span>STAGE 04 / 07</span>
               <span aria-hidden="true">·</span>
-              <span>STRUCTURED INQUIRY</span>
+              <span>STUDY QUESTIONNAIRE</span>
             </div>
             <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
-              Generative AI Usage & Cognitive Inquiry
+              GenAI Exposure and Cognitive Offloading Among Medical Doctors
             </h2>
-            <div className="text-xs text-slate-500 mt-0.5">
-              Subject: <span className="font-mono font-semibold text-slate-800">{participant.code}</span> · {participant.designation} ({participant.specialty})
+            <div className="text-xs text-slate-500 mt-1">
+              Subject: <span className="font-mono font-semibold text-slate-800">{participant.code}</span> · {designation === 'Other' && designationOther ? designationOther : designation} ({specialty === 'Other' && specialtyOther ? specialtyOther : specialty})
             </div>
           </div>
 
@@ -183,289 +231,613 @@ export const Stage4Questionnaire: React.FC<Stage4QuestionnaireProps> = ({
             type="button"
             onClick={handleAutoFillSurvey}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded border border-slate-200 transition-colors shrink-0 self-start sm:self-auto"
-            title="Auto-fill typical survey responses"
+            title="Auto-fill representative questionnaire responses"
           >
             <span>⚡ Auto-Fill Survey</span>
           </button>
         </div>
 
+        {/* Participant Information and Instructions */}
+        <div className="mb-8 p-4 rounded bg-slate-50 border border-slate-200 text-xs text-slate-700 space-y-2 leading-relaxed">
+          <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-900">
+            Participant Information and Instructions
+          </div>
+          <p>
+            This questionnaire aims to assess the use of Generative Artificial Intelligence (GenAI) tools and their association with cognitive offloading among medical doctors.
+          </p>
+          <p>
+            For this questionnaire, GenAI refers to tools that generate text in response to prompts, such as <strong>ChatGPT, Google Gemini, Microsoft Copilot and Claude</strong>.
+          </p>
+          <p>
+            Please answer all questions based on your <strong>work-related use during the past 3 months only</strong>. Do not include personal or entertainment use.
+          </p>
+          <p className="text-slate-600">
+            Do not enter or disclose patient names or identifiable information. Your responses will be kept confidential and used exclusively for research purposes.
+          </p>
+        </div>
+
         <form onSubmit={handleSubmit} className="space-y-8">
           
-          {/* SECTION B: CLINICAL AI USAGE */}
-          <div className="p-5 rounded bg-slate-50 border border-slate-200 space-y-4">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+          {/* ==================================================== */}
+          {/* SECTION I: RESPONDENT PROFILE */}
+          {/* ==================================================== */}
+          <div className="p-5 sm:p-6 rounded bg-slate-50/70 border border-slate-200 space-y-5">
+            <div className="pb-2 border-b border-slate-200 flex items-center justify-between">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 font-mono">
-                Section B: Generative AI Usage in Clinical Practice
+                Section I: Respondent Profile
               </h3>
+              <span className="text-[10px] font-mono text-slate-500">5 ITEMS</span>
             </div>
 
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-2">
-                  Have you used generative AI tools for clinical tasks during the last three months?
+            {/* Q1. Designation */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-800 mb-2">
+                1. Designation:
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                {DESIGNATION_OPTIONS.map(opt => (
+                  <label
+                    key={opt}
+                    className={`flex items-center gap-2.5 p-2.5 rounded border text-xs cursor-pointer transition-colors ${
+                      designation === opt
+                        ? 'bg-slate-900 text-white border-slate-900 font-semibold'
+                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="sec1-designation"
+                      checked={designation === opt}
+                      onChange={() => setDesignation(opt)}
+                      className="text-slate-900 focus:ring-slate-900"
+                    />
+                    <span>{opt}</span>
+                  </label>
+                ))}
+              </div>
+              {designation === 'Other' && (
+                <input
+                  type="text"
+                  value={designationOther}
+                  onChange={(e) => setDesignationOther(e.target.value)}
+                  placeholder="Specify designation..."
+                  className="mt-2 w-full sm:w-1/2 px-3 py-2 rounded border border-slate-300 text-xs text-slate-800 bg-white"
+                />
+              )}
+            </div>
+
+            {/* Q2. Specialty */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-800 mb-2">
+                2. Specialty:
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                {SPECIALTY_OPTIONS.map(opt => (
+                  <label
+                    key={opt}
+                    className={`flex items-center gap-2.5 p-2.5 rounded border text-xs cursor-pointer transition-colors ${
+                      specialty === opt
+                        ? 'bg-slate-900 text-white border-slate-900 font-semibold'
+                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="sec1-specialty"
+                      checked={specialty === opt}
+                      onChange={() => setSpecialty(opt)}
+                      className="text-slate-900 focus:ring-slate-900"
+                    />
+                    <span>{opt}</span>
+                  </label>
+                ))}
+              </div>
+              {specialty === 'Other' && (
+                <input
+                  type="text"
+                  value={specialtyOther}
+                  onChange={(e) => setSpecialtyOther(e.target.value)}
+                  placeholder="Specify specialty..."
+                  className="mt-2 w-full sm:w-1/2 px-3 py-2 rounded border border-slate-300 text-xs text-slate-800 bg-white"
+                />
+              )}
+            </div>
+
+            {/* Q3. Years since MBBS completion */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-800 mb-2">
+                3. Years since MBBS completion:
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {MBBS_BRACKETS.map(opt => (
+                  <label
+                    key={opt}
+                    className={`flex items-center gap-2 p-2.5 rounded border text-xs cursor-pointer transition-colors ${
+                      yearsSinceMbbsBracket === opt
+                        ? 'bg-slate-900 text-white border-slate-900 font-semibold'
+                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="sec1-mbbs"
+                      checked={yearsSinceMbbsBracket === opt}
+                      onChange={() => setYearsSinceMbbsBracket(opt)}
+                      className="text-slate-900 focus:ring-slate-900"
+                    />
+                    <span>{opt}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Q4. Type of hospital */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-800 mb-2">
+                4. Type of hospital:
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {HOSPITAL_TYPES.map(opt => (
+                  <label
+                    key={opt}
+                    className={`flex items-center gap-2 p-2.5 rounded border text-xs cursor-pointer transition-colors ${
+                      hospitalType === opt
+                        ? 'bg-slate-900 text-white border-slate-900 font-semibold'
+                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="sec1-hospital"
+                      checked={hospitalType === opt}
+                      onChange={() => setHospitalType(opt)}
+                      className="text-slate-900 focus:ring-slate-900"
+                    />
+                    <span>{opt}</span>
+                  </label>
+                ))}
+              </div>
+              {hospitalType === 'Other' && (
+                <input
+                  type="text"
+                  value={hospitalTypeOther}
+                  onChange={(e) => setHospitalTypeOther(e.target.value)}
+                  placeholder="Specify type of hospital..."
+                  className="mt-2 w-full sm:w-1/2 px-3 py-2 rounded border border-slate-300 text-xs text-slate-800 bg-white"
+                />
+              )}
+            </div>
+
+            {/* Q5. Formal training */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-800 mb-2">
+                5. Have you received any formal training regarding the use of GenAI in healthcare?
+              </label>
+              <div className="flex gap-6">
+                <label className="flex items-center gap-2 text-xs font-medium text-slate-800 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="sec1-training"
+                    checked={formalGenAiTraining === true}
+                    onChange={() => setFormalGenAiTraining(true)}
+                    className="text-slate-900 focus:ring-slate-900"
+                  />
+                  <span>Yes</span>
                 </label>
-                <div className="flex gap-6">
-                  <label className="flex items-center gap-2 text-xs text-slate-800 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="usedAiLast3Months"
-                      checked={usedAiLast3Months === true}
-                      onChange={() => setUsedAiLast3Months(true)}
-                      className="text-slate-900 focus:ring-slate-900"
-                    />
-                    <span>Yes</span>
+                <label className="flex items-center gap-2 text-xs font-medium text-slate-800 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="sec1-training"
+                    checked={formalGenAiTraining === false}
+                    onChange={() => setFormalGenAiTraining(false)}
+                    className="text-slate-900 focus:ring-slate-900"
+                  />
+                  <span>No</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          {/* ==================================================== */}
+          {/* SECTION II: GENAI EXPOSURE */}
+          {/* ==================================================== */}
+          <div className="p-5 sm:p-6 rounded bg-slate-50/70 border border-slate-200 space-y-6">
+            <div className="pb-2 border-b border-slate-200 flex items-center justify-between">
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 font-mono">
+                  Section II: GenAI Exposure
+                </h3>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Answer based on your work-related use during the past 3 months.
+                </p>
+              </div>
+              <span className="text-[10px] font-mono text-slate-500">12 ITEMS</span>
+            </div>
+
+            {/* Q1. Used GenAI in past 3 months */}
+            <div className="p-4 rounded bg-white border border-slate-200 space-y-2.5">
+              <label className="block text-xs font-semibold text-slate-900">
+                1. In the past 3 months, have you used any GenAI tool for a work-related clinical purpose?
+              </label>
+              <div className="flex gap-6">
+                <label className="flex items-center gap-2 text-xs font-medium text-slate-800 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="sec2-q1"
+                    checked={usedGenAiLast3Months === true}
+                    onChange={() => setUsedGenAiLast3Months(true)}
+                    className="text-slate-900 focus:ring-slate-900"
+                  />
+                  <span>Yes</span>
+                </label>
+                <label className="flex items-center gap-2 text-xs font-medium text-slate-800 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="sec2-q1"
+                    checked={usedGenAiLast3Months === false}
+                    onChange={() => setUsedGenAiLast3Months(false)}
+                    className="text-slate-900 focus:ring-slate-900"
+                  />
+                  <span>No</span>
+                </label>
+              </div>
+              <p className="text-[11px] text-slate-500 italic">
+                If No, skip to the clinical vignette section.
+              </p>
+            </div>
+
+            {!usedGenAiLast3Months ? (
+              <div className="p-4 rounded bg-amber-50/70 border border-amber-200 text-xs text-amber-950 leading-relaxed">
+                <strong>Skip Logic Applied:</strong> Because you selected <strong>No</strong> for Question 1, Questions 2–12 are skipped. Click below to proceed directly to the clinical vignette section.
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* Q2. First use duration */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-800 mb-2">
+                    2. How long ago did you first use GenAI for work-related purposes?
                   </label>
-                  <label className="flex items-center gap-2 text-xs text-slate-800 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="usedAiLast3Months"
-                      checked={usedAiLast3Months === false}
-                      onChange={() => setUsedAiLast3Months(false)}
-                      className="text-slate-900 focus:ring-slate-900"
-                    />
-                    <span>No</span>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {([
+                      'Less than 3 months',
+                      '3–6 months',
+                      '6–12 months',
+                      'More than 12 months'
+                    ] as GenAiFirstUseDuration[]).map(opt => (
+                      <button
+                        key={opt}
+                        type="button"
+                        onClick={() => setFirstUseDuration(opt)}
+                        className={`px-3 py-2 text-xs text-left rounded border transition-colors ${
+                          firstUseDuration === opt
+                            ? 'bg-slate-900 text-white border-slate-900 font-semibold'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                        }`}
+                      >
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Q3. Frequency of use during past 3 months */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-800 mb-2">
+                    3. Frequency of use during the past 3 months:
                   </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+                    {([
+                      'Less than once a week',
+                      '1–2 days per week',
+                      '3–5 days per week',
+                      'Daily',
+                      'Several times a day'
+                    ] as GenAiUsageFrequency[]).map(opt => (
+                      <button
+                        key={opt}
+                        type="button"
+                        onClick={() => setUsageFrequency(opt)}
+                        className={`px-3 py-2 text-xs text-left rounded border transition-colors ${
+                          usageFrequency === opt
+                            ? 'bg-slate-900 text-white border-slate-900 font-semibold'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                        }`}
+                      >
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Q4. Total time spent per day */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-800 mb-2">
+                    4. Total time spent per day when using GenAI for work:
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {([
+                      'Less than 10 minutes',
+                      '10–30 minutes',
+                      '31–60 minutes',
+                      'More than 60 minutes'
+                    ] as GenAiDailyDuration[]).map(opt => (
+                      <button
+                        key={opt}
+                        type="button"
+                        onClick={() => setDailyTimeSpent(opt)}
+                        className={`px-3 py-2 text-xs text-left rounded border transition-colors ${
+                          dailyTimeSpent === opt
+                            ? 'bg-slate-900 text-white border-slate-900 font-semibold'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                        }`}
+                      >
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Q5. Which GenAI tools */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-800 mb-2">
+                    5. Which GenAI tools have you used? (Select all that apply)
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {[
+                      'ChatGPT',
+                      'Google Gemini',
+                      'Microsoft Copilot',
+                      'Claude',
+                      'Perplexity',
+                      'Medical-specific AI tool',
+                      'Other'
+                    ].map(tool => (
+                      <button
+                        key={tool}
+                        type="button"
+                        onClick={() => toggleTool(tool)}
+                        className={`px-3 py-2 text-xs text-left rounded border transition-colors ${
+                          toolsUsed.includes(tool)
+                            ? 'bg-slate-900 text-white border-slate-900 font-semibold'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                        }`}
+                      >
+                        {tool}
+                      </button>
+                    ))}
+                  </div>
+
+                  {toolsUsed.includes('Medical-specific AI tool') && (
+                    <input
+                      type="text"
+                      value={medicalSpecificToolName}
+                      onChange={(e) => setMedicalSpecificToolName(e.target.value)}
+                      placeholder="Specify medical-specific AI tool (e.g., OpenEvidence, Glass Health)..."
+                      className="mt-2.5 w-full px-3 py-2 rounded border border-slate-300 text-xs text-slate-800 bg-white"
+                    />
+                  )}
+
+                  {toolsUsed.includes('Other') && (
+                    <input
+                      type="text"
+                      value={otherToolName}
+                      onChange={(e) => setOtherToolName(e.target.value)}
+                      placeholder="Specify other GenAI tool..."
+                      className="mt-2.5 w-full px-3 py-2 rounded border border-slate-300 text-xs text-slate-800 bg-white"
+                    />
+                  )}
+                </div>
+
+                {/* Q6. Access method */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-800 mb-2">
+                    6. How do you usually access GenAI tools for work?
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {([
+                      'Free public version',
+                      'Personal paid subscription',
+                      'Provided by my hospital/institution',
+                      'A combination of the above'
+                    ] as GenAiAccessMethod[]).map(opt => (
+                      <button
+                        key={opt}
+                        type="button"
+                        onClick={() => setAccessMethod(opt)}
+                        className={`px-3 py-2 text-xs text-left rounded border transition-colors ${
+                          accessMethod === opt
+                            ? 'bg-slate-900 text-white border-slate-900 font-semibold'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                        }`}
+                      >
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Q7. Entered patient-related information */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-800 mb-2">
+                    7. Have you entered patient-related information (even without patient name or identifiers) into a publicly available GenAI tool?
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {([
+                      'Never',
+                      'Once or twice',
+                      'Sometimes',
+                      'Often'
+                    ] as PatientInfoEntryFrequency[]).map(opt => (
+                      <button
+                        key={opt}
+                        type="button"
+                        onClick={() => setEnteredPatientInfo(opt)}
+                        className={`px-3 py-2 text-xs text-left rounded border transition-colors ${
+                          enteredPatientInfo === opt
+                            ? 'bg-slate-900 text-white border-slate-900 font-semibold'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                        }`}
+                      >
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Q8. Task Frequency Matrix */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-800 mb-2">
+                    8. During the past 3 months, how often have you used GenAI for each of the following work-related tasks?
+                  </label>
+                  <div className="bg-white rounded border border-slate-200 overflow-x-auto">
+                    <table className="w-full text-xs border-collapse">
+                      <thead>
+                        <tr className="border-b border-slate-200 bg-slate-50 text-slate-700">
+                          <th className="p-3 text-left font-semibold min-w-[210px]">Work-Related Task</th>
+                          {TASK_FREQ_OPTIONS.map(freq => (
+                            <th key={freq} className="p-2.5 text-center font-semibold whitespace-nowrap">
+                              {freq}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {TASK_ROWS.map(row => (
+                          <tr key={row.key} className="hover:bg-slate-50/60">
+                            <td className="p-3 text-slate-800 font-medium">
+                              <span className="font-mono text-slate-400 mr-1.5">{row.code}.</span>
+                              {row.label}
+                            </td>
+                            {TASK_FREQ_OPTIONS.map(freq => (
+                              <td key={freq} className="p-2 text-center">
+                                <input
+                                  type="radio"
+                                  name={`task-${row.key}`}
+                                  aria-label={`${row.label} - ${freq}`}
+                                  checked={taskFrequency[row.key] === freq}
+                                  onChange={() =>
+                                    setTaskFrequency(prev => ({ ...prev, [row.key]: freq }))
+                                  }
+                                  className="text-slate-900 focus:ring-slate-900 cursor-pointer"
+                                />
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Q9. Stage during clinical reasoning task */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-800 mb-2">
+                    9. At what stage during a clinical reasoning task do you most often consult GenAI?
+                  </label>
+                  <div className="space-y-1.5">
+                    {([
+                      'Before forming my own clinical assessment',
+                      'After my initial assessment, to cross-check my thinking',
+                      'When uncertain or unable to reach a conclusion',
+                      'After making a decision, primarily for documentation',
+                      'I do not use GenAI for clinical reasoning'
+                    ] as ClinicalReasoningConsultationStage[]).map(opt => (
+                      <label
+                        key={opt}
+                        className={`flex items-center gap-3 p-2.5 rounded border cursor-pointer text-xs transition-colors ${
+                          reasoningConsultationStage === opt
+                            ? 'bg-slate-900 text-white border-slate-900 font-semibold'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="sec2-q9"
+                          checked={reasoningConsultationStage === opt}
+                          onChange={() => setReasoningConsultationStage(opt)}
+                          className="text-slate-900 focus:ring-slate-900"
+                        />
+                        <span>{opt}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Q10. Last 10 clinical cases consulted count */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-xs font-semibold text-slate-800">
+                      10. Out of your last 10 clinical cases where you were deciding diagnosis, investigations, or management, in how many did you consult a GenAI tool?
+                    </label>
+                    <span className="font-mono text-xs font-bold text-slate-900 shrink-0 ml-3">
+                      {last10CasesConsultedCount} / 10
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-11 gap-1 sm:gap-1.5">
+                    {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(num => (
+                      <button
+                        key={num}
+                        type="button"
+                        onClick={() => setLast10CasesConsultedCount(num)}
+                        className={`py-2 rounded border text-xs font-mono font-bold transition-colors ${
+                          last10CasesConsultedCount === num
+                            ? 'bg-slate-900 text-white border-slate-900'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                        }`}
+                      >
+                        {num}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Q11. Verification frequency */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-800 mb-2">
+                    11. How often do you verify GenAI-generated answers against a clinical guideline, reference source, or qualified colleague?
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                    {TASK_FREQ_OPTIONS.map(opt => (
+                      <button
+                        key={opt}
+                        type="button"
+                        onClick={() => setVerificationFrequency(opt)}
+                        className={`px-3 py-2 text-xs text-center rounded border transition-colors ${
+                          verificationFrequency === opt
+                            ? 'bg-slate-900 text-white border-slate-900 font-semibold'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                        }`}
+                      >
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Q12. Institutional written policy */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-800 mb-2">
+                    12. Does your institution have a written policy regarding the use of GenAI in clinical work?
+                  </label>
+                  <div className="grid grid-cols-3 gap-2 sm:w-1/2">
+                    {(['Yes', 'No', 'Not sure'] as InstitutionalPolicyStatus[]).map(opt => (
+                      <button
+                        key={opt}
+                        type="button"
+                        onClick={() => setInstitutionalPolicy(opt)}
+                        className={`px-3 py-2 text-xs text-center rounded border transition-colors ${
+                          institutionalPolicy === opt
+                            ? 'bg-slate-900 text-white border-slate-900 font-semibold'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                        }`}
+                      >
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
-
-              {usedAiLast3Months && (
-                <>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                      Commonly utilized platforms (Select all that apply)
-                    </label>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                      {['ChatGPT (GPT-4o)', 'Gemini (Google)', 'Claude (Anthropic)', 'Perplexity Pro', 'Open-source LLMs', 'Copilot / Other'].map(tool => (
-                        <button
-                          key={tool}
-                          type="button"
-                          onClick={() => toggleTool(tool)}
-                          className={`px-3 py-2 text-xs text-left rounded border transition-colors ${
-                            aiToolsUsed.includes(tool)
-                              ? 'bg-slate-900 text-white border-slate-900 font-semibold'
-                              : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
-                          }`}
-                        >
-                          {tool}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                        Frequency of Clinical Use
-                      </label>
-                      <select
-                        value={aiFrequency}
-                        onChange={(e) => setAiFrequency(e.target.value)}
-                        className="w-full px-3 py-2 rounded border border-slate-300 text-xs text-slate-800 bg-white"
-                      >
-                        <option value="Multiple times daily">Multiple times daily</option>
-                        <option value="Daily">Daily</option>
-                        <option value="Several times weekly">Several times weekly</option>
-                        <option value="Weekly">Weekly</option>
-                        <option value="Rarely">Rarely</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                        Consultation Sequence
-                      </label>
-                      <select
-                        value={aiTiming}
-                        onChange={(e) => setAiTiming(e.target.value as any)}
-                        className="w-full px-3 py-2 rounded border border-slate-300 text-xs text-slate-800 bg-white"
-                      >
-                        <option value="before">Consult AI before independently formulating a diagnosis</option>
-                        <option value="after">Formulate clinical opinion independently, then consult AI</option>
-                        <option value="both">Both equally / depends on case urgency</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                      Primary Clinical Applications
-                    </label>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                      {[
-                        'Differential diagnosis formulation',
-                        'Clinical information retrieval',
-                        'Investigation interpretation',
-                        'Treatment protocol review',
-                        'Drug interaction checking',
-                        'Documentation drafting'
-                      ].map(purpose => (
-                        <button
-                          key={purpose}
-                          type="button"
-                          onClick={() => togglePurpose(purpose)}
-                          className={`px-3 py-2 text-xs text-left rounded border transition-colors ${
-                            primaryPurposes.includes(purpose)
-                              ? 'bg-slate-900 text-white border-slate-900 font-semibold'
-                              : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
-                          }`}
-                        >
-                          {purpose}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                        Verification Frequency of AI Outputs
-                      </label>
-                      <select
-                        value={verificationFrequency}
-                        onChange={(e) => setVerificationFrequency(e.target.value)}
-                        className="w-full px-3 py-2 rounded border border-slate-300 text-xs text-slate-800 bg-white"
-                      >
-                        <option value="Always">Always (100% of the time)</option>
-                        <option value="Often">Often (70–90%)</option>
-                        <option value="Sometimes">Sometimes (40–60%)</option>
-                        <option value="Rarely">Rarely (&lt; 30%)</option>
-                        <option value="Never">Never</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                        Clinical Complexity Preference
-                      </label>
-                      <select
-                        value={complexVsRoutine ? 'complex' : 'routine'}
-                        onChange={(e) => setComplexVsRoutine(e.target.value === 'complex')}
-                        className="w-full px-3 py-2 rounded border border-slate-300 text-xs text-slate-800 bg-white"
-                      >
-                        <option value="complex">Use AI more frequently for complex/atypical presentations</option>
-                        <option value="routine">Use AI more frequently for routine presentations</option>
-                      </select>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* SECTION C: COGNITIVE OFFLOADING */}
-          <div className="p-5 rounded bg-slate-50 border border-slate-200 space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-200">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 font-mono">
-                Section C: Cognitive Offloading Scale
-              </h3>
-              <span className="text-[10px] font-mono text-slate-500">1: Strongly Disagree · 5: Strongly Agree</span>
-            </div>
-
-            <div className="divide-y divide-slate-200/60">
-              {renderLikertRow(
-                1,
-                'I frequently depend on AI to formulate differential diagnoses.',
-                cogOffloading.dependDifferential,
-                (val) => setCogOffloading({ ...cogOffloading, dependDifferential: val })
-              )}
-              {renderLikertRow(
-                2,
-                'I use AI instead of independently recalling memorized clinical information.',
-                cogOffloading.substituteRecall,
-                (val) => setCogOffloading({ ...cogOffloading, substituteRecall: val })
-              )}
-              {renderLikertRow(
-                3,
-                'I rely on AI to interpret complex clinical findings.',
-                cogOffloading.interpretComplex,
-                (val) => setCogOffloading({ ...cogOffloading, interpretComplex: val })
-              )}
-              {renderLikertRow(
-                4,
-                'I sometimes transfer clinical reasoning tasks to AI rather than performing them independently.',
-                cogOffloading.transferReasoning,
-                (val) => setCogOffloading({ ...cogOffloading, transferReasoning: val })
-              )}
-              {renderLikertRow(
-                5,
-                'I consult AI before independently considering all possible diagnoses.',
-                cogOffloading.consultBeforeThinking,
-                (val) => setCogOffloading({ ...cogOffloading, consultBeforeThinking: val })
-              )}
-              {renderLikertRow(
-                6,
-                'I find AI useful for reducing my overall cognitive workload.',
-                cogOffloading.reduceWorkload,
-                (val) => setCogOffloading({ ...cogOffloading, reduceWorkload: val })
-              )}
-              {renderLikertRow(
-                7,
-                'I independently verify AI recommendations before applying them.',
-                cogOffloading.verifyBeforeUsing,
-                (val) => setCogOffloading({ ...cogOffloading, verifyBeforeUsing: val })
-              )}
-            </div>
-          </div>
-
-          {/* SECTION D: PERCEIVED COGNITIVE DESKILLING RISK */}
-          <div className="p-5 rounded bg-slate-50 border border-slate-200 space-y-3">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-200">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 font-mono">
-                Section D: Perceived Cognitive Deskilling Risk
-              </h3>
-              <span className="text-[10px] font-mono text-slate-500">1: Strongly Disagree · 5: Strongly Agree</span>
-            </div>
-
-            <div className="p-3 rounded bg-white border border-slate-200 text-[11px] text-slate-600 leading-relaxed">
-              <strong className="text-slate-800">Methodological Clarification: </strong>
-              These items measure subjective perceptions and concerns; they do not establish permanent cognitive decline or objective loss of clinical reasoning.
-            </div>
-
-            <div className="divide-y divide-slate-200/60">
-              {renderLikertRow(
-                1,
-                'My reliance on AI has reduced the effort I spend independently formulating differential diagnoses.',
-                perceivedDeskilling.reducedEffort,
-                (val) => setPerceivedDeskilling({ ...perceivedDeskilling, reducedEffort: val })
-              )}
-              {renderLikertRow(
-                2,
-                'I sometimes find it difficult to make clinical decisions without AI assistance.',
-                perceivedDeskilling.difficultWithoutAi,
-                (val) => setPerceivedDeskilling({ ...perceivedDeskilling, difficultWithoutAi: val })
-              )}
-              {renderLikertRow(
-                3,
-                'I feel less confident in independent clinical reasoning when AI is unavailable.',
-                perceivedDeskilling.lessConfidentIndependent,
-                (val) => setPerceivedDeskilling({ ...perceivedDeskilling, lessConfidentIndependent: val })
-              )}
-              {renderLikertRow(
-                4,
-                'I increasingly depend on AI to interpret investigations.',
-                perceivedDeskilling.dependInvestigations,
-                (val) => setPerceivedDeskilling({ ...perceivedDeskilling, dependInvestigations: val })
-              )}
-              {renderLikertRow(
-                5,
-                'I feel that frequent AI use may affect my ability to independently solve clinical problems.',
-                perceivedDeskilling.affectProblemSolving,
-                (val) => setPerceivedDeskilling({ ...perceivedDeskilling, affectProblemSolving: val })
-              )}
-              {renderLikertRow(
-                6,
-                'Compared with before using AI, how has your confidence in independent clinical reasoning changed?',
-                perceivedDeskilling.confidenceChange,
-                (val) => setPerceivedDeskilling({ ...perceivedDeskilling, confidenceChange: val }),
-                [
-                  'Significantly Decreased',
-                  'Decreased',
-                  'Unchanged / Neutral',
-                  'Increased',
-                  'Significantly Increased'
-                ]
-              )}
-            </div>
+            )}
           </div>
 
           {/* Navigation */}
@@ -483,7 +855,11 @@ export const Stage4Questionnaire: React.FC<Stage4QuestionnaireProps> = ({
               type="submit"
               className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded transition-colors shadow-2xs"
             >
-              <span>Submit Survey & Proceed</span>
+              <span>
+                {usedGenAiLast3Months
+                  ? 'Submit Questionnaire & Proceed to CDSS'
+                  : 'Skip to CDSS & Vignette Cases'}
+              </span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>

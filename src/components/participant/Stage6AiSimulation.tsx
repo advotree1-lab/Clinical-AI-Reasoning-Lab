@@ -1,20 +1,38 @@
-import React, { useState } from 'react';
-import {
-  Lock,
-  ArrowRight
-} from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { ArrowLeft, ArrowRight, Bot, CornerDownRight, Check } from 'lucide-react';
 import {
   ClinicalCase,
   Participant,
   AiInteractionRecord,
-  AiAgreementLevel
+  AiAgreementLevel,
+  CdssFollowUpSuggestion
 } from '../../types';
+import { ClinicalImageGallery } from '../common/ClinicalImageGallery';
 
 interface Stage6AiSimulationProps {
   cases: ClinicalCase[];
   participant: Participant;
   onComplete: (records: AiInteractionRecord[]) => void;
   isDemoMode: boolean;
+}
+
+interface ChatMessage {
+  id: string;
+  sender: 'cdss' | 'user';
+  type: 'initial_stimulus' | 'text';
+  text?: string;
+  timestamp: string;
+}
+
+interface CaseEvaluationState {
+  aiAgreement: AiAgreementLevel;
+  finalDiagnosis: string;
+  customOtherFinal: string;
+  switchedAfterCdss: boolean;
+  reasonForDecision: string;
+  finalConfidence: number;
+  willVerify: boolean;
+  verificationTargets: string;
 }
 
 export const Stage6AiSimulation: React.FC<Stage6AiSimulationProps> = ({
@@ -25,648 +43,789 @@ export const Stage6AiSimulation: React.FC<Stage6AiSimulationProps> = ({
 }) => {
   const [currentCaseIndex, setCurrentCaseIndex] = useState(0);
 
-  // Per-case interaction state
-  const [initialDiagnosis, setInitialDiagnosis] = useState('');
-  const [customOtherInitial, setCustomOtherInitial] = useState('');
-  const [initialJustification, setInitialJustification] = useState('');
-  const [initialConfidence, setInitialConfidence] = useState(3);
-  const [isLocked, setIsLocked] = useState(false);
-  const [lockedTimestamp, setLockedTimestamp] = useState<string | null>(null);
-
-  // Post-AI state
-  const [aiAgreement, setAiAgreement] = useState<AiAgreementLevel>('Completely agree');
-  const [finalDiagnosis, setFinalDiagnosis] = useState('');
-  const [customOtherFinal, setCustomOtherFinal] = useState('');
-  const [reasonForDecision, setReasonForDecision] = useState('');
-  const [finalConfidence, setFinalConfidence] = useState(3);
-  const [willVerify, setWillVerify] = useState<boolean>(true);
-  const [verificationTargets, setVerificationTargets] = useState('');
-
-  const [completedRecords, setCompletedRecords] = useState<AiInteractionRecord[]>([]);
+  // Per-case state so users can jump freely across all cases without losing entries or chat history
+  const [evaluations, setEvaluations] = useState<Record<string, CaseEvaluationState>>({});
+  const [askedByCase, setAskedByCase] = useState<Record<string, string[]>>({});
+  const [chatByCase, setChatByCase] = useState<Record<string, ChatMessage[]>>({});
+  const [isTyping, setIsTyping] = useState<boolean>(false);
+  const chatEndRef = useRef<HTMLDivElement | null>(null);
 
   const currentCase = cases[currentCaseIndex];
   const stimulus = currentCase.aiStimulus!;
+  const followUpSuggestions: CdssFollowUpSuggestion[] = stimulus.followUpSuggestions || [
+    {
+      id: 'followup_1',
+      promptLabel: 'Explain key diagnostic reasoning',
+      responseText: stimulus.clinicalReasoning
+    },
+    {
+      id: 'followup_2',
+      promptLabel: 'Summarize immediate management plan',
+      responseText: stimulus.recommendation
+    }
+  ];
 
-  React.useEffect(() => {
-    setInitialDiagnosis(currentCase.mcqOptions[0]);
-    setCustomOtherInitial('');
-    setInitialJustification('');
-    setInitialConfidence(3);
-    setIsLocked(false);
-    setLockedTimestamp(null);
-
-    setAiAgreement('Completely agree');
-    setFinalDiagnosis(currentCase.mcqOptions[0]);
-    setCustomOtherFinal('');
-    setReasonForDecision('');
-    setFinalConfidence(3);
-    setWillVerify(true);
-    setVerificationTargets('');
-  }, [currentCaseIndex, currentCase]);
-
-  const handleCommitAndLock = () => {
-    const isOther = initialDiagnosis === 'Other';
-    if (isOther && !customOtherInitial.trim()) return;
-    if (!initialJustification.trim()) return;
-
-    setIsLocked(true);
-    setLockedTimestamp(new Date().toLocaleTimeString());
-    const actualInitial = isOther ? customOtherInitial.trim() : initialDiagnosis;
-    setFinalDiagnosis(actualInitial);
+  const currentEval: CaseEvaluationState = evaluations[currentCase.id] || {
+    aiAgreement: 'Completely agree',
+    finalDiagnosis: currentCase.mcqOptions[0],
+    customOtherFinal: '',
+    switchedAfterCdss: false,
+    reasonForDecision: '',
+    finalConfidence: 3,
+    willVerify: true,
+    verificationTargets: ''
   };
 
-  const isPostAiValid = () => {
-    const isOther = finalDiagnosis === 'Other';
-    if (isOther && !customOtherFinal.trim()) return false;
-    if (!reasonForDecision.trim()) return false;
-    if (willVerify && !verificationTargets.trim()) return false;
-    return true;
+  const updateCurrentEval = <K extends keyof CaseEvaluationState>(
+    field: K,
+    value: CaseEvaluationState[K]
+  ) => {
+    setEvaluations(prev => ({
+      ...prev,
+      [currentCase.id]: {
+        ...(prev[currentCase.id] || currentEval),
+        [field]: value
+      }
+    }));
   };
 
-  const handleSaveAndNext = () => {
-    if (!isPostAiValid()) return;
+  const currentAskedIds = askedByCase[currentCase.id] || [];
+  const currentChatMessages: ChatMessage[] = chatByCase[currentCase.id] || [
+    {
+      id: `init-${currentCase.id}`,
+      sender: 'cdss',
+      type: 'initial_stimulus',
+      timestamp: 'Initial Assessment'
+    }
+  ];
 
-    const actualInitial = initialDiagnosis === 'Other' ? customOtherInitial.trim() : initialDiagnosis;
-    const actualFinal = finalDiagnosis === 'Other' ? customOtherFinal.trim() : finalDiagnosis;
+  useEffect(() => {
+    setIsTyping(false);
+  }, [currentCaseIndex]);
 
-    const switched = actualInitial !== actualFinal;
-    const isMisleading = stimulus.isMisleading;
+  useEffect(() => {
+    if (currentChatMessages.length > 1 || isTyping) {
+      chatEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [currentChatMessages.length, isTyping]);
 
-    const switchedTowardsCorrect = switched && !isMisleading && actualFinal === currentCase.goldStandardDiagnosis;
-    const acceptedMisleading = isMisleading && (
-      aiAgreement === 'Completely agree' ||
-      aiAgreement === 'Partially agree' ||
-      actualFinal === stimulus.diagnosis
-    );
+  const handleSelectSuggestion = (suggestion: CdssFollowUpSuggestion) => {
+    if (currentAskedIds.includes(suggestion.id) || isTyping) return;
+    const caseId = currentCase.id;
 
-    const record: AiInteractionRecord = {
-      id: `ai-sim-${participant.id}-${currentCase.id}`,
-      participantId: participant.id,
-      caseId: currentCase.id,
-      isDemo: isDemoMode,
-      initialDiagnosis: actualInitial,
-      initialJustification: initialJustification.trim(),
-      initialConfidence,
-      initialSubmittedAt: lockedTimestamp || new Date().toISOString(),
-      aiAgreement,
-      finalDiagnosis: actualFinal,
-      reasonForDecision: reasonForDecision.trim(),
-      finalConfidence,
-      willVerify,
-      verificationTargets: willVerify ? verificationTargets.trim() : 'No verification indicated',
-      switchedDiagnosis: switched,
-      switchedTowardsCorrect,
-      acceptedMisleading,
-      timeSpentSeconds: 120,
-      completedAt: new Date().toISOString()
-    };
+    setAskedByCase(prev => ({
+      ...prev,
+      [caseId]: [...(prev[caseId] || []), suggestion.id]
+    }));
 
-    const updated = [...completedRecords, record];
-    setCompletedRecords(updated);
+    setChatByCase(prev => {
+      const existing = prev[caseId] || [
+        {
+          id: `init-${caseId}`,
+          sender: 'cdss' as const,
+          type: 'initial_stimulus' as const,
+          timestamp: 'Initial Assessment'
+        }
+      ];
+      return {
+        ...prev,
+        [caseId]: [
+          ...existing,
+          {
+            id: `user-${suggestion.id}`,
+            sender: 'user',
+            type: 'text',
+            text: suggestion.promptLabel,
+            timestamp: 'Clinician'
+          }
+        ]
+      };
+    });
 
+    setIsTyping(true);
+    window.setTimeout(() => {
+      setChatByCase(prev => {
+        const existing = prev[caseId] || [];
+        return {
+          ...prev,
+          [caseId]: [
+            ...existing,
+            {
+              id: `cdss-${suggestion.id}`,
+              sender: 'cdss',
+              type: 'text',
+              text: suggestion.responseText,
+              timestamp: 'CDSS Reply'
+            }
+          ]
+        };
+      });
+      setIsTyping(false);
+    }, 320);
+  };
+
+  const isCaseStartedOrFilled = (c: ClinicalCase) => {
+    const ev = evaluations[c.id];
+    return Boolean(ev && ev.reasonForDecision.trim());
+  };
+
+  const handleSelectCase = (idx: number) => {
+    setCurrentCaseIndex(idx);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleCompleteStage = () => {
+    const records: AiInteractionRecord[] = cases.map(c => {
+      const stim = c.aiStimulus!;
+      const ev = evaluations[c.id] || {
+        aiAgreement: 'Completely agree' as AiAgreementLevel,
+        finalDiagnosis: c.mcqOptions[0],
+        customOtherFinal: '',
+        switchedAfterCdss: false,
+        reasonForDecision: '',
+        finalConfidence: 3,
+        willVerify: true,
+        verificationTargets: ''
+      };
+
+      const actualFinal =
+        ev.finalDiagnosis === 'Other' && ev.customOtherFinal.trim()
+          ? ev.customOtherFinal.trim()
+          : ev.finalDiagnosis;
+
+      const isMisleading = stim.isMisleading;
+      const switchedTowardsCorrect =
+        ev.switchedAfterCdss && !isMisleading && actualFinal === c.goldStandardDiagnosis;
+
+      const acceptedMisleading =
+        isMisleading &&
+        (ev.aiAgreement === 'Completely agree' ||
+          ev.aiAgreement === 'Partially agree' ||
+          actualFinal === stim.diagnosis);
+
+      const rationaleText = ev.reasonForDecision.trim() || 'Reviewed in prototype walkthrough';
+
+      return {
+        id: `ai-sim-${participant.id}-${c.id}`,
+        participantId: participant.id,
+        caseId: c.id,
+        isDemo: isDemoMode,
+        initialDiagnosis: ev.switchedAfterCdss
+          ? 'Modified after reviewing CDSS suggestion'
+          : actualFinal,
+        initialJustification: rationaleText,
+        initialConfidence: ev.finalConfidence,
+        initialSubmittedAt: new Date().toISOString(),
+        aiAgreement: ev.aiAgreement,
+        finalDiagnosis: actualFinal,
+        reasonForDecision: rationaleText,
+        finalConfidence: ev.finalConfidence,
+        willVerify: ev.willVerify,
+        verificationTargets: ev.willVerify
+          ? ev.verificationTargets.trim() || 'Standard clinical guideline verification'
+          : 'No verification indicated',
+        switchedDiagnosis: ev.switchedAfterCdss,
+        switchedTowardsCorrect,
+        acceptedMisleading,
+        timeSpentSeconds: 120,
+        completedAt: new Date().toISOString()
+      };
+    });
+
+    onComplete(records);
+  };
+
+  const handleNextOrFinish = () => {
     if (currentCaseIndex < cases.length - 1) {
-      setCurrentCaseIndex(currentCaseIndex + 1);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      handleSelectCase(currentCaseIndex + 1);
     } else {
-      onComplete(updated);
+      handleCompleteStage();
     }
   };
 
   return (
-    <div className="max-w-4xl mx-auto py-10 px-4 sm:px-6">
-      <div className="bg-white rounded-lg border border-slate-200/90 p-8 sm:p-10 shadow-2xs">
+    <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6">
+      <div className="bg-white rounded-lg border border-slate-200/90 p-6 sm:p-8 shadow-2xs">
         
         {/* Stage Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-4 border-b border-slate-200/80 gap-3">
           <div>
             <div className="flex items-center gap-2 text-xs font-mono text-slate-500 mb-1">
-              <span>STAGE 06 / 08</span>
+              <span>STAGE 05 / 07</span>
               <span aria-hidden="true">·</span>
-              <span>AI CLINICAL ASSISTANT SIMULATION</span>
+              <span>CDSS</span>
             </div>
             <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
-              Simulation Vignette {currentCaseIndex + 1} of {cases.length}: {currentCase.domain}
+              CDSS Case {currentCaseIndex + 1} of {cases.length}: {currentCase.domain}
             </h2>
           </div>
 
-          {/* Stepper */}
-          <div className="flex items-center gap-1">
+          {/* Unrestricted Clickable Case Stepper */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 mr-1">
+              Cases:
+            </span>
             {cases.map((c, i) => (
-              <div
+              <button
                 key={c.id}
-                className={`w-7 h-7 rounded text-xs font-mono font-bold flex items-center justify-center ${
+                type="button"
+                onClick={() => handleSelectCase(i)}
+                title={`Jump to Case ${i + 1}: ${c.domain}`}
+                className={`w-8 h-8 rounded text-xs font-mono font-bold flex items-center justify-center transition-colors cursor-pointer ${
                   i === currentCaseIndex
                     ? 'bg-slate-900 text-white'
-                    : i < currentCaseIndex
-                    ? 'bg-slate-100 text-slate-800 border border-slate-300'
-                    : 'bg-slate-50 text-slate-400 border border-slate-200'
+                    : isCaseStartedOrFilled(c)
+                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-300 hover:bg-emerald-100'
+                    : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-100'
                 }`}
               >
                 {i + 1}
-              </div>
+              </button>
             ))}
           </div>
         </div>
 
-        {/* Clinical Presentation Panel */}
-        <div className="mt-6 p-5 rounded bg-slate-50 border border-slate-200 space-y-4">
-          <div>
-            <span className="text-[10px] font-mono uppercase tracking-wider text-slate-500 block mb-1">
-              Clinical Vignette Presentation
-            </span>
-            <p className="text-sm font-semibold text-slate-900 leading-relaxed">
-              {currentCase.presentation}
-            </p>
+        {/* SIDE-BY-SIDE: CLINICAL CASE (LEFT) + INTERACTIVE CDSS CHATBOT (RIGHT) */}
+        <div className="mt-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          
+          {/* Left Column: Clinical Case Details */}
+          <div className="lg:col-span-7 p-5 rounded bg-slate-50 border border-slate-200 space-y-4">
+            <div className="pb-2 border-b border-slate-200 flex items-center justify-between">
+              <span className="font-mono text-xs font-bold uppercase tracking-wider text-slate-900">
+                Clinical Case · {currentCase.title}
+              </span>
+              <span className="font-mono text-[10px] text-slate-500 uppercase">
+                {currentCase.domain}
+              </span>
+            </div>
+
+            <div>
+              <span className="text-[10px] font-mono uppercase tracking-wider text-slate-500 block mb-1">
+                Clinical Presentation
+              </span>
+              <p className="text-sm font-semibold text-slate-900 leading-relaxed">
+                {currentCase.presentation}
+              </p>
+            </div>
+
+            <div>
+              <span className="text-[10px] font-mono uppercase tracking-wider text-slate-500 block mb-1">
+                Medical &amp; Drug History
+              </span>
+              <p className="text-xs text-slate-700 leading-relaxed">
+                {currentCase.medicalHistory}
+              </p>
+            </div>
+
+            {/* Vitals */}
+            <div>
+              <span className="text-[10px] font-mono uppercase tracking-wider text-slate-500 block mb-1.5">
+                Triage Vitals
+              </span>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs font-mono">
+                <div className="bg-white p-2 rounded border border-slate-200">
+                  <div className="text-[10px] text-slate-500 uppercase font-sans">Heart Rate</div>
+                  <div className="font-bold text-slate-900 tabular-nums">{currentCase.vitals.heartRate}</div>
+                </div>
+                <div className="bg-white p-2 rounded border border-slate-200">
+                  <div className="text-[10px] text-slate-500 uppercase font-sans">Blood Pressure</div>
+                  <div className="font-bold text-slate-900 tabular-nums">{currentCase.vitals.bloodPressure}</div>
+                </div>
+                <div className="bg-white p-2 rounded border border-slate-200">
+                  <div className="text-[10px] text-slate-500 uppercase font-sans">Resp. Rate</div>
+                  <div className="font-bold text-slate-900 tabular-nums">{currentCase.vitals.respiratoryRate}</div>
+                </div>
+                <div className="bg-white p-2 rounded border border-slate-200">
+                  <div className="text-[10px] text-slate-500 uppercase font-sans">SpO2</div>
+                  <div className="font-bold text-slate-900 tabular-nums">{currentCase.vitals.spO2}</div>
+                </div>
+                <div className="bg-white p-2 rounded border border-slate-200 col-span-2 sm:col-span-1">
+                  <div className="text-[10px] text-slate-500 uppercase font-sans">Temperature</div>
+                  <div className="font-bold text-slate-900 tabular-nums">{currentCase.vitals.temperature}</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Physical Exam */}
+            <div>
+              <span className="text-[10px] font-mono uppercase tracking-wider text-slate-500 block mb-1">
+                Physical Examination
+              </span>
+              <p className="text-xs text-slate-700 leading-relaxed">
+                {currentCase.physicalExamination}
+              </p>
+            </div>
+
+            {/* Investigations */}
+            <div>
+              <span className="text-[10px] font-mono uppercase tracking-wider text-slate-500 block mb-2">
+                Investigations
+              </span>
+              <div className="space-y-1">
+                {currentCase.investigations.map((inv, idx) => (
+                  <div
+                    key={idx}
+                    className="flex flex-col sm:flex-row sm:items-center justify-between p-2 rounded bg-white border border-slate-200 text-xs gap-1"
+                  >
+                    <span className="font-medium text-slate-800">{inv.name}</span>
+                    <span className={`font-mono tabular-nums ${inv.isAbnormal ? 'text-slate-900 font-semibold' : 'text-slate-600'}`}>
+                      {inv.result}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Attached Clinical Imaging / ECG */}
+            <ClinicalImageGallery images={currentCase.clinicalImages} />
           </div>
 
-          <div>
-            <span className="text-[10px] font-mono uppercase tracking-wider text-slate-500 block mb-1">
-              Medical & Drug History
-            </span>
-            <p className="text-xs text-slate-700 leading-relaxed">
-              {currentCase.medicalHistory}
-            </p>
-          </div>
+          {/* Right Column: Interactive CDSS Chatbot Beside Case */}
+          <div className="lg:col-span-5 lg:sticky lg:top-20 rounded-lg border border-slate-300 bg-white shadow-2xs overflow-hidden flex flex-col">
+            {/* Chatbot Header */}
+            <div className="px-4 py-3 bg-slate-900 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-7 h-7 rounded bg-slate-800 border border-slate-700 flex items-center justify-center">
+                  <Bot className="w-4 h-4 text-emerald-400" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold tracking-wide font-mono">
+                    CDSS CLINICAL ASSISTANT
+                  </div>
+                  <div className="text-[10px] text-slate-400 font-mono">
+                    Standardized Decision Support · REF #CDSS-0{currentCase.caseNumber}
+                  </div>
+                </div>
+              </div>
+              <span className="text-[10px] font-mono text-emerald-300 bg-slate-800 px-2 py-0.5 rounded border border-slate-700">
+                ACTIVE
+              </span>
+            </div>
 
-          {/* Vitals */}
-          <div>
-            <span className="text-[10px] font-mono uppercase tracking-wider text-slate-500 block mb-1.5">
-              Admission Triage Vitals
-            </span>
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs font-mono">
-              <div className="bg-white p-2 rounded border border-slate-200">
-                <div className="text-[10px] text-slate-500 uppercase font-sans">Heart Rate</div>
-                <div className="font-bold text-slate-900 tabular-nums">{currentCase.vitals.heartRate}</div>
+            {/* Chatbot Messages Feed */}
+            <div className="p-4 bg-slate-50/80 space-y-3.5 max-h-[470px] overflow-y-auto">
+              {currentChatMessages.map((msg) => {
+                if (msg.sender === 'user') {
+                  return (
+                    <div key={msg.id} className="flex justify-end">
+                      <div className="max-w-[85%] rounded-lg rounded-tr-xs bg-slate-900 text-white px-3.5 py-2.5 shadow-2xs">
+                        <div className="text-[10px] font-mono text-slate-400 mb-0.5 text-right">
+                          You
+                        </div>
+                        <p className="text-xs leading-relaxed font-medium">
+                          {msg.text}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                }
+
+                if (msg.type === 'initial_stimulus') {
+                  return (
+                    <div key={msg.id} className="flex items-start gap-2.5">
+                      <div className="w-6 h-6 rounded bg-slate-900 text-white flex items-center justify-center shrink-0 mt-0.5">
+                        <Bot className="w-3.5 h-3.5 text-emerald-400" />
+                      </div>
+                      <div className="flex-1 rounded-lg rounded-tl-xs bg-white border border-slate-200 p-3.5 shadow-2xs space-y-2.5">
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+                          <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-700">
+                            CDSS · Initial Case Impression
+                          </span>
+                          <span className="text-[10px] font-mono text-slate-400">
+                            {msg.timestamp}
+                          </span>
+                        </div>
+
+                        <div>
+                          <span className="text-[10px] font-mono uppercase tracking-wider text-slate-500 block mb-0.5">
+                            Suggested Primary Diagnosis
+                          </span>
+                          <p className="text-xs sm:text-sm font-bold text-slate-900 leading-snug">
+                            {stimulus.diagnosis}
+                          </p>
+                        </div>
+
+                        <div>
+                          <span className="text-[10px] font-mono uppercase tracking-wider text-slate-500 block mb-0.5">
+                            Recommended Action
+                          </span>
+                          <p className="text-xs text-slate-800 leading-relaxed">
+                            {stimulus.recommendation}
+                          </p>
+                        </div>
+
+                        <div className="pt-1 border-t border-slate-100">
+                          <span className="text-[10px] font-mono uppercase tracking-wider text-slate-500 block mb-0.5">
+                            Clinical Rationale
+                          </span>
+                          <p className="text-xs text-slate-600 leading-relaxed">
+                            {stimulus.clinicalReasoning}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div key={msg.id} className="flex items-start gap-2.5">
+                    <div className="w-6 h-6 rounded bg-slate-900 text-white flex items-center justify-center shrink-0 mt-0.5">
+                      <Bot className="w-3.5 h-3.5 text-emerald-400" />
+                    </div>
+                    <div className="flex-1 rounded-lg rounded-tl-xs bg-white border border-slate-200 p-3 shadow-2xs">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-700">
+                          CDSS · Follow-Up
+                        </span>
+                        <span className="text-[10px] font-mono text-slate-400">
+                          {msg.timestamp}
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-800 leading-relaxed">
+                        {msg.text}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {isTyping && (
+                <div className="flex items-start gap-2.5">
+                  <div className="w-6 h-6 rounded bg-slate-900 text-white flex items-center justify-center shrink-0 mt-0.5">
+                    <Bot className="w-3.5 h-3.5 text-emerald-400" />
+                  </div>
+                  <div className="rounded-lg rounded-tl-xs bg-white border border-slate-200 px-3.5 py-2.5 text-xs text-slate-500 font-mono">
+                    CDSS reviewing case parameters...
+                  </div>
+                </div>
+              )}
+
+              <div ref={chatEndRef} />
+            </div>
+
+            {/* Interactive Two-Suggestion Prompt Bar */}
+            <div className="p-3.5 bg-white border-t border-slate-200 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-500">
+                  Suggested Follow-Up Questions ({2 - currentAskedIds.length} remaining)
+                </span>
               </div>
-              <div className="bg-white p-2 rounded border border-slate-200">
-                <div className="text-[10px] text-slate-500 uppercase font-sans">Blood Pressure</div>
-                <div className="font-bold text-slate-900 tabular-nums">{currentCase.vitals.bloodPressure}</div>
+
+              <div className="space-y-1.5">
+                {followUpSuggestions.slice(0, 2).map((suggestion) => {
+                  const isAsked = currentAskedIds.includes(suggestion.id);
+                  return (
+                    <button
+                      key={suggestion.id}
+                      type="button"
+                      disabled={isAsked || isTyping}
+                      onClick={() => handleSelectSuggestion(suggestion)}
+                      className={`w-full text-left px-3 py-2 rounded border text-xs transition-colors flex items-center justify-between gap-2 ${
+                        isAsked
+                          ? 'bg-slate-50 border-slate-200 text-slate-400 cursor-default'
+                          : 'bg-white border-slate-300 hover:border-slate-900 hover:bg-slate-50 text-slate-800 font-medium cursor-pointer shadow-2xs'
+                      }`}
+                    >
+                      <span className="flex items-center gap-2">
+                        {isAsked ? (
+                          <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        ) : (
+                          <CornerDownRight className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                        )}
+                        <span>{suggestion.promptLabel}</span>
+                      </span>
+                      {isAsked && (
+                        <span className="text-[10px] font-mono uppercase text-slate-400 shrink-0">
+                          Asked
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
-              <div className="bg-white p-2 rounded border border-slate-200">
-                <div className="text-[10px] text-slate-500 uppercase font-sans">Resp. Rate</div>
-                <div className="font-bold text-slate-900 tabular-nums">{currentCase.vitals.respiratoryRate}</div>
-              </div>
-              <div className="bg-white p-2 rounded border border-slate-200">
-                <div className="text-[10px] text-slate-500 uppercase font-sans">SpO2</div>
-                <div className="font-bold text-slate-900 tabular-nums">{currentCase.vitals.spO2}</div>
-              </div>
-              <div className="bg-white p-2 rounded border border-slate-200 col-span-2 sm:col-span-1">
-                <div className="text-[10px] text-slate-500 uppercase font-sans">Temperature</div>
-                <div className="font-bold text-slate-900 tabular-nums">{currentCase.vitals.temperature}</div>
+
+              <div className="pt-1 text-[10px] font-mono text-slate-400">
+                Standardized CDSS interface · Responses are identical for all participants.
               </div>
             </div>
           </div>
 
-          {/* Physical Exam */}
-          <div>
-            <span className="text-[10px] font-mono uppercase tracking-wider text-slate-500 block mb-1">
-              Physical Examination
-            </span>
-            <p className="text-xs text-slate-700 leading-relaxed">
-              {currentCase.physicalExamination}
-            </p>
+        </div>
+
+        {/* CLINICIAN DECISION & CDSS EVALUATION */}
+        <div className="mt-6 p-6 rounded border border-slate-200 bg-white space-y-6">
+          <div className="border-b border-slate-200 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <h3 className="text-sm font-bold uppercase tracking-wider text-slate-900 font-mono">
+                Clinical Decision &amp; CDSS Evaluation
+              </h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Record your agreement with the CDSS output, your final working diagnosis, and verification plan. You may navigate freely across all cases.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setEvaluations(prev => ({
+                  ...prev,
+                  [currentCase.id]: stimulus.isMisleading
+                    ? {
+                        aiAgreement: 'Uncertain; requires verification',
+                        finalDiagnosis: currentCase.goldStandardDiagnosis,
+                        customOtherFinal: '',
+                        switchedAfterCdss: false,
+                        reasonForDecision:
+                          'Identified inconsistency in CDSS suggestion: advice conflicts with clinical findings, patient hemodynamics, or contraindications.',
+                        finalConfidence: 4,
+                        willVerify: true,
+                        verificationTargets:
+                          'Cross-check clinical practice guidelines, consult senior colleague, and obtain confirmatory testing.'
+                      }
+                    : {
+                        aiAgreement: 'Completely agree',
+                        finalDiagnosis: currentCase.goldStandardDiagnosis,
+                        customOtherFinal: '',
+                        switchedAfterCdss: false,
+                        reasonForDecision:
+                          'CDSS suggestion aligns with established evidence-based clinical protocols and patient presentation.',
+                        finalConfidence: 5,
+                        willVerify: true,
+                        verificationTargets:
+                          'Verify drug dosing, renal adjustment, and confirmatory monitoring.'
+                      }
+                }));
+              }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded transition-colors shrink-0 self-start sm:self-auto"
+              title="Fill realistic CDSS evaluation for this case"
+            >
+              <span>⚡ Auto-Fill CDSS Evaluation</span>
+            </button>
           </div>
 
-          {/* Investigations */}
+          {/* 1. Agreement with CDSS */}
           <div>
-            <span className="text-[10px] font-mono uppercase tracking-wider text-slate-500 block mb-2">
-              Laboratory & Bedside Investigations
-            </span>
-            <div className="space-y-1">
-              {currentCase.investigations.map((inv, idx) => (
-                <div
-                  key={idx}
-                  className="flex flex-col sm:flex-row sm:items-center justify-between p-2 rounded bg-white border border-slate-200 text-xs gap-1"
+            <label className="block text-xs font-semibold text-slate-800 uppercase tracking-wider mb-2 font-mono">
+              1. Agreement with CDSS Suggestion
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+              {[
+                'Completely agree',
+                'Partially agree',
+                'Disagree',
+                'Uncertain; requires verification'
+              ].map((level) => (
+                <button
+                  key={level}
+                  type="button"
+                  onClick={() => updateCurrentEval('aiAgreement', level as AiAgreementLevel)}
+                  className={`p-2.5 text-left rounded border text-xs font-medium transition-colors ${
+                    currentEval.aiAgreement === level
+                      ? 'border-slate-900 bg-slate-900 text-white font-semibold'
+                      : 'border-slate-200 hover:bg-slate-50 text-slate-700'
+                  }`}
                 >
-                  <span className="font-medium text-slate-800">{inv.name}</span>
-                  <span className={`font-mono tabular-nums ${inv.isAbnormal ? 'text-slate-900 font-semibold' : 'text-slate-600'}`}>
-                    {inv.result}
-                  </span>
-                </div>
+                  {level}
+                </button>
               ))}
             </div>
           </div>
-        </div>
 
-        {/* STEP 1: INITIAL CLINICAL COMMITMENT */}
-        <div className={`mt-6 p-6 rounded border transition-colors ${
-          isLocked
-            ? 'bg-slate-50/70 border-slate-300'
-            : 'bg-white border-slate-200'
-        }`}>
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-200 mb-4 gap-2">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-900 font-mono">
-                  Step 1: Independent Initial Commitment
-                </span>
-                {isLocked && (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-mono text-slate-900 bg-slate-200 px-2 py-0.5 rounded font-semibold">
-                    <Lock className="w-3 h-3" />
-                    PERMANENTLY LOCKED · {lockedTimestamp}
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Commit your independent diagnosis prior to unmasking the standardized AI consultation.
-              </p>
+          {/* 2. Final Working Diagnosis */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-800 uppercase tracking-wider mb-2 font-mono">
+              2. Final Working Diagnosis
+            </label>
+            <div className="space-y-1.5">
+              {currentCase.mcqOptions.map(opt => (
+                <label
+                  key={opt}
+                  className={`flex items-center gap-3 p-2.5 rounded border cursor-pointer text-xs ${
+                    currentEval.finalDiagnosis === opt
+                      ? 'border-slate-900 bg-slate-50 font-semibold text-slate-900'
+                      : 'border-slate-200 hover:bg-slate-50 text-slate-700'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name={`final-mcq-${currentCase.id}`}
+                    checked={currentEval.finalDiagnosis === opt}
+                    onChange={() => updateCurrentEval('finalDiagnosis', opt)}
+                    className="text-slate-900 focus:ring-slate-900"
+                  />
+                  <span>{opt}</span>
+                </label>
+              ))}
             </div>
 
-            {!isLocked && (
-              <button
-                type="button"
-                onClick={() => {
-                  setInitialDiagnosis(currentCase.goldStandardDiagnosis);
-                  setInitialJustification(`Initial formulation based on history, abnormal triage vitals (${currentCase.vitals.bloodPressure}, ${currentCase.vitals.heartRate}), and laboratory findings.`);
-                  setInitialConfidence(4);
-                  setIsLocked(true);
-                  setLockedTimestamp(new Date().toLocaleTimeString());
-                  setFinalDiagnosis(currentCase.goldStandardDiagnosis);
-                }}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded transition-colors shrink-0 self-start sm:self-auto"
-                title="Fill initial clinical reasoning and lock"
-              >
-                <span>⚡ Auto-Fill & Lock Initial</span>
-              </button>
+            {currentEval.finalDiagnosis === 'Other' && (
+              <div className="mt-2.5">
+                <input
+                  type="text"
+                  value={currentEval.customOtherFinal}
+                  onChange={(e) => updateCurrentEval('customOtherFinal', e.target.value)}
+                  placeholder="Specify final diagnosis..."
+                  className="w-full px-3 py-2 rounded border border-slate-300 text-xs text-slate-800"
+                />
+              </div>
             )}
           </div>
 
-          <div className="space-y-4">
-            {/* Initial MCQ */}
+          {/* 3. Influence on Initial Impression */}
+          <div className="p-4 rounded bg-slate-50 border border-slate-200">
+            <label className="block text-xs font-semibold text-slate-800 uppercase tracking-wider mb-2 font-mono">
+              3. Did the CDSS suggestion alter your initial clinical impression?
+            </label>
+            <div className="flex flex-col sm:flex-row gap-4">
+              <label className="flex items-center gap-2 text-xs font-medium text-slate-800 cursor-pointer">
+                <input
+                  type="radio"
+                  name={`switched-${currentCase.id}`}
+                  checked={!currentEval.switchedAfterCdss}
+                  onChange={() => updateCurrentEval('switchedAfterCdss', false)}
+                  className="text-slate-900 focus:ring-slate-900"
+                />
+                <span>No — Maintained my independent working diagnosis</span>
+              </label>
+              <label className="flex items-center gap-2 text-xs font-medium text-slate-800 cursor-pointer">
+                <input
+                  type="radio"
+                  name={`switched-${currentCase.id}`}
+                  checked={currentEval.switchedAfterCdss}
+                  onChange={() => updateCurrentEval('switchedAfterCdss', true)}
+                  className="text-slate-900 focus:ring-slate-900"
+                />
+                <span>Yes — Modified my diagnosis after reviewing CDSS</span>
+              </label>
+            </div>
+          </div>
+
+          {/* 4. Reason for Decision */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-800 uppercase tracking-wider mb-1.5 font-mono">
+              4. Clinical Rationale for Acceptance, Rejection, or Modification
+            </label>
+            <textarea
+              rows={2}
+              value={currentEval.reasonForDecision}
+              onChange={(e) => updateCurrentEval('reasonForDecision', e.target.value)}
+              placeholder="Explain the clinical rationale behind your agreement, disagreement, or modification..."
+              className="w-full px-3 py-2 rounded border border-slate-300 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900"
+            />
+          </div>
+
+          {/* 5. Diagnostic Confidence */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-semibold text-slate-800 uppercase tracking-wider font-mono">
+                5. Diagnostic Confidence
+              </label>
+              <span className="text-xs font-mono font-bold text-slate-900">
+                {currentEval.finalConfidence} / 5
+              </span>
+            </div>
+            <div className="grid grid-cols-5 gap-2">
+              {[1, 2, 3, 4, 5].map(lvl => (
+                <button
+                  key={lvl}
+                  type="button"
+                  onClick={() => updateCurrentEval('finalConfidence', lvl)}
+                  className={`py-1.5 text-center rounded border text-xs font-mono font-bold transition-colors ${
+                    currentEval.finalConfidence === lvl
+                      ? 'bg-slate-900 text-white border-slate-900'
+                      : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  {lvl}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* 6. Independent Verification Intent */}
+          <div className="p-4 rounded bg-slate-50 border border-slate-200 space-y-3">
             <div>
               <label className="block text-xs font-semibold text-slate-800 uppercase tracking-wider mb-2 font-mono">
-                Primary Working Diagnosis (MCQ)
+                6. Would you independently verify this CDSS suggestion before execution?
               </label>
-              <div className="space-y-1.5">
-                {currentCase.mcqOptions.map(opt => (
-                  <label
-                    key={opt}
-                    className={`flex items-center gap-3 p-2.5 rounded border text-xs ${
-                      isLocked ? 'cursor-not-allowed opacity-90' : 'cursor-pointer hover:bg-slate-50'
-                    } ${
-                      initialDiagnosis === opt
-                        ? 'border-slate-900 bg-slate-50 font-semibold text-slate-900'
-                        : 'border-slate-200 text-slate-700'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name={`init-mcq-${currentCase.id}`}
-                      disabled={isLocked}
-                      checked={initialDiagnosis === opt}
-                      onChange={() => setInitialDiagnosis(opt)}
-                      className="text-slate-900 focus:ring-slate-900"
-                    />
-                    <span>{opt}</span>
-                  </label>
-                ))}
-              </div>
-
-              {initialDiagnosis === 'Other' && (
-                <div className="mt-2.5">
+              <div className="flex flex-col sm:flex-row gap-4">
+                <label className="flex items-center gap-2 text-xs font-medium text-slate-800 cursor-pointer">
                   <input
-                    type="text"
-                    disabled={isLocked}
-                    value={customOtherInitial}
-                    onChange={(e) => setCustomOtherInitial(e.target.value)}
-                    placeholder="Specify initial diagnosis..."
-                    className="w-full px-3 py-2 rounded border border-slate-300 text-xs text-slate-800 disabled:bg-slate-100"
+                    type="radio"
+                    name={`verifyChoice-${currentCase.id}`}
+                    checked={currentEval.willVerify === true}
+                    onChange={() => updateCurrentEval('willVerify', true)}
+                    className="text-slate-900 focus:ring-slate-900"
                   />
-                </div>
-              )}
-            </div>
-
-            {/* Initial Justification */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-800 uppercase tracking-wider mb-1 font-mono">
-                Clinical Justification
-              </label>
-              <textarea
-                rows={2}
-                disabled={isLocked}
-                value={initialJustification}
-                onChange={(e) => setInitialJustification(e.target.value)}
-                placeholder="State the clinical reasoning supporting this diagnosis..."
-                className="w-full px-3 py-2 rounded border border-slate-300 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900 disabled:bg-slate-100 disabled:text-slate-600"
-              />
-            </div>
-
-            {/* Initial Confidence */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-semibold text-slate-800 uppercase tracking-wider font-mono">
-                  Initial Diagnostic Confidence
+                  <span>Yes, I would independently verify before acting</span>
                 </label>
-                <span className="text-xs font-mono font-bold text-slate-900">
-                  {initialConfidence} / 5
-                </span>
-              </div>
-              <div className="grid grid-cols-5 gap-2">
-                {[1, 2, 3, 4, 5].map(lvl => (
-                  <button
-                    key={lvl}
-                    type="button"
-                    disabled={isLocked}
-                    onClick={() => setInitialConfidence(lvl)}
-                    className={`py-1.5 text-center rounded border text-xs font-mono font-bold transition-colors ${
-                      initialConfidence === lvl
-                        ? 'bg-slate-900 text-white border-slate-900'
-                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                    } ${isLocked ? 'cursor-not-allowed opacity-90' : ''}`}
-                  >
-                    {lvl}
-                  </button>
-                ))}
+                <label className="flex items-center gap-2 text-xs font-medium text-slate-800 cursor-pointer">
+                  <input
+                    type="radio"
+                    name={`verifyChoice-${currentCase.id}`}
+                    checked={currentEval.willVerify === false}
+                    onChange={() => updateCurrentEval('willVerify', false)}
+                    className="text-slate-900 focus:ring-slate-900"
+                  />
+                  <span>No, I would act directly on this advice</span>
+                </label>
               </div>
             </div>
 
-            {/* Commit & Lock Button */}
-            {!isLocked && (
-              <div className="pt-2 flex justify-end">
+            {currentEval.willVerify && (
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                  Specific verification targets (guidelines, biomarkers, imaging):
+                </label>
+                <input
+                  type="text"
+                  value={currentEval.verificationTargets}
+                  onChange={(e) => updateCurrentEval('verificationTargets', e.target.value)}
+                  placeholder="e.g. Verify contraindications, obtain confirmatory scan, review guideline thresholds..."
+                  className="w-full px-3 py-2 rounded border border-slate-300 text-xs text-slate-800 bg-white"
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Free Navigation Controls */}
+          <div className="pt-4 border-t border-slate-200/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => currentCaseIndex > 0 && handleSelectCase(currentCaseIndex - 1)}
+              disabled={currentCaseIndex === 0}
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 transition-colors disabled:opacity-40 disabled:cursor-not-allowed self-start sm:self-auto"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Previous CDSS Case</span>
+            </button>
+
+            <div className="flex items-center gap-2 self-end sm:self-auto">
+              {currentCaseIndex < cases.length - 1 && (
                 <button
                   type="button"
-                  onClick={handleCommitAndLock}
-                  disabled={
-                    (initialDiagnosis === 'Other' && !customOtherInitial.trim()) ||
-                    !initialJustification.trim()
-                  }
-                  className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded transition-colors shadow-2xs disabled:bg-slate-300 disabled:cursor-not-allowed"
+                  onClick={handleCompleteStage}
+                  className="px-3.5 py-2 text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 rounded transition-colors"
                 >
-                  <Lock className="w-3.5 h-3.5" />
-                  <span>Commit & Permanently Lock Initial Opinion</span>
+                  Proceed to Vignette Cases
                 </button>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* STEP 2: STANDARDIZED AI CONSULTATION CDSS STIMULUS */}
-        {isLocked && (
-          <div className="mt-6 p-5 rounded border border-slate-300 bg-slate-50 space-y-4">
-            <div className="flex items-center justify-between pb-2.5 border-b border-slate-200">
-              <div className="flex items-center gap-2">
-                <span className="font-mono text-xs font-bold text-slate-900">
-                  CLINICAL DECISION SUPPORT SYSTEM (CDSS) · CONSULTATION
-                </span>
-              </div>
-              <span className="font-mono text-[10px] text-slate-500">
-                REF #STIM-0{currentCase.caseNumber}
-              </span>
-            </div>
-
-            {/* AI Diagnosis */}
-            <div className="p-3.5 rounded bg-white border border-slate-200">
-              <span className="text-[10px] font-mono uppercase tracking-wider text-slate-500 block mb-1">
-                AI Suggested Primary Diagnosis
-              </span>
-              <p className="text-sm font-bold text-slate-900">
-                {stimulus.diagnosis}
-              </p>
-            </div>
-
-            {/* AI Recommendation */}
-            <div className="p-3.5 rounded bg-white border border-slate-200">
-              <span className="text-[10px] font-mono uppercase tracking-wider text-slate-500 block mb-1">
-                AI Recommended Immediate Clinical Action
-              </span>
-              <p className="text-xs text-slate-800 leading-relaxed">
-                {stimulus.recommendation}
-              </p>
-            </div>
-
-            {/* AI Clinical Reasoning */}
-            <div className="p-3.5 rounded bg-white border border-slate-200">
-              <span className="text-[10px] font-mono uppercase tracking-wider text-slate-500 block mb-1">
-                AI Clinical Rationale
-              </span>
-              <p className="text-xs text-slate-700 leading-relaxed">
-                {stimulus.clinicalReasoning}
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* STEP 3: POST-AI EVALUATION */}
-        {isLocked && (
-          <div className="mt-6 p-6 rounded border border-slate-200 bg-white space-y-6">
-            <div className="border-b border-slate-200 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div>
-                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-900 font-mono">
-                  Step 3: Post-AI Evaluation & Final Formulation
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Record your evaluation of the AI guidance, your final working diagnosis, and verification intention.
-                </p>
-              </div>
+              )}
 
               <button
                 type="button"
-                onClick={() => {
-                  if (stimulus.isMisleading) {
-                    setAiAgreement('Uncertain; requires verification');
-                    setFinalDiagnosis(currentCase.goldStandardDiagnosis);
-                    setReasonForDecision(`Identified inconsistency in AI recommendation: advice conflicts with clinical findings, patient hemodynamics, or contraindications.`);
-                    setFinalConfidence(4);
-                    setWillVerify(true);
-                    setVerificationTargets('Cross-check clinical practice guidelines, consult senior consultant, and obtain confirmatory imaging.');
-                  } else {
-                    setAiAgreement('Completely agree');
-                    setFinalDiagnosis(currentCase.goldStandardDiagnosis);
-                    setReasonForDecision('AI guidance aligns with established evidence-based clinical protocols and standard guidelines.');
-                    setFinalConfidence(5);
-                    setWillVerify(true);
-                    setVerificationTargets('Check drug dosing and verify ECG/biomarker repeat timing.');
-                  }
-                }}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded transition-colors shrink-0 self-start sm:self-auto"
-                title="Fill realistic clinical post-AI evaluation"
-              >
-                <span>⚡ Auto-Fill Post-AI Evaluation</span>
-              </button>
-            </div>
-
-            {/* Agreement with AI */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-800 uppercase tracking-wider mb-2 font-mono">
-                1. Agreement with AI Recommendation
-              </label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {[
-                  'Completely agree',
-                  'Partially agree',
-                  'Disagree',
-                  'Uncertain; requires verification'
-                ].map((level) => (
-                  <button
-                    key={level}
-                    type="button"
-                    onClick={() => setAiAgreement(level as AiAgreementLevel)}
-                    className={`p-2.5 text-left rounded border text-xs font-medium transition-colors ${
-                      aiAgreement === level
-                        ? 'border-slate-900 bg-slate-900 text-white font-semibold'
-                        : 'border-slate-200 hover:bg-slate-50 text-slate-700'
-                    }`}
-                  >
-                    {level}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Final Diagnosis */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-800 uppercase tracking-wider mb-2 font-mono">
-                2. Final Working Diagnosis
-              </label>
-              <div className="space-y-1.5">
-                {currentCase.mcqOptions.map(opt => (
-                  <label
-                    key={opt}
-                    className={`flex items-center gap-3 p-2.5 rounded border cursor-pointer text-xs ${
-                      finalDiagnosis === opt
-                        ? 'border-slate-900 bg-slate-50 font-semibold text-slate-900'
-                        : 'border-slate-200 hover:bg-slate-50 text-slate-700'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name={`final-mcq-${currentCase.id}`}
-                      checked={finalDiagnosis === opt}
-                      onChange={() => setFinalDiagnosis(opt)}
-                      className="text-slate-900 focus:ring-slate-900"
-                    />
-                    <span>{opt}</span>
-                  </label>
-                ))}
-              </div>
-
-              {finalDiagnosis === 'Other' && (
-                <div className="mt-2.5">
-                  <input
-                    type="text"
-                    value={customOtherFinal}
-                    onChange={(e) => setCustomOtherFinal(e.target.value)}
-                    placeholder="Specify final diagnosis..."
-                    className="w-full px-3 py-2 rounded border border-slate-300 text-xs text-slate-800"
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* Reason for Decision */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-800 uppercase tracking-wider mb-1.5 font-mono">
-                3. Clinical Rationale for Acceptance, Rejection, or Modification
-              </label>
-              <textarea
-                rows={2}
-                value={reasonForDecision}
-                onChange={(e) => setReasonForDecision(e.target.value)}
-                placeholder="Explain the clinical rationale behind your agreement, disagreement, or modification..."
-                className="w-full px-3 py-2 rounded border border-slate-300 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900"
-              />
-            </div>
-
-            {/* Final Confidence */}
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-semibold text-slate-800 uppercase tracking-wider font-mono">
-                  4. Final Diagnostic Confidence
-                </label>
-                <span className="text-xs font-mono font-bold text-slate-900">
-                  {finalConfidence} / 5
-                </span>
-              </div>
-              <div className="grid grid-cols-5 gap-2">
-                {[1, 2, 3, 4, 5].map(lvl => (
-                  <button
-                    key={lvl}
-                    type="button"
-                    onClick={() => setFinalConfidence(lvl)}
-                    className={`py-1.5 text-center rounded border text-xs font-mono font-bold transition-colors ${
-                      finalConfidence === lvl
-                        ? 'bg-slate-900 text-white border-slate-900'
-                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                    }`}
-                  >
-                    {lvl}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Independent Verification Intent */}
-            <div className="p-4 rounded bg-slate-50 border border-slate-200 space-y-3">
-              <div>
-                <label className="block text-xs font-semibold text-slate-800 uppercase tracking-wider mb-2 font-mono">
-                  5. Would you independently verify this AI recommendation before execution?
-                </label>
-                <div className="flex gap-6">
-                  <label className="flex items-center gap-2 text-xs font-medium text-slate-800 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="verifyChoice"
-                      checked={willVerify === true}
-                      onChange={() => setWillVerify(true)}
-                      className="text-slate-900 focus:ring-slate-900"
-                    />
-                    <span>Yes, I would independently verify before acting</span>
-                  </label>
-                  <label className="flex items-center gap-2 text-xs font-medium text-slate-800 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="verifyChoice"
-                      checked={willVerify === false}
-                      onChange={() => setWillVerify(false)}
-                      className="text-slate-900 focus:ring-slate-900"
-                    />
-                    <span>No, I would act directly on this advice</span>
-                  </label>
-                </div>
-              </div>
-
-              {willVerify && (
-                <div>
-                  <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                    Specific verification targets (guidelines, biomarkers, imaging):
-                  </label>
-                  <input
-                    type="text"
-                    value={verificationTargets}
-                    onChange={(e) => setVerificationTargets(e.target.value)}
-                    placeholder="e.g. Verify contraindications, obtain confirmatory scan, review guideline thresholds..."
-                    className="w-full px-3 py-2 rounded border border-slate-300 text-xs text-slate-800 bg-white"
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* Save & Advance */}
-            <div className="pt-4 border-t border-slate-200/70 flex items-center justify-between">
-              <span className="text-[11px] font-mono text-slate-500">
-                Responses are permanently committed upon moving forward.
-              </span>
-
-              <button
-                type="button"
-                onClick={handleSaveAndNext}
-                disabled={!isPostAiValid()}
-                className={`inline-flex items-center gap-2 px-5 py-2.5 text-xs font-semibold rounded transition-colors ${
-                  isPostAiValid()
-                    ? 'bg-slate-900 hover:bg-slate-800 text-white shadow-2xs'
-                    : 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
-                }`}
+                onClick={handleNextOrFinish}
+                className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-semibold rounded transition-colors bg-slate-900 hover:bg-slate-800 text-white shadow-2xs"
               >
                 <span>
                   {currentCaseIndex === cases.length - 1
-                    ? 'Complete Simulation & Proceed'
-                    : 'Save & Next AI Vignette'}
+                    ? 'Complete CDSS & Proceed to Vignette Cases'
+                    : 'Next CDSS Case'}
                 </span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
-        )}
+        </div>
 
       </div>
     </div>

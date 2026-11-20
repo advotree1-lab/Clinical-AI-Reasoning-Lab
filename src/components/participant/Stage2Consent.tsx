@@ -24,7 +24,7 @@ export const Stage2Consent: React.FC<Stage2ConsentProps> = ({
         
         {/* Header Metadata */}
         <div className="flex items-center gap-2 text-xs font-mono text-slate-500 mb-2">
-          <span>STAGE 02 / 08</span>
+          <span>STAGE 02 / 07</span>
           <span aria-hidden="true">·</span>
           <span>INFORMED CONSENT & TERMS</span>
         </div>
@@ -127,14 +127,9 @@ export const Stage2Consent: React.FC<Stage2ConsentProps> = ({
 
           <button
             onClick={onConsent}
-            disabled={!canProceed}
-            className={`inline-flex items-center gap-2 px-5 py-2.5 text-xs font-semibold rounded transition-colors ${
-              canProceed
-                ? 'bg-slate-900 hover:bg-slate-800 text-white shadow-2xs'
-                : 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
-            }`}
+            className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-semibold rounded transition-colors bg-slate-900 hover:bg-slate-800 text-white shadow-2xs"
           >
-            <span>Confirm Consent & Continue</span>
+            <span>{canProceed ? 'Confirm Consent & Continue' : 'Continue to Profile'}</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>

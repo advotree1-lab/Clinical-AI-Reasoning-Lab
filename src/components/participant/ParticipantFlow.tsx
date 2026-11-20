@@ -12,11 +12,9 @@ import { Stage1Welcome } from './Stage1Welcome';
 import { Stage2Consent } from './Stage2Consent';
 import { Stage3Registration } from './Stage3Registration';
 import { Stage4Questionnaire } from './Stage4Questionnaire';
-import { Stage5BaselineAssessment } from './Stage5BaselineAssessment';
 import { Stage6AiSimulation } from './Stage6AiSimulation';
 import { Stage7PostAiAssessment } from './Stage7PostAiAssessment';
 import { Stage8Debriefing } from './Stage8Debriefing';
-
 import { PrototypeDemoBar } from './PrototypeDemoBar';
 
 interface ParticipantFlowProps {
@@ -35,7 +33,6 @@ export const ParticipantFlow: React.FC<ParticipantFlowProps> = ({
   const [stage, setStage] = useState<number>(1);
   const [currentParticipant, setCurrentParticipant] = useState<Participant | null>(null);
 
-  const baselineCases = cases.filter(c => c.stage === 'baseline');
   const simCases = cases.filter(c => c.stage === 'ai_simulation');
   const postAiCases = cases.filter(c => c.stage === 'post_ai');
 
@@ -45,13 +42,11 @@ export const ParticipantFlow: React.FC<ParticipantFlowProps> = ({
     const p: Participant = {
       id: `part-demo-${Date.now()}`,
       code: `DOC-${Math.floor(2000 + Math.random() * 8000)}`,
-      designation: 'Postgraduate resident',
-      specialty: 'General medicine',
-      yearsSinceMBBS: 3,
-      yearsExperience: 2,
-      institutionType: 'Medical college',
-      dailyPatientLoad: 35,
-      priorAiExposure: true,
+      designation: 'Junior Resident',
+      specialty: 'General Medicine',
+      yearsSinceMbbsBracket: '1–5 years',
+      institutionType: 'Teaching hospital',
+      formalGenAiTraining: false,
       consentGiven: true,
       isDemo: isDemoMode,
       createdAt: new Date().toISOString(),
@@ -62,6 +57,42 @@ export const ParticipantFlow: React.FC<ParticipantFlowProps> = ({
     researchStore.saveParticipant(p);
     return p;
   };
+
+  const buildSampleQuestionnaire = (p: Participant): QuestionnaireResponse => ({
+    id: `q-quick-${p.id}`,
+    participantId: p.id,
+    isDemo: isDemoMode,
+    designation: p.designation,
+    designationOther: p.designationOther,
+    specialty: p.specialty,
+    specialtyOther: p.specialtyOther,
+    yearsSinceMbbsBracket: p.yearsSinceMbbsBracket,
+    hospitalType: p.institutionType,
+    hospitalTypeOther: p.institutionOther,
+    formalGenAiTraining: p.formalGenAiTraining,
+    usedGenAiLast3Months: true,
+    firstUseDuration: '6–12 months',
+    usageFrequency: 'Daily',
+    dailyTimeSpent: '10–30 minutes',
+    toolsUsed: ['ChatGPT', 'Google Gemini'],
+    accessMethod: 'Free public version',
+    enteredPatientInfo: 'Never',
+    taskFrequency: {
+      differentialDiagnoses: 'Often',
+      interpretingInvestigations: 'Sometimes',
+      choosingInvestigations: 'Sometimes',
+      identifyingManagement: 'Often',
+      drugDosesAndInteractions: 'Often',
+      summarisingLiterature: 'Very often',
+      clinicalDocumentation: 'Sometimes',
+      patientCommunication: 'Rarely'
+    },
+    reasoningConsultationStage: 'After my initial assessment, to cross-check my thinking',
+    last10CasesConsultedCount: 4,
+    verificationFrequency: 'Often',
+    institutionalPolicy: 'No',
+    createdAt: new Date().toISOString()
+  });
 
   // Quick-Fill the Current Step
   const handleQuickFillCurrentStep = () => {
@@ -74,56 +105,8 @@ export const ParticipantFlow: React.FC<ParticipantFlowProps> = ({
       handleRegister(p);
     } else if (stage === 4) {
       const p = ensureParticipant();
-      const q: QuestionnaireResponse = {
-        id: `q-quick-${p.id}`,
-        participantId: p.id,
-        isDemo: isDemoMode,
-        usedAiLast3Months: true,
-        aiToolsUsed: ['ChatGPT (GPT-4o)', 'Gemini (Google)'],
-        aiFrequency: 'Daily',
-        primaryPurposes: ['Differential diagnosis formulation', 'Clinical information retrieval'],
-        aiTiming: 'after',
-        complexVsRoutine: true,
-        verificationFrequency: 'Often',
-        verificationResources: ['UpToDate / Dynamed', 'Clinical Practice Guidelines'],
-        cognitiveOffloading: {
-          dependDifferential: 3,
-          substituteRecall: 3,
-          interpretComplex: 3,
-          transferReasoning: 2,
-          consultBeforeThinking: 2,
-          reduceWorkload: 4,
-          verifyBeforeUsing: 4
-        },
-        perceivedDeskilling: {
-          reducedEffort: 3,
-          difficultWithoutAi: 2,
-          lessConfidentIndependent: 2,
-          dependInvestigations: 3,
-          affectProblemSolving: 3,
-          confidenceChange: 3
-        },
-        createdAt: new Date().toISOString()
-      };
-      handleQuestionnaireSubmit(q);
+      handleQuestionnaireSubmit(buildSampleQuestionnaire(p), p);
     } else if (stage === 5) {
-      const p = ensureParticipant();
-      const baselineRecords: VignetteAnswerRecord[] = baselineCases.map(c => ({
-        id: `base-${p.id}-${c.id}`,
-        participantId: p.id,
-        caseId: c.id,
-        stage: 'baseline',
-        isDemo: isDemoMode,
-        mostLikelyDiagnosis: c.goldStandardDiagnosis,
-        differential1: c.differentialDiagnosisKeys[0] || 'Competing Differential 1',
-        differential2: c.differentialDiagnosisKeys[1] || 'Competing Differential 2',
-        redFlags: c.redFlagKeys[0] || 'Hemodynamic instability',
-        nextStep: c.nextManagementStepKey,
-        confidence: 4,
-        submittedAt: new Date().toISOString()
-      }));
-      handleBaselineComplete(baselineRecords);
-    } else if (stage === 6) {
       const p = ensureParticipant();
       const simRecords: AiInteractionRecord[] = simCases.map(c => {
         const isMisleading = c.aiStimulus?.isMisleading;
@@ -152,7 +135,7 @@ export const ParticipantFlow: React.FC<ParticipantFlowProps> = ({
         };
       });
       handleAiSimulationComplete(simRecords);
-    } else if (stage === 7) {
+    } else if (stage === 6) {
       const p = ensureParticipant();
       const postRecords: VignetteAnswerRecord[] = postAiCases.map(c => ({
         id: `post-${p.id}-${c.id}`,
@@ -169,8 +152,6 @@ export const ParticipantFlow: React.FC<ParticipantFlowProps> = ({
         submittedAt: new Date().toISOString()
       }));
       handlePostAiComplete(postRecords);
-    } else {
-      alert('Walkthrough session is already completed at Stage 8.');
     }
   };
 
@@ -185,74 +166,21 @@ export const ParticipantFlow: React.FC<ParticipantFlowProps> = ({
   const handleLoadCompleteSession = () => {
     const p: Participant = {
       id: `part-complete-${Date.now()}`,
-      code: `DOC-9421`,
-      designation: 'Postgraduate resident',
-      specialty: 'General medicine',
-      yearsSinceMBBS: 3,
-      yearsExperience: 2,
-      institutionType: 'Medical college',
-      dailyPatientLoad: 40,
-      priorAiExposure: true,
+      code: `DOC-${Math.floor(2000 + Math.random() * 7999)}`,
+      designation: 'Junior Resident',
+      specialty: 'General Medicine',
+      yearsSinceMbbsBracket: '1–5 years',
+      institutionType: 'Teaching hospital',
+      formalGenAiTraining: false,
       consentGiven: true,
       isDemo: isDemoMode,
       createdAt: new Date().toISOString(),
       completed: true,
-      currentStage: 8
+      currentStage: 7
     };
     setCurrentParticipant(p);
     researchStore.saveParticipant(p);
-
-    // Save questionnaire
-    const q: QuestionnaireResponse = {
-      id: `q-full-${p.id}`,
-      participantId: p.id,
-      isDemo: isDemoMode,
-      usedAiLast3Months: true,
-      aiToolsUsed: ['ChatGPT (GPT-4o)', 'Gemini (Google)'],
-      aiFrequency: 'Daily',
-      primaryPurposes: ['Differential diagnosis formulation', 'Clinical information retrieval'],
-      aiTiming: 'after',
-      complexVsRoutine: true,
-      verificationFrequency: 'Often',
-      verificationResources: ['UpToDate / Dynamed', 'Clinical Practice Guidelines'],
-      cognitiveOffloading: {
-        dependDifferential: 3,
-        substituteRecall: 3,
-        interpretComplex: 3,
-        transferReasoning: 2,
-        consultBeforeThinking: 2,
-        reduceWorkload: 4,
-        verifyBeforeUsing: 4
-      },
-      perceivedDeskilling: {
-        reducedEffort: 3,
-        difficultWithoutAi: 2,
-        lessConfidentIndependent: 2,
-        dependInvestigations: 3,
-        affectProblemSolving: 3,
-        confidenceChange: 3
-      },
-      createdAt: new Date().toISOString()
-    };
-    researchStore.saveQuestionnaire(q);
-
-    // Save baseline
-    baselineCases.forEach(c => {
-      researchStore.saveVignetteAnswer({
-        id: `base-${p.id}-${c.id}`,
-        participantId: p.id,
-        caseId: c.id,
-        stage: 'baseline',
-        isDemo: isDemoMode,
-        mostLikelyDiagnosis: c.goldStandardDiagnosis,
-        differential1: c.differentialDiagnosisKeys[0] || 'Differential 1',
-        differential2: c.differentialDiagnosisKeys[1] || 'Differential 2',
-        redFlags: c.redFlagKeys[0] || 'Hemodynamic instability',
-        nextStep: c.nextManagementStepKey,
-        confidence: 4,
-        submittedAt: new Date().toISOString()
-      });
-    });
+    researchStore.saveQuestionnaire(buildSampleQuestionnaire(p));
 
     // Save AI simulation
     simCases.forEach(c => {
@@ -298,7 +226,7 @@ export const ParticipantFlow: React.FC<ParticipantFlowProps> = ({
       });
     });
 
-    setStage(8);
+    setStage(7);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -322,29 +250,29 @@ export const ParticipantFlow: React.FC<ParticipantFlowProps> = ({
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Stage 4 -> 5 or 6 (Check if baseline enabled)
-  const handleQuestionnaireSubmit = (response: QuestionnaireResponse) => {
+  // Stage 4 -> 5 (AI Simulation)
+  const handleQuestionnaireSubmit = (
+    response: QuestionnaireResponse,
+    updatedParticipant?: Participant
+  ) => {
     researchStore.saveQuestionnaire(response);
-    if (currentParticipant) {
+    const baseParticipant = updatedParticipant || currentParticipant;
+    if (baseParticipant) {
       const updated = {
-        ...currentParticipant,
-        currentStage: settings.baselineAssessmentEnabled ? 5 : 6
+        ...baseParticipant,
+        currentStage: 5
       };
       setCurrentParticipant(updated);
       researchStore.saveParticipant(updated);
     }
 
-    if (settings.baselineAssessmentEnabled) {
-      setStage(5);
-    } else {
-      setStage(6);
-    }
+    setStage(5);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Stage 5 -> 6
-  const handleBaselineComplete = (answers: VignetteAnswerRecord[]) => {
-    answers.forEach(a => researchStore.saveVignetteAnswer(a));
+  // Stage 5 -> 6 (Post-AI Independent Reasoning)
+  const handleAiSimulationComplete = (records: AiInteractionRecord[]) => {
+    records.forEach(r => researchStore.saveAiInteraction(r));
     if (currentParticipant) {
       const updated = { ...currentParticipant, currentStage: 6 };
       setCurrentParticipant(updated);
@@ -354,27 +282,15 @@ export const ParticipantFlow: React.FC<ParticipantFlowProps> = ({
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Stage 6 -> 7
-  const handleAiSimulationComplete = (records: AiInteractionRecord[]) => {
-    records.forEach(r => researchStore.saveAiInteraction(r));
+  // Stage 6 -> 7 (Debriefing)
+  const handlePostAiComplete = (answers: VignetteAnswerRecord[]) => {
+    answers.forEach(a => researchStore.saveVignetteAnswer(a));
     if (currentParticipant) {
-      const updated = { ...currentParticipant, currentStage: 7 };
+      const updated = { ...currentParticipant, currentStage: 7, completed: true };
       setCurrentParticipant(updated);
       researchStore.saveParticipant(updated);
     }
     setStage(7);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  // Stage 7 -> 8
-  const handlePostAiComplete = (answers: VignetteAnswerRecord[]) => {
-    answers.forEach(a => researchStore.saveVignetteAnswer(a));
-    if (currentParticipant) {
-      const updated = { ...currentParticipant, currentStage: 8, completed: true };
-      setCurrentParticipant(updated);
-      researchStore.saveParticipant(updated);
-    }
-    setStage(8);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -389,9 +305,8 @@ export const ParticipantFlow: React.FC<ParticipantFlowProps> = ({
     'Consent',
     'ID Profile',
     'Survey',
-    'Baseline Reasoning',
-    'AI Simulation',
-    'Post-AI Reasoning',
+    'CDSS',
+    'Vignette Cases',
     'Debriefing'
   ];
 
@@ -414,19 +329,18 @@ export const ParticipantFlow: React.FC<ParticipantFlowProps> = ({
             const stepNum = idx + 1;
             const isCompleted = stage > stepNum;
             const isCurrent = stage === stepNum;
-            const isSkipped = stepNum === 5 && !settings.baselineAssessmentEnabled;
 
             return (
-              <div
+              <button
                 key={label}
-                className={`flex items-center gap-1.5 text-xs whitespace-nowrap shrink-0 ${
+                type="button"
+                onClick={() => handleJumpToStage(stepNum)}
+                className={`flex items-center gap-1.5 text-xs whitespace-nowrap shrink-0 px-2 py-1 rounded transition-colors cursor-pointer ${
                   isCurrent
-                    ? 'text-slate-900 font-bold'
+                    ? 'text-slate-900 font-bold bg-slate-100'
                     : isCompleted
-                    ? 'text-emerald-700 font-medium'
-                    : isSkipped
-                    ? 'text-slate-300 line-through'
-                    : 'text-slate-400'
+                    ? 'text-emerald-700 font-medium hover:bg-slate-50'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                 }`}
               >
                 <div
@@ -435,9 +349,7 @@ export const ParticipantFlow: React.FC<ParticipantFlowProps> = ({
                       ? 'bg-slate-900 text-white'
                       : isCompleted
                       ? 'bg-emerald-100 text-emerald-800'
-                      : isSkipped
-                      ? 'bg-slate-100 text-slate-300'
-                      : 'bg-slate-100 text-slate-400'
+                      : 'bg-slate-100 text-slate-600'
                   }`}
                 >
                   {stepNum}
@@ -446,7 +358,7 @@ export const ParticipantFlow: React.FC<ParticipantFlowProps> = ({
                 {idx < stepLabels.length - 1 && (
                   <span className="text-slate-300 mx-1 hidden lg:inline">/</span>
                 )}
-              </div>
+              </button>
             );
           })}
         </div>
@@ -457,7 +369,6 @@ export const ParticipantFlow: React.FC<ParticipantFlowProps> = ({
         {stage === 1 && (
           <Stage1Welcome
             onBegin={handleBegin}
-            baselineEnabled={settings.baselineAssessmentEnabled}
             institutionName={settings.institutionName}
             protocolNumber={settings.protocolNumber}
           />
@@ -489,16 +400,6 @@ export const ParticipantFlow: React.FC<ParticipantFlowProps> = ({
         )}
 
         {stage === 5 && currentParticipant && (
-          <Stage5BaselineAssessment
-            cases={baselineCases}
-            participant={currentParticipant}
-            onComplete={handleBaselineComplete}
-            onBack={() => setStage(4)}
-            isDemoMode={isDemoMode}
-          />
-        )}
-
-        {stage === 6 && currentParticipant && (
           <Stage6AiSimulation
             cases={simCases}
             participant={currentParticipant}
@@ -507,7 +408,7 @@ export const ParticipantFlow: React.FC<ParticipantFlowProps> = ({
           />
         )}
 
-        {stage === 7 && currentParticipant && (
+        {stage === 6 && currentParticipant && (
           <Stage7PostAiAssessment
             cases={postAiCases}
             participant={currentParticipant}
@@ -516,7 +417,7 @@ export const ParticipantFlow: React.FC<ParticipantFlowProps> = ({
           />
         )}
 
-        {stage === 8 && currentParticipant && (
+        {stage === 7 && currentParticipant && (
           <Stage8Debriefing
             participant={currentParticipant}
             onRestart={handleRestart}

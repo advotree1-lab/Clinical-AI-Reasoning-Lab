@@ -32,10 +32,9 @@ export const PrototypeDemoBar: React.FC<PrototypeDemoBarProps> = ({
     { num: 2, label: 'Consent' },
     { num: 3, label: 'ID & Profile' },
     { num: 4, label: 'Survey' },
-    { num: 5, label: 'Baseline Cases (5)' },
-    { num: 6, label: 'AI Simulation (5)' },
-    { num: 7, label: 'Post-AI Cases (5)' },
-    { num: 8, label: 'Debriefing' }
+    { num: 5, label: 'CDSS (5)' },
+    { num: 6, label: 'Vignette Cases (6)' },
+    { num: 7, label: 'Debriefing' }
   ];
 
   return (
@@ -58,7 +57,6 @@ export const PrototypeDemoBar: React.FC<PrototypeDemoBarProps> = ({
 
           {/* Right Action Controls */}
           <div className="flex items-center gap-2 shrink-0">
-            {/* Auto-Fill Current Step */}
             <button
               onClick={onQuickFillStep}
               className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-slate-950 bg-emerald-400 hover:bg-emerald-300 rounded transition-colors shadow-2xs"
@@ -68,17 +66,15 @@ export const PrototypeDemoBar: React.FC<PrototypeDemoBarProps> = ({
               <span>Auto-Fill Step</span>
             </button>
 
-            {/* Load Complete Journey */}
             <button
               onClick={onLoadCompleteSession}
               className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-slate-300 bg-slate-800 hover:bg-slate-700 hover:text-white rounded transition-colors border border-slate-700"
-              title="Instantly generate a complete participant run across all 8 stages"
+              title="Instantly generate a complete participant run across all 7 stages"
             >
               <CheckCircle2 className="w-3 h-3 text-emerald-400" />
               <span className="hidden sm:inline">Populate Full Run</span>
             </button>
 
-            {/* Reset Walkthrough */}
             <button
               onClick={onResetSession}
               className="p-1 text-slate-400 hover:text-white transition-colors"
@@ -87,7 +83,6 @@ export const PrototypeDemoBar: React.FC<PrototypeDemoBarProps> = ({
               <RotateCcw className="w-3.5 h-3.5" />
             </button>
 
-            {/* Collapse / Expand */}
             <button
               onClick={() => setIsExpanded(!isExpanded)}
               className="p-1 text-slate-400 hover:text-white transition-colors"

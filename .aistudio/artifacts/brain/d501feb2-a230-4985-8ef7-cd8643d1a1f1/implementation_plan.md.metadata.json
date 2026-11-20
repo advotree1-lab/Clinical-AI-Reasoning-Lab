@@ -1,6 +1,0 @@
-{
-  "summary":  "Revised implementation plan incorporating all critical research and implementation refinements: exact 8-stage participant sequence (Welcome -> Consent -> ID Gen -> Questionnaire -> Baseline 5 Cases -> Standardized 5 AI Cases -> Post-AI 5 Cases -> Debriefing), hybrid MCQ + short written clinical reasoning with transparent rubrics and dual-assessor manual scoring with inter-rater reliability, strict permanent locking of initial diagnoses before AI stimulus unmasking, strict data partition between Synthetic Demo Mode (40 fictional clinicians) and Genuine Research Mode, comprehensive SPSS export with codebook, and ethical debriefing disclosures.",
-  "updatedAt":  "2026-11-11T02:54:17.321056556Z",
-  "requestFeedback":  true,
-  "userFacing":  true
-}

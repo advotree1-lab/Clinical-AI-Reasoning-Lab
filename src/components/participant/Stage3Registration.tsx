@@ -4,6 +4,7 @@ import {
   Participant,
   ParticipantDesignation,
   ClinicalSpecialty,
+  YearsSinceMbbsBracket,
   InstitutionType
 } from '../../types';
 
@@ -20,13 +21,14 @@ export const Stage3Registration: React.FC<Stage3RegistrationProps> = ({
 }) => {
   const [anonymousCode] = useState(() => `DOC-${Math.floor(1000 + Math.random() * 9000)}`);
 
-  const [designation, setDesignation] = useState<ParticipantDesignation>('Postgraduate resident');
-  const [specialty, setSpecialty] = useState<ClinicalSpecialty>('General medicine');
-  const [yearsSinceMBBS, setYearsSinceMBBS] = useState<number>(3);
-  const [yearsExperience, setYearsExperience] = useState<number>(2);
-  const [institutionType, setInstitutionType] = useState<InstitutionType>('Medical college');
-  const [dailyPatientLoad, setDailyPatientLoad] = useState<number>(35);
-  const [priorAiExposure, setPriorAiExposure] = useState<boolean>(true);
+  const [designation, setDesignation] = useState<ParticipantDesignation>('Junior Resident');
+  const [designationOther, setDesignationOther] = useState('');
+  const [specialty, setSpecialty] = useState<ClinicalSpecialty>('General Medicine');
+  const [specialtyOther, setSpecialtyOther] = useState('');
+  const [yearsSinceMbbsBracket, setYearsSinceMbbsBracket] = useState<YearsSinceMbbsBracket>('1–5 years');
+  const [institutionType, setInstitutionType] = useState<InstitutionType>('Teaching hospital');
+  const [institutionOther, setInstitutionOther] = useState('');
+  const [formalGenAiTraining, setFormalGenAiTraining] = useState<boolean>(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,12 +37,13 @@ export const Stage3Registration: React.FC<Stage3RegistrationProps> = ({
       id: `part-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       code: anonymousCode,
       designation,
+      designationOther: designation === 'Other' ? (designationOther.trim() || 'Other (Not specified)') : undefined,
       specialty,
-      yearsSinceMBBS,
-      yearsExperience,
+      specialtyOther: specialty === 'Other' ? (specialtyOther.trim() || 'Other (Not specified)') : undefined,
+      yearsSinceMbbsBracket,
       institutionType,
-      dailyPatientLoad,
-      priorAiExposure,
+      institutionOther: institutionType === 'Other' ? (institutionOther.trim() || 'Other (Not specified)') : undefined,
+      formalGenAiTraining,
       consentGiven: true,
       isDemo: isDemoMode,
       createdAt: new Date().toISOString(),
@@ -57,20 +60,20 @@ export const Stage3Registration: React.FC<Stage3RegistrationProps> = ({
         
         {/* Header Metadata */}
         <div className="flex items-center gap-2 text-xs font-mono text-slate-500 mb-2">
-          <span>STAGE 03 / 08</span>
+          <span>STAGE 03 / 07</span>
           <span aria-hidden="true">·</span>
-          <span>PARTICIPANT PROFILE</span>
+          <span>ANONYMOUS TOKEN & RESPONDENT PROFILE</span>
         </div>
 
         <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
-          Professional Demographic Profile
+          Participant Token & Respondent Profile
         </h2>
 
         <p className="mt-2 text-xs text-slate-600 leading-relaxed">
-          Provide your professional background for stratified cohort analysis. All entries are linked strictly to your anonymous research identifier.
+          Your anonymous research identifier has been generated. Complete your baseline professional profile before proceeding to the GenAI Exposure and Cognitive Offloading Study Questionnaire.
         </p>
 
-        {/* Anonymous ID Strip (Clean, Unboxed) */}
+        {/* Anonymous ID Strip */}
         <div className="mt-6 p-4 rounded bg-slate-50 border border-slate-200 flex items-center justify-between">
           <div>
             <span className="text-[10px] font-mono uppercase tracking-wider text-slate-500 block">
@@ -86,143 +89,132 @@ export const Stage3Registration: React.FC<Stage3RegistrationProps> = ({
         <form onSubmit={handleSubmit} className="mt-6 space-y-5">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             
-            {/* Designation */}
+            {/* 1. Designation */}
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                Current Designation / Cadre
+                1. Designation
               </label>
               <select
                 value={designation}
                 onChange={(e) => setDesignation(e.target.value as ParticipantDesignation)}
                 className="w-full px-3 py-2 rounded border border-slate-300 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900 bg-white"
               >
-                <option value="Postgraduate resident">Postgraduate resident</option>
-                <option value="Senior resident">Senior resident</option>
-                <option value="Medical officer">Medical officer</option>
-                <option value="Assistant professor">Assistant professor</option>
-                <option value="Associate professor">Associate professor</option>
+                <option value="Junior Resident">Junior Resident</option>
+                <option value="Senior Resident">Senior Resident</option>
+                <option value="Assistant Professor">Assistant Professor</option>
+                <option value="Associate Professor">Associate Professor</option>
                 <option value="Professor">Professor</option>
                 <option value="Consultant">Consultant</option>
-                <option value="General practitioner">General practitioner</option>
                 <option value="Other">Other</option>
               </select>
+              {designation === 'Other' && (
+                <input
+                  type="text"
+                  value={designationOther}
+                  onChange={(e) => setDesignationOther(e.target.value)}
+                  placeholder="Specify designation..."
+                  className="mt-2 w-full px-3 py-2 rounded border border-slate-300 text-xs text-slate-800"
+                />
+              )}
             </div>
 
-            {/* Specialty */}
+            {/* 2. Specialty */}
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                Primary Specialty
+                2. Specialty
               </label>
               <select
                 value={specialty}
                 onChange={(e) => setSpecialty(e.target.value as ClinicalSpecialty)}
                 className="w-full px-3 py-2 rounded border border-slate-300 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900 bg-white"
               >
-                <option value="General medicine">General medicine</option>
-                <option value="Emergency medicine">Emergency medicine</option>
-                <option value="Cardiology">Cardiology</option>
-                <option value="Pulmonology">Pulmonology</option>
-                <option value="Nephrology">Nephrology</option>
-                <option value="Neurology">Neurology</option>
-                <option value="General surgery">General surgery</option>
-                <option value="Obstetrics and gynaecology">Obstetrics and gynaecology</option>
-                <option value="Paediatrics">Paediatrics</option>
-                <option value="Orthopaedics">Orthopaedics</option>
-                <option value="Dermatology">Dermatology</option>
-                <option value="Psychiatry">Psychiatry</option>
+                <option value="General Medicine">General Medicine</option>
+                <option value="General Surgery">General Surgery</option>
+                <option value="Pediatrics">Pediatrics</option>
+                <option value="Obstetrics and Gynaecology">Obstetrics and Gynaecology</option>
+                <option value="Emergency Medicine">Emergency Medicine</option>
                 <option value="Other">Other</option>
+              </select>
+              {specialty === 'Other' && (
+                <input
+                  type="text"
+                  value={specialtyOther}
+                  onChange={(e) => setSpecialtyOther(e.target.value)}
+                  placeholder="Specify specialty..."
+                  className="mt-2 w-full px-3 py-2 rounded border border-slate-300 text-xs text-slate-800"
+                />
+              )}
+            </div>
+
+            {/* 3. Years since MBBS completion */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
+                3. Years since MBBS completion
+              </label>
+              <select
+                value={yearsSinceMbbsBracket}
+                onChange={(e) => setYearsSinceMbbsBracket(e.target.value as YearsSinceMbbsBracket)}
+                className="w-full px-3 py-2 rounded border border-slate-300 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900 bg-white"
+              >
+                <option value="Less than 1 year">Less than 1 year</option>
+                <option value="1–5 years">1–5 years</option>
+                <option value="6–10 years">6–10 years</option>
+                <option value="More than 10 years">More than 10 years</option>
               </select>
             </div>
 
-            {/* Years since MBBS */}
+            {/* 4. Type of hospital */}
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                Years Since MBBS Graduation
-              </label>
-              <input
-                type="number"
-                min="0"
-                max="50"
-                value={yearsSinceMBBS}
-                onChange={(e) => setYearsSinceMBBS(Math.max(0, parseInt(e.target.value) || 0))}
-                className="w-full px-3 py-2 rounded border border-slate-300 text-xs font-mono text-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900"
-              />
-            </div>
-
-            {/* Experience */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                Post-Registration Clinical Experience (Years)
-              </label>
-              <input
-                type="number"
-                min="0"
-                max="50"
-                value={yearsExperience}
-                onChange={(e) => setYearsExperience(Math.max(0, parseInt(e.target.value) || 0))}
-                className="w-full px-3 py-2 rounded border border-slate-300 text-xs font-mono text-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900"
-              />
-            </div>
-
-            {/* Institution */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                Primary Institution Type
+                4. Type of hospital
               </label>
               <select
                 value={institutionType}
                 onChange={(e) => setInstitutionType(e.target.value as InstitutionType)}
                 className="w-full px-3 py-2 rounded border border-slate-300 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900 bg-white"
               >
-                <option value="Medical college">Medical college / University hospital</option>
-                <option value="Government hospital">Government public health hospital</option>
-                <option value="Private hospital">Private hospital / Multispecialty center</option>
-                <option value="Clinic">Outpatient clinic</option>
+                <option value="Government hospital">Government hospital</option>
+                <option value="Private hospital">Private hospital</option>
+                <option value="Teaching hospital">Teaching hospital</option>
                 <option value="Other">Other</option>
               </select>
-            </div>
-
-            {/* Patient load */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                Average Daily Patient Volume (OPD + IPD)
-              </label>
-              <input
-                type="number"
-                min="1"
-                max="300"
-                value={dailyPatientLoad}
-                onChange={(e) => setDailyPatientLoad(Math.max(1, parseInt(e.target.value) || 1))}
-                className="w-full px-3 py-2 rounded border border-slate-300 text-xs font-mono text-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-900"
-              />
+              {institutionType === 'Other' && (
+                <input
+                  type="text"
+                  value={institutionOther}
+                  onChange={(e) => setInstitutionOther(e.target.value)}
+                  placeholder="Specify type of hospital..."
+                  className="mt-2 w-full px-3 py-2 rounded border border-slate-300 text-xs text-slate-800"
+                />
+              )}
             </div>
           </div>
 
-          {/* AI Exposure Radio */}
+          {/* 5. Formal training regarding GenAI in healthcare */}
           <div className="pt-2">
             <label className="block text-xs font-semibold text-slate-700 mb-2">
-              Have you ever utilized generative AI tools (e.g. ChatGPT, Claude, Gemini) for clinical tasks?
+              5. Have you received any formal training regarding the use of GenAI in healthcare?
             </label>
             <div className="flex gap-6">
               <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-slate-800">
                 <input
                   type="radio"
-                  name="priorAi"
-                  checked={priorAiExposure === true}
-                  onChange={() => setPriorAiExposure(true)}
+                  name="formalGenAiTraining"
+                  checked={formalGenAiTraining === true}
+                  onChange={() => setFormalGenAiTraining(true)}
                   className="text-slate-900 focus:ring-slate-900"
                 />
-                <span>Yes, I have prior exposure</span>
+                <span>Yes</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-slate-800">
                 <input
                   type="radio"
-                  name="priorAi"
-                  checked={priorAiExposure === false}
-                  onChange={() => setPriorAiExposure(false)}
+                  name="formalGenAiTraining"
+                  checked={formalGenAiTraining === false}
+                  onChange={() => setFormalGenAiTraining(false)}
                   className="text-slate-900 focus:ring-slate-900"
                 />
-                <span>No, I have no previous exposure</span>
+                <span>No</span>
               </label>
             </div>
           </div>
@@ -242,7 +234,7 @@ export const Stage3Registration: React.FC<Stage3RegistrationProps> = ({
               type="submit"
               className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded transition-colors shadow-2xs"
             >
-              <span>Save Profile & Proceed to Survey</span>
+              <span>Save Profile & Proceed to Questionnaire</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>

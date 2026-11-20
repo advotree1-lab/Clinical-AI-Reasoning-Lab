@@ -1,36 +1,22 @@
 import React, { useState } from 'react';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, LineChart, Line, Legend
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
 import {
-  ShieldAlert,
   Download,
-  Users,
-  CheckCircle2,
-  AlertTriangle,
   RotateCcw,
-  Sparkles,
-  Database,
-  Sliders,
   Code,
-  FileSpreadsheet,
-  Award,
-  BookOpen,
-  Settings,
-  Scale
+  FileSpreadsheet
 } from 'lucide-react';
 import {
-  Participant,
-  QuestionnaireResponse,
-  AiInteractionRecord,
-  VignetteAnswerRecord,
   ClinicalCase,
-  ResearchProtocolSettings
+  ResearchProtocolSettings,
+  GenAiTaskFrequency
 } from '../../types';
 import { researchStore } from '../../services/researchStore';
 import { computeAnalytics, exportToCsv } from '../../services/analytics';
 import { FASTAPI_MAIN_PY, SUPABASE_SQL_MIGRATION, SPSS_SYNTAX_SPS } from '../../data/backendCode';
+import { ClinicalImageGallery } from '../common/ClinicalImageGallery';
 
 interface ResearcherDashboardProps {
   isDemoMode: boolean;
@@ -41,6 +27,14 @@ interface ResearcherDashboardProps {
   onUpdateCase: (c: ClinicalCase) => void;
 }
 
+const TASK_FREQ_NUMERIC: Record<GenAiTaskFrequency, number> = {
+  'Never': 1,
+  'Rarely': 2,
+  'Sometimes': 3,
+  'Often': 4,
+  'Very often': 5
+};
+
 export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
   isDemoMode,
   onToggleDemoMode,
@@ -49,7 +43,17 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
   cases,
   onUpdateCase
 }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'automation_bias' | 'independent_reasoning' | 'offloading' | 'manual_scoring' | 'cases' | 'export' | 'backend' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<
+    | 'overview'
+    | 'automation_bias'
+    | 'independent_reasoning'
+    | 'offloading'
+    | 'manual_scoring'
+    | 'cases'
+    | 'export'
+    | 'backend'
+    | 'settings'
+  >('overview');
 
   // Load datasets based on active mode
   const participants = researchStore.getParticipants(isDemoMode);
@@ -74,11 +78,15 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
   const [scoreRedFlags, setScoreRedFlags] = useState<number>(1);
   const [scoreNextStep, setScoreNextStep] = useState<number>(1);
   const [assessorNotes, setAssessorNotes] = useState<string>('');
+  const [scoreSavedMessage, setScoreSavedMessage] = useState<string | null>(null);
+  const [copiedCodeType, setCopiedCodeType] = useState<string | null>(null);
 
-  // Selected vignette answer
-  const currentScoringVignette = vignetteAnswers.find(v => v.id === selectedVignetteId) || vignetteAnswers[0];
+  const currentScoringVignette =
+    vignetteAnswers.find(v => v.id === selectedVignetteId) || vignetteAnswers[0];
   const currentScoringCase = cases.find(c => c.id === currentScoringVignette?.caseId);
-  const currentParticipant = participants.find(p => p.id === currentScoringVignette?.participantId);
+  const currentParticipant = participants.find(
+    p => p.id === currentScoringVignette?.participantId
+  );
 
   // Case editor state
   const [selectedEditCaseId, setSelectedEditCaseId] = useState<string>(cases[0]?.id || '');
@@ -93,32 +101,33 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
       redFlagsMark: scoreRedFlags,
       nextStepMark: scoreNextStep,
       totalScore: total,
-      assessorName: activeAssessor === 1 ? 'Assessor 1 (Lead Evaluator)' : 'Assessor 2 (Independent Reviewer)',
+      assessorName:
+        activeAssessor === 1 ? 'Assessor 1 (Lead Evaluator)' : 'Assessor 2 (Independent Reviewer)',
       scoredAt: new Date().toISOString(),
       notes: assessorNotes
     });
-    alert(`Assessor ${activeAssessor} score saved: ${total} / 4 marks.`);
+    setScoreSavedMessage(`Assessor ${activeAssessor} score saved: ${total} / 4 marks.`);
+    setTimeout(() => setScoreSavedMessage(null), 3500);
   };
 
   const handleResetDemoCohort = () => {
-    if (window.confirm('Reset synthetic demonstration cohort to default 40 clinicians?')) {
-      researchStore.resetDemoData();
-      window.location.reload();
-    }
+    researchStore.resetDemoData();
+    window.location.reload();
   };
 
-  // CSV Exporters for the 5 datasets
+  // CSV Exporters
   const handleExportParticipants = () => {
     const rows = participants.map(p => ({
       participant_id: p.id,
       code: p.code,
-      designation: p.designation,
-      specialty: p.specialty,
-      years_since_mbbs: p.yearsSinceMBBS,
-      years_experience: p.yearsExperience,
-      institution_type: p.institutionType,
-      daily_patient_load: p.dailyPatientLoad,
-      prior_ai_exposure: p.priorAiExposure ? 1 : 0,
+      designation: p.designation === 'Other' && p.designationOther ? p.designationOther : p.designation,
+      specialty: p.specialty === 'Other' && p.specialtyOther ? p.specialtyOther : p.specialty,
+      years_since_mbbs_bracket: p.yearsSinceMbbsBracket,
+      institution_type:
+        p.institutionType === 'Other' && p.institutionOther
+          ? p.institutionOther
+          : p.institutionType,
+      formal_genai_training: p.formalGenAiTraining ? 1 : 0,
       consent_given: p.consentGiven ? 1 : 0,
       completed: p.completed ? 1 : 0,
       is_demo: p.isDemo ? 1 : 0,
@@ -131,26 +140,32 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
     const rows = questionnaires.map(q => ({
       response_id: q.id,
       participant_id: q.participantId,
-      used_ai_last_3_months: q.usedAiLast3Months ? 1 : 0,
-      ai_frequency: q.aiFrequency,
-      ai_timing: q.aiTiming,
-      complex_vs_routine: q.complexVsRoutine ? 1 : 0,
-      verification_frequency: q.verificationFrequency,
-      // Section C Offloading
-      cog_depend_diff: q.cognitiveOffloading.dependDifferential,
-      cog_substitute_recall: q.cognitiveOffloading.substituteRecall,
-      cog_interpret_complex: q.cognitiveOffloading.interpretComplex,
-      cog_transfer_reasoning: q.cognitiveOffloading.transferReasoning,
-      cog_consult_before: q.cognitiveOffloading.consultBeforeThinking,
-      cog_reduce_workload: q.cognitiveOffloading.reduceWorkload,
-      cog_verify_before: q.cognitiveOffloading.verifyBeforeUsing,
-      // Section D Deskilling
-      desk_reduced_effort: q.perceivedDeskilling.reducedEffort,
-      desk_difficult_without: q.perceivedDeskilling.difficultWithoutAi,
-      desk_less_confident: q.perceivedDeskilling.lessConfidentIndependent,
-      desk_depend_investigations: q.perceivedDeskilling.dependInvestigations,
-      desk_affect_problem_solving: q.perceivedDeskilling.affectProblemSolving,
-      desk_confidence_change: q.perceivedDeskilling.confidenceChange,
+      designation: q.designation === 'Other' && q.designationOther ? q.designationOther : q.designation,
+      specialty: q.specialty === 'Other' && q.specialtyOther ? q.specialtyOther : q.specialty,
+      years_since_mbbs_bracket: q.yearsSinceMbbsBracket,
+      hospital_type: q.hospitalType === 'Other' && q.hospitalTypeOther ? q.hospitalTypeOther : q.hospitalType,
+      formal_genai_training: q.formalGenAiTraining ? 1 : 0,
+      used_genai_last_3_months: q.usedGenAiLast3Months ? 1 : 0,
+      first_use_duration: q.firstUseDuration ?? '',
+      usage_frequency: q.usageFrequency ?? '',
+      daily_time_spent: q.dailyTimeSpent ?? '',
+      tools_used: (q.toolsUsed ?? []).join('; '),
+      medical_specific_tool: q.medicalSpecificToolName ?? '',
+      other_tool: q.otherToolName ?? '',
+      access_method: q.accessMethod ?? '',
+      entered_patient_info: q.enteredPatientInfo ?? '',
+      task_diff_dx: q.taskFrequency ? TASK_FREQ_NUMERIC[q.taskFrequency.differentialDiagnoses] : '',
+      task_interp_inv: q.taskFrequency ? TASK_FREQ_NUMERIC[q.taskFrequency.interpretingInvestigations] : '',
+      task_choose_inv: q.taskFrequency ? TASK_FREQ_NUMERIC[q.taskFrequency.choosingInvestigations] : '',
+      task_mgmt_opt: q.taskFrequency ? TASK_FREQ_NUMERIC[q.taskFrequency.identifyingManagement] : '',
+      task_drug_dose: q.taskFrequency ? TASK_FREQ_NUMERIC[q.taskFrequency.drugDosesAndInteractions] : '',
+      task_lit_summary: q.taskFrequency ? TASK_FREQ_NUMERIC[q.taskFrequency.summarisingLiterature] : '',
+      task_doc_letters: q.taskFrequency ? TASK_FREQ_NUMERIC[q.taskFrequency.clinicalDocumentation] : '',
+      task_patient_comm: q.taskFrequency ? TASK_FREQ_NUMERIC[q.taskFrequency.patientCommunication] : '',
+      reasoning_consultation_stage: q.reasoningConsultationStage ?? '',
+      last_10_cases_consulted_count: q.last10CasesConsultedCount ?? '',
+      verification_frequency: q.verificationFrequency ?? '',
+      institutional_policy: q.institutionalPolicy ?? '',
       is_demo: q.isDemo ? 1 : 0,
       created_at: q.createdAt
     }));
@@ -174,11 +189,11 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
       is_demo: r.isDemo ? 1 : 0,
       completed_at: r.completedAt
     }));
-    exportToCsv(`carl_ai_interactions_${isDemoMode ? 'demo' : 'research'}.csv`, rows);
+    exportToCsv(`carl_cdss_interactions_${isDemoMode ? 'demo' : 'research'}.csv`, rows);
   };
 
-  const handleExportVignettes = (stage: 'baseline' | 'post_ai') => {
-    const list = vignetteAnswers.filter(v => v.stage === stage);
+  const handleExportPostAiVignettes = () => {
+    const list = vignetteAnswers.filter(v => v.stage === 'post_ai');
     const rows = list.map(v => ({
       vignette_id: v.id,
       participant_id: v.participantId,
@@ -196,7 +211,7 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
       is_demo: v.isDemo ? 1 : 0,
       submitted_at: v.submittedAt
     }));
-    exportToCsv(`carl_${stage}_vignettes_${isDemoMode ? 'demo' : 'research'}.csv`, rows);
+    exportToCsv(`carl_vignette_cases_${isDemoMode ? 'demo' : 'research'}.csv`, rows);
   };
 
   return (
@@ -214,7 +229,7 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
             Clinical AI Reasoning Lab: Research Analytics
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Automation bias metrics, pre/post score comparisons, dual-assessor rubrics & SPSS exports.
+            GenAI exposure & cognitive offloading metrics, automation bias rates, dual-assessor rubrics & SPSS exports.
           </p>
         </div>
 
@@ -235,7 +250,7 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
                 !isDemoMode ? 'bg-white text-slate-900 shadow-2xs font-bold' : 'text-slate-500 hover:text-slate-900'
               }`}
             >
-              Research Data ({participants.filter(p => !p.isDemo).length})
+              Research Data ({researchStore.getParticipants(false).length})
             </button>
           </div>
 
@@ -243,7 +258,7 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
             <button
               onClick={handleResetDemoCohort}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 rounded transition-colors border border-slate-200 shadow-2xs"
-              title="Reset synthetic demo cohort back to initial 40 doctors"
+              title="Reset synthetic demo cohort back to default 40 doctors"
             >
               <RotateCcw className="w-3.5 h-3.5" />
               <span>Reset Cohort</span>
@@ -252,22 +267,18 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
         </div>
       </div>
 
-      {/* Mode Warning Notice (Quiet Unboxed) */}
+      {/* Mode Notice */}
       {isDemoMode ? (
         <div className="p-3 rounded bg-amber-50/70 border border-amber-200/80 flex items-center justify-between text-xs text-amber-950 font-mono">
-          <div className="flex items-center gap-2">
-            <span>SYNTHETIC DEMO MODE ACTIVE: Currently evaluating 40 simulated clinicians. Fictional demo records are partitioned from genuine research data.</span>
-          </div>
-          <span className="text-[10px] bg-white px-2 py-0.5 rounded border border-amber-300 font-bold">
+          <span>SYNTHETIC DEMO MODE ACTIVE: Evaluating 40 simulated clinicians. Fictional demo records are partitioned from genuine research data.</span>
+          <span className="text-[10px] bg-white px-2 py-0.5 rounded border border-amber-300 font-bold shrink-0 ml-3">
             N = 40
           </span>
         </div>
       ) : (
         <div className="p-3 rounded bg-emerald-50/70 border border-emerald-200/80 flex items-center justify-between text-xs text-emerald-950 font-mono">
-          <div className="flex items-center gap-2">
-            <span>GENUINE RESEARCH MODE ACTIVE: Live consenting participants only. Zero synthetic records.</span>
-          </div>
-          <span className="text-[10px] bg-white px-2 py-0.5 rounded border border-emerald-300 font-bold">
+          <span>GENUINE RESEARCH MODE ACTIVE: Live consenting participants only. Zero synthetic records.</span>
+          <span className="text-[10px] bg-white px-2 py-0.5 rounded border border-emerald-300 font-bold shrink-0 ml-3">
             LIVE STUDY
           </span>
         </div>
@@ -277,9 +288,9 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
       <div className="flex items-center gap-1.5 overflow-x-auto border-b border-slate-200/80 pb-2">
         {[
           { id: 'overview', label: '1. Executive Overview' },
-          { id: 'automation_bias', label: '2. Automation Bias & Stimuli' },
-          { id: 'independent_reasoning', label: '3. Pre/Post Paired Reasoning' },
-          { id: 'offloading', label: '4. Cognitive Offloading' },
+          { id: 'automation_bias', label: '2. CDSS & Automation Bias' },
+          { id: 'independent_reasoning', label: '3. Vignette Cases' },
+          { id: 'offloading', label: '4. GenAI Exposure & Offloading' },
           { id: 'manual_scoring', label: '5. Dual-Assessor Console' },
           { id: 'cases', label: '6. Case Management' },
           { id: 'export', label: '7. SPSS Data Export' },
@@ -288,7 +299,7 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
         ].map(t => (
           <button
             key={t.id}
-            onClick={() => setActiveTab(t.id as any)}
+            onClick={() => setActiveTab(t.id as typeof activeTab)}
             className={`px-3 py-1.5 text-xs font-semibold rounded whitespace-nowrap transition-colors ${
               activeTab === t.id
                 ? 'bg-slate-900 text-white font-bold'
@@ -308,7 +319,6 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
           {/* Key Metric KPI Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             
-            {/* Primary Outcome: Misleading Acceptance */}
             <div className="p-5 rounded bg-white border border-slate-200/90 shadow-2xs">
               <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-rose-700 block mb-1">
                 Primary Outcome · Automation Bias
@@ -324,7 +334,6 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
               </div>
             </div>
 
-            {/* Sound AI Acceptance */}
             <div className="p-5 rounded bg-white border border-slate-200/90 shadow-2xs">
               <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-500 block mb-1">
                 Secondary Outcome · Sound AI
@@ -340,7 +349,6 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
               </div>
             </div>
 
-            {/* Diagnostic Switching */}
             <div className="p-5 rounded bg-white border border-slate-200/90 shadow-2xs">
               <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-500 block mb-1">
                 Diagnostic Revision Rate
@@ -356,19 +364,18 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
               </div>
             </div>
 
-            {/* Score Delta */}
             <div className="p-5 rounded bg-white border border-slate-200/90 shadow-2xs">
               <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-500 block mb-1">
-                Pre vs Post Score Delta
+                Vignette Cases
               </span>
               <div className="text-3xl font-mono font-bold text-slate-900 tabular-nums">
-                {analytics.meanScoreDifference >= 0 ? `+${analytics.meanScoreDifference}` : analytics.meanScoreDifference}
+                {analytics.postAiMeanScore} / {analytics.postAiMaxScore}
               </div>
               <div className="text-xs text-slate-700 font-medium mt-1">
-                Baseline {analytics.baselineMeanScore} vs Post-AI {analytics.postAiMeanScore}
+                Mean Vignette Cases Score
               </div>
               <div className="text-[11px] font-mono text-slate-500 mt-2">
-                Paired t = {analytics.pairedTStatApprox} (p ≈ {analytics.pValueApprox})
+                SD = {analytics.postAiStdDev} · {analytics.postAiMeanPercentage}% accuracy
               </div>
             </div>
 
@@ -377,7 +384,6 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
           {/* Charts Row */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             
-            {/* Misleading Acceptance Distribution (0, 1, 2, 3) */}
             <div className="p-5 rounded-xl bg-white border border-slate-200 shadow-xs">
               <h3 className="text-sm font-bold text-slate-900 mb-1">
                 Primary Outcome: Misleading AI Acceptance Distribution
@@ -401,7 +407,6 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
               </div>
             </div>
 
-            {/* Designation vs Misleading Acceptance */}
             <div className="p-5 rounded-xl bg-white border border-slate-200 shadow-xs">
               <h3 className="text-sm font-bold text-slate-900 mb-1">
                 Automation Bias by Clinical Hierarchy
@@ -434,10 +439,10 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
           <div className="p-5 rounded-xl bg-white border border-slate-200 shadow-xs space-y-4">
             <div>
               <h3 className="text-base font-bold text-slate-900">
-                Standardized AI Stimuli Breakdown (5 Cases)
+                Standardized CDSS Stimuli Breakdown (5 Cases)
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                Evaluation of participant acceptance and verification across the 2 sound and 3 misleading stimuli.
+                Evaluation of participant acceptance and verification across the 2 clinically appropriate and 3 misleading CDSS stimuli.
               </p>
             </div>
 
@@ -485,7 +490,6 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
             </div>
           </div>
 
-          {/* Diagnostic Switching Details */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="p-5 rounded-xl bg-white border border-slate-200">
               <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
@@ -527,89 +531,147 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
       )}
 
       {/* ==================================================== */}
-      {/* TAB 3: INDEPENDENT REASONING (BASELINE VS POST-AI) */}
+      {/* TAB 3: POST-AI INDEPENDENT REASONING */}
       {/* ==================================================== */}
       {activeTab === 'independent_reasoning' && (
         <div className="space-y-6">
-          <div className="p-5 rounded-xl bg-white border border-slate-200 shadow-xs space-y-4">
+          <div className="p-5 rounded-xl bg-white border border-slate-200 shadow-xs space-y-5">
             <div>
               <h3 className="text-base font-bold text-slate-900">
-                Independent Clinical Reasoning Comparison (0–20 Marks)
+                Vignette Cases Assessment (0–{analytics.postAiMaxScore} Marks)
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                Paired analysis of 5 Baseline Unaided cases versus 5 Post-AI Unaided cases.
+                Performance across the {cases.filter(c => c.stage === 'post_ai').length} independent clinical Vignette Cases (4 marks per case: Primary Diagnosis, Differentials, Red Flags, Next Step).
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-2">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
               <div className="p-4 rounded-lg bg-slate-50 border border-slate-200">
-                <span className="text-[10px] font-bold text-slate-500 uppercase">Baseline Mean Score</span>
+                <span className="text-[10px] font-bold text-slate-500 uppercase">Vignette Cases Mean Total Score</span>
                 <div className="text-2xl font-mono font-bold text-slate-900 mt-1">
-                  {analytics.baselineMeanScore} / 20
-                </div>
-                <div className="text-[11px] font-mono text-slate-500">SD = {analytics.baselineStdDev}</div>
-              </div>
-
-              <div className="p-4 rounded-lg bg-slate-50 border border-slate-200">
-                <span className="text-[10px] font-bold text-slate-500 uppercase">Post-AI Mean Score</span>
-                <div className="text-2xl font-mono font-bold text-slate-900 mt-1">
-                  {analytics.postAiMeanScore} / 20
+                  {analytics.postAiMeanScore} / {analytics.postAiMaxScore}
                 </div>
                 <div className="text-[11px] font-mono text-slate-500">SD = {analytics.postAiStdDev}</div>
               </div>
 
               <div className="p-4 rounded-lg bg-slate-50 border border-slate-200">
-                <span className="text-[10px] font-bold text-slate-500 uppercase">Paired Difference</span>
+                <span className="text-[10px] font-bold text-slate-500 uppercase">Mean Rubric Accuracy</span>
                 <div className="text-2xl font-mono font-bold text-slate-900 mt-1">
-                  {analytics.meanScoreDifference >= 0 ? `+${analytics.meanScoreDifference}` : analytics.meanScoreDifference}
+                  {analytics.postAiMeanPercentage}%
                 </div>
-                <div className="text-[11px] font-mono text-slate-500">Post - Baseline score delta</div>
+                <div className="text-[11px] font-mono text-slate-500">Across {cases.filter(c => c.stage === 'post_ai').length} Vignette Cases</div>
               </div>
 
               <div className="p-4 rounded-lg bg-slate-50 border border-slate-200">
-                <span className="text-[10px] font-bold text-slate-500 uppercase">Statistical Significance</span>
-                <div className="text-2xl font-mono font-bold text-slate-900 mt-1">
-                  p ≈ {analytics.pValueApprox}
+                <span className="text-[10px] font-bold text-slate-500 uppercase">Inter-Rater Agreement</span>
+                <div className="text-2xl font-mono font-bold text-emerald-700 mt-1">
+                  {analytics.interRaterAgreementPercentage}%
                 </div>
-                <div className="text-[11px] font-mono text-slate-500">Paired t = {analytics.pairedTStatApprox}</div>
+                <div className="text-[11px] font-mono text-slate-500">κ = {analytics.cohensKappaApprox} (Dual-scored)</div>
               </div>
             </div>
 
-            <div className="mt-4 p-4 rounded-lg bg-blue-50/70 border border-blue-200 text-xs text-blue-900 leading-relaxed">
-              <span className="font-bold">Interpretation Guidelines for Academic Defense: </span>
-              In a single-group research design, differences between baseline and post-AI scores may reflect test fatigue, practice effects, or task difficulty variance across domains rather than permanent cognitive deskilling. Formal SPSS scripts for repeated-measures ANOVA and Wilcoxon signed-rank tests are provided in the Export section.
-            </div>
+            {analytics.postAiCaseMeans.length > 0 && (
+              <div className="pt-2">
+                <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-3 font-mono">
+                  Mean Score by Vignette Case (Max 4.0 Marks)
+                </h4>
+                <div className="h-60">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={analytics.postAiCaseMeans}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                      <XAxis dataKey="domain" tick={{ fontSize: 11 }} />
+                      <YAxis domain={[0, 4]} tick={{ fontSize: 11 }} />
+                      <Tooltip formatter={(val: any) => [`${val} / 4.0`, 'Mean Score']} />
+                      <Bar dataKey="meanScore" fill="#0f172a" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
 
       {/* ==================================================== */}
-      {/* TAB 4: COGNITIVE OFFLOADING & PERCEIVED DESKILLING */}
+      {/* TAB 4: GENAI EXPOSURE & COGNITIVE OFFLOADING */}
       {/* ==================================================== */}
       {activeTab === 'offloading' && (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            
-            {/* Cognitive Offloading Items */}
+          {/* Top Summary Strip */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="p-4 rounded-lg bg-white border border-slate-200">
+              <span className="text-[10px] font-mono font-bold text-slate-500 uppercase block">
+                Q1 · 3-Month Clinical GenAI Use
+              </span>
+              <div className="text-2xl font-mono font-bold text-slate-900 mt-1">
+                {analytics.genAiAdoptionRate}%
+              </div>
+              <div className="text-[11px] text-slate-500 mt-0.5">
+                Formal training: {analytics.formalTrainingRate}%
+              </div>
+            </div>
+
+            <div className="p-4 rounded-lg bg-white border border-slate-200">
+              <span className="text-[10px] font-mono font-bold text-slate-500 uppercase block">
+                Q10 · Last 10 Cases Consulted
+              </span>
+              <div className="text-2xl font-mono font-bold text-slate-900 mt-1">
+                {analytics.meanCasesConsultedOutOf10} / 10
+              </div>
+              <div className="text-[11px] text-slate-500 mt-0.5">
+                Mean cases among active users
+              </div>
+            </div>
+
+            <div className="p-4 rounded-lg bg-white border border-slate-200">
+              <span className="text-[10px] font-mono font-bold text-rose-700 uppercase block">
+                Q7 · Patient Info Entered
+              </span>
+              <div className="text-2xl font-mono font-bold text-rose-700 mt-1">
+                {analytics.patientInfoEnteredRate}%
+              </div>
+              <div className="text-[11px] text-slate-500 mt-0.5">
+                Entered clinical data into public GenAI
+              </div>
+            </div>
+
+            <div className="p-4 rounded-lg bg-white border border-slate-200">
+              <span className="text-[10px] font-mono font-bold text-emerald-700 uppercase block">
+                Q11 · Guideline Verification
+              </span>
+              <div className="text-2xl font-mono font-bold text-emerald-700 mt-1">
+                {analytics.alwaysOrOftenVerifyRate}%
+              </div>
+              <div className="text-[11px] text-slate-500 mt-0.5">
+                Verify answers Often / Very often
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Q8 Task Offloading Frequency Matrix */}
             <div className="p-5 rounded-xl bg-white border border-slate-200 shadow-xs space-y-3">
               <h3 className="text-sm font-bold text-slate-900">
-                Cognitive Offloading Habits (Likert 1 to 5)
+                Q8 · Work-Related Task Offloading Frequency (Scale 1 = Never to 5 = Very often)
               </h3>
               <p className="text-xs text-slate-500">
-                Self-reported transfer of diagnostic recall, synthesis, and reasoning to AI.
+                Mean frequency across clinical tasks during the past 3 months among active GenAI users.
               </p>
 
-              <div className="space-y-2.5 pt-2 text-xs">
-                {Object.entries(analytics.cognitiveOffloadingAverages).map(([key, val]) => (
-                  <div key={key} className="space-y-1">
+              <div className="space-y-3 pt-2 text-xs">
+                {analytics.taskFrequencyAverages.map(item => (
+                  <div key={item.task} className="space-y-1">
                     <div className="flex justify-between text-slate-700">
-                      <span className="capitalize">{key.replace(/([A-Z])/g, ' $1')}</span>
-                      <span className="font-mono font-bold text-slate-900">{val} / 5</span>
+                      <span>{item.task}</span>
+                      <span className="font-mono font-bold text-slate-900 tabular-nums">
+                        {item.meanScore} / 5 ({item.oftenOrVeryOftenPct}% Often+)
+                      </span>
                     </div>
                     <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
                       <div
                         className="bg-emerald-600 h-2 rounded-full"
-                        style={{ width: `${(val / 5) * 100}%` }}
+                        style={{ width: `${(item.meanScore / 5) * 100}%` }}
                       />
                     </div>
                   </div>
@@ -617,33 +679,49 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
               </div>
             </div>
 
-            {/* Perceived Deskilling Risk Items */}
-            <div className="p-5 rounded-xl bg-white border border-slate-200 shadow-xs space-y-3">
-              <h3 className="text-sm font-bold text-slate-900">
-                Perceived Cognitive Deskilling Risk (Likert 1 to 5)
-              </h3>
-              <p className="text-xs text-slate-500">
-                Subjective concerns regarding diagnostic dependence and problem-solving confidence.
-              </p>
+            {/* Q9 Stage of Consultation & Q12 Policy */}
+            <div className="space-y-6">
+              <div className="p-5 rounded-xl bg-white border border-slate-200 shadow-xs space-y-3">
+                <h3 className="text-sm font-bold text-slate-900">
+                  Q9 · Stage of Clinical Reasoning When GenAI Is Consulted
+                </h3>
+                <div className="space-y-2.5 pt-1 text-xs">
+                  {analytics.consultationStageBreakdown.map(row => (
+                    <div key={row.stage} className="space-y-1">
+                      <div className="flex justify-between text-slate-700 gap-2">
+                        <span>{row.stage}</span>
+                        <span className="font-mono font-bold text-slate-900 shrink-0">
+                          {row.count} ({row.percentage}%)
+                        </span>
+                      </div>
+                      <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                        <div
+                          className="bg-slate-900 h-2 rounded-full"
+                          style={{ width: `${row.percentage}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
 
-              <div className="space-y-2.5 pt-2 text-xs">
-                {Object.entries(analytics.perceivedDeskillingAverages).map(([key, val]) => (
-                  <div key={key} className="space-y-1">
-                    <div className="flex justify-between text-slate-700">
-                      <span className="capitalize">{key.replace(/([A-Z])/g, ' $1')}</span>
-                      <span className="font-mono font-bold text-slate-900">{val} / 5</span>
+              <div className="p-5 rounded-xl bg-white border border-slate-200 shadow-xs space-y-3">
+                <h3 className="text-sm font-bold text-slate-900">
+                  Q12 · Institutional Written GenAI Policy Awareness
+                </h3>
+                <div className="grid grid-cols-3 gap-3 pt-1">
+                  {analytics.institutionalPolicyBreakdown.map(item => (
+                    <div key={item.status} className="p-3 rounded bg-slate-50 border border-slate-200 text-center">
+                      <div className="text-xs font-semibold text-slate-700">{item.status}</div>
+                      <div className="text-lg font-mono font-bold text-slate-900 mt-0.5">
+                        {item.percentage}%
+                      </div>
+                      <div className="text-[11px] font-mono text-slate-500">n = {item.count}</div>
                     </div>
-                    <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                      <div
-                        className="bg-blue-600 h-2 rounded-full"
-                        style={{ width: `${(val / 5) * 100}%` }}
-                      />
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             </div>
-
           </div>
         </div>
       )}
@@ -653,7 +731,6 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
       {/* ==================================================== */}
       {activeTab === 'manual_scoring' && (
         <div className="space-y-6">
-          {/* Inter-Rater Reliability Header Ribbon */}
           <div className="p-5 rounded-xl bg-white border border-slate-200 shadow-xs grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <span className="text-[10px] font-bold text-slate-500 uppercase">Inter-Rater Agreement %</span>
@@ -664,11 +741,11 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
             </div>
 
             <div>
-              <span className="text-[10px] font-bold text-slate-500 uppercase">Cohen's Kappa (Approx)</span>
+              <span className="text-[10px] font-bold text-slate-500 uppercase">Cohen&apos;s Kappa (Approx)</span>
               <div className="text-2xl font-mono font-bold text-slate-900 mt-1">
                 κ = {analytics.cohensKappaApprox}
               </div>
-              <p className="text-[11px] text-slate-500">High inter-rater diagnostic reliability</p>
+              <p className="text-[11px] text-slate-500">Inter-rater diagnostic reliability</p>
             </div>
 
             <div>
@@ -680,7 +757,6 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
             </div>
           </div>
 
-          {/* Interactive Manual Scoring Console */}
           <div className="p-6 rounded-xl bg-white border border-slate-200 shadow-xs space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
               <div>
@@ -688,11 +764,10 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
                   Human Expert Manual Scoring Console
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Evaluate participant's written reasoning side-by-side with transparent rubrics and gold-standard keys.
+                  Evaluate participant&apos;s written reasoning side-by-side with transparent rubrics and gold-standard keys.
                 </p>
               </div>
 
-              {/* Assessor Switcher */}
               <div className="flex items-center gap-2">
                 <span className="text-xs font-semibold text-slate-700">Active Evaluator:</span>
                 <div className="flex p-0.5 bg-slate-100 rounded border border-slate-200 text-xs">
@@ -716,14 +791,13 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
               </div>
             </div>
 
-            {/* Select Vignette */}
             <div className="flex flex-col sm:flex-row gap-4">
               <div className="flex-1">
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Select Participant & Vignette Answer to Evaluate:
+                  Select Participant &amp; Vignette Case Answer to Evaluate:
                 </label>
                 <select
-                  value={selectedVignetteId || currentScoringVignette?.id}
+                  value={selectedVignetteId || currentScoringVignette?.id || ''}
                   onChange={(e) => setSelectedVignetteId(e.target.value)}
                   className="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs text-slate-800 bg-white"
                 >
@@ -732,7 +806,7 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
                     const p = participants.find(item => item.id === v.participantId);
                     return (
                       <option key={v.id} value={v.id}>
-                        [{v.stage.toUpperCase()}] {p?.code} - {c?.domain}: {c?.title} (Score: {v.finalResolvedScore ?? 'Pending'})
+                        [VIGNETTE CASE] {p?.code} - {c?.domain}: {c?.title} (Score: {v.finalResolvedScore ?? 'Pending'})
                       </option>
                     );
                   })}
@@ -740,10 +814,8 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
               </div>
             </div>
 
-            {currentScoringVignette && currentScoringCase && (
+            {currentScoringVignette && currentScoringCase ? (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-2">
-                
-                {/* Left: Participant's Written Submissions */}
                 <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-4 text-xs">
                   <div className="flex items-center justify-between pb-2 border-b border-slate-200">
                     <span className="font-bold text-slate-900 uppercase">Participant Response</span>
@@ -787,14 +859,12 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
                   </div>
                 </div>
 
-                {/* Right: Gold Standard & Rubric Scoring */}
                 <div className="p-4 rounded-xl bg-white border border-slate-200 space-y-4 text-xs">
                   <div className="flex items-center justify-between pb-2 border-b border-slate-200">
                     <span className="font-bold text-slate-900 uppercase">Expert Answer Key & Rubric</span>
                     <span className="font-mono text-emerald-700 font-bold">Max 4.0 Marks</span>
                   </div>
 
-                  {/* Criteria 1: Primary Dx */}
                   <div className="p-3 rounded-lg border border-slate-200 space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-slate-900">1. Primary Diagnosis (0–1 Mark)</span>
@@ -813,7 +883,6 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
                     </p>
                   </div>
 
-                  {/* Criteria 2: Differentials */}
                   <div className="p-3 rounded-lg border border-slate-200 space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-slate-900">2. Differential Diagnoses (0–1 Mark)</span>
@@ -832,7 +901,6 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
                     </p>
                   </div>
 
-                  {/* Criteria 3: Red Flags */}
                   <div className="p-3 rounded-lg border border-slate-200 space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-slate-900">3. Red Flags Recognition (0–1 Mark)</span>
@@ -851,7 +919,6 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
                     </p>
                   </div>
 
-                  {/* Criteria 4: Next Step */}
                   <div className="p-3 rounded-lg border border-slate-200 space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-slate-900">4. Next Management Step (0–1 Mark)</span>
@@ -870,10 +937,28 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
                     </p>
                   </div>
 
-                  {/* Save button */}
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      Assessor Notes (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={assessorNotes}
+                      onChange={(e) => setAssessorNotes(e.target.value)}
+                      placeholder="Optional grading rationale..."
+                      className="w-full px-3 py-1.5 rounded border border-slate-300 text-xs"
+                    />
+                  </div>
+
                   <div className="pt-2 flex items-center justify-between">
                     <div className="text-xs">
-                      Total Case Score: <span className="font-mono font-bold text-emerald-700 text-sm">{scorePrimary + scoreDiff + scoreRedFlags + scoreNextStep} / 4.0</span>
+                      Total Case Score:{' '}
+                      <span className="font-mono font-bold text-emerald-700 text-sm">
+                        {scorePrimary + scoreDiff + scoreRedFlags + scoreNextStep} / 4.0
+                      </span>
+                      {scoreSavedMessage && (
+                        <span className="ml-2 text-emerald-700 font-medium">{scoreSavedMessage}</span>
+                      )}
                     </div>
                     <button
                       type="button"
@@ -884,7 +969,10 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
                     </button>
                   </div>
                 </div>
-
+              </div>
+            ) : (
+              <div className="p-6 text-center text-xs text-slate-500 border border-dashed border-slate-200 rounded-lg">
+                No post-AI vignette submissions recorded in this dataset yet.
               </div>
             )}
           </div>
@@ -900,14 +988,13 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
             <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-200 gap-3">
               <div>
                 <h3 className="text-base font-bold text-slate-900">
-                  Standardized Case Library & Stimuli Editor (15 Cases)
+                  Standardized Case Library & Stimuli Editor ({cases.length} Cases)
                 </h3>
                 <p className="text-xs text-slate-500">
-                  Inspect or modify patient histories, vitals, answer keys, and fixed AI stimuli.
+                  Inspect or modify patient histories, vitals, answer keys, and fixed CDSS stimuli across the {cases.filter(c => c.stage === 'ai_simulation').length} CDSS and {cases.filter(c => c.stage === 'post_ai').length} Vignette Cases.
                 </p>
               </div>
 
-              {/* Case selector */}
               <select
                 value={selectedEditCaseId}
                 onChange={(e) => setSelectedEditCaseId(e.target.value)}
@@ -915,7 +1002,7 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
               >
                 {cases.map(c => (
                   <option key={c.id} value={c.id}>
-                    [{c.stage.toUpperCase()}] Case {c.caseNumber}: {c.domain} - {c.title}
+                    [{c.stage === 'ai_simulation' ? 'CDSS' : 'VIGNETTE CASE'}] Case {c.caseNumber}: {c.domain} - {c.title}
                   </option>
                 ))}
               </select>
@@ -929,7 +1016,7 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
                     <input
                       type="text"
                       disabled
-                      value={editingCase.stage}
+                      value={editingCase.stage === 'ai_simulation' ? 'CDSS' : 'Vignette Cases'}
                       className="w-full px-3 py-2 rounded bg-slate-100 border border-slate-200 uppercase font-mono"
                     />
                   </div>
@@ -973,7 +1060,12 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
                   />
                 </div>
 
-                {/* AI Stimulus (If in AI simulation stage) */}
+                {editingCase.clinicalImages && editingCase.clinicalImages.length > 0 && (
+                  <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
+                    <ClinicalImageGallery images={editingCase.clinicalImages} />
+                  </div>
+                )}
+
                 {editingCase.stage === 'ai_simulation' && editingCase.aiStimulus && (
                   <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3 text-xs">
                     <div className="flex items-center justify-between pb-2 border-b border-slate-200">
@@ -1050,7 +1142,7 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
                     <span>Participants Cohort Dataset</span>
                   </div>
                   <p className="text-[11px] text-slate-600">
-                    One row per participant: anonymous ID, designation, specialty, years of experience, daily load, AI exposure.
+                    One row per participant: anonymous ID, designation, specialty, MBBS bracket, hospital type, formal GenAI training.
                   </p>
                 </div>
                 <button
@@ -1066,10 +1158,10 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
                 <div>
                   <div className="flex items-center gap-2 font-bold text-xs text-slate-900 mb-1">
                     <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-                    <span>Questionnaire Survey Dataset</span>
+                    <span>Study Questionnaire Dataset</span>
                   </div>
                   <p className="text-[11px] text-slate-600">
-                    All Sections A-D survey items, AI frequency, 7 cognitive offloading items, and 6 deskilling items.
+                    Section I profile + Section II GenAI Exposure Q1–Q12 (including 8 task offloading items, last 10 cases, policy).
                   </p>
                 </div>
                 <button
@@ -1085,10 +1177,10 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
                 <div>
                   <div className="flex items-center gap-2 font-bold text-xs text-slate-900 mb-1">
                     <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-                    <span>AI Simulation Interaction Log</span>
+                    <span>CDSS Interaction Log</span>
                   </div>
                   <p className="text-[11px] text-slate-600">
-                    One row per case per participant: Initial Dx, locked timestamp, AI agreement, final Dx, confidence shift, verification intent.
+                    One row per CDSS case per participant: CDSS agreement, final Dx, decision rationale, confidence, verification intent.
                   </p>
                 </div>
                 <button
@@ -1096,7 +1188,7 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
                   className="mt-4 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-slate-900 rounded-lg hover:bg-slate-800 transition-colors shadow-xs"
                 >
                   <Download className="w-3.5 h-3.5" />
-                  <span>Export ai_interactions.csv</span>
+                  <span>Export cdss_interactions.csv</span>
                 </button>
               </div>
 
@@ -1104,37 +1196,18 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
                 <div>
                   <div className="flex items-center gap-2 font-bold text-xs text-slate-900 mb-1">
                     <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-                    <span>Baseline Unaided Scores</span>
+                    <span>Vignette Cases Scores</span>
                   </div>
                   <p className="text-[11px] text-slate-600">
-                    Primary diagnosis, differentials, red flags, next step, confidence, and Assessor 1 & 2 scores (0-4 marks).
+                    Independent Vignette Cases responses and Assessor 1 &amp; 2 scores (0–4 marks per case).
                   </p>
                 </div>
                 <button
-                  onClick={() => handleExportVignettes('baseline')}
+                  onClick={handleExportPostAiVignettes}
                   className="mt-4 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-slate-900 rounded-lg hover:bg-slate-800 transition-colors shadow-xs"
                 >
                   <Download className="w-3.5 h-3.5" />
-                  <span>Export baseline_scores.csv</span>
-                </button>
-              </div>
-
-              <div className="p-4 rounded-lg border border-slate-200 bg-slate-50/70 flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center gap-2 font-bold text-xs text-slate-900 mb-1">
-                    <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
-                    <span>Post-AI Unaided Scores</span>
-                  </div>
-                  <p className="text-[11px] text-slate-600">
-                    Post-exposure clinical reasoning scores across 5 new clinical cases for paired comparative testing.
-                  </p>
-                </div>
-                <button
-                  onClick={() => handleExportVignettes('post_ai')}
-                  className="mt-4 inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-slate-900 rounded-lg hover:bg-slate-800 transition-colors shadow-xs"
-                >
-                  <Download className="w-3.5 h-3.5" />
-                  <span>Export post_ai_scores.csv</span>
+                  <span>Export vignette_cases_scores.csv</span>
                 </button>
               </div>
 
@@ -1187,7 +1260,6 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
             </div>
 
             <div className="space-y-6 pt-2">
-              {/* FastAPI */}
               <div>
                 <div className="flex items-center justify-between pb-1.5 mb-2 border-b border-slate-200">
                   <span className="font-mono text-xs font-bold text-slate-800">
@@ -1196,11 +1268,12 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
                   <button
                     onClick={() => {
                       navigator.clipboard.writeText(FASTAPI_MAIN_PY);
-                      alert('FastAPI source code copied to clipboard.');
+                      setCopiedCodeType('main.py');
+                      setTimeout(() => setCopiedCodeType(null), 2500);
                     }}
                     className="text-xs text-emerald-700 hover:text-emerald-800 font-semibold"
                   >
-                    Copy main.py
+                    {copiedCodeType === 'main.py' ? 'Copied' : 'Copy main.py'}
                   </button>
                 </div>
                 <pre className="p-4 rounded-lg bg-slate-900 text-slate-100 text-xs font-mono overflow-x-auto max-h-72 leading-relaxed">
@@ -1208,7 +1281,6 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
                 </pre>
               </div>
 
-              {/* Supabase SQL */}
               <div>
                 <div className="flex items-center justify-between pb-1.5 mb-2 border-b border-slate-200">
                   <span className="font-mono text-xs font-bold text-slate-800">
@@ -1217,11 +1289,12 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
                   <button
                     onClick={() => {
                       navigator.clipboard.writeText(SUPABASE_SQL_MIGRATION);
-                      alert('Supabase SQL migration copied to clipboard.');
+                      setCopiedCodeType('schema.sql');
+                      setTimeout(() => setCopiedCodeType(null), 2500);
                     }}
                     className="text-xs text-emerald-700 hover:text-emerald-800 font-semibold"
                   >
-                    Copy schema.sql
+                    {copiedCodeType === 'schema.sql' ? 'Copied' : 'Copy schema.sql'}
                   </button>
                 </div>
                 <pre className="p-4 rounded-lg bg-slate-900 text-slate-100 text-xs font-mono overflow-x-auto max-h-72 leading-relaxed">
@@ -1244,32 +1317,11 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
                 Research Protocol & Session Configuration
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
-                Customize study variables, institutional details, and baseline enablement according to IEC-approved protocols.
+                Customize study variables and institutional details according to IEC-approved protocols.
               </p>
             </div>
 
             <div className="space-y-4 pt-2 text-xs">
-              
-              {/* Baseline Assessment Toggle */}
-              <div className="p-4 rounded-lg bg-slate-50 border border-slate-200 flex items-center justify-between">
-                <div>
-                  <span className="font-bold text-slate-900 block">Baseline Unaided Clinical Reasoning Stage</span>
-                  <span className="text-slate-500 block text-[11px] mt-0.5">
-                    When enabled (default), participants complete 5 baseline cases before AI exposure. When disabled, participants proceed directly to the AI simulation.
-                  </span>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={settings.baselineAssessmentEnabled}
-                    onChange={(e) => onUpdateSettings({ baselineAssessmentEnabled: e.target.checked })}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
-                </label>
-              </div>
-
-              {/* Protocol Details */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Institution Name</label>
@@ -1312,7 +1364,6 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
                 </div>
               </div>
 
-              {/* Data Deletion */}
               <div className="pt-4 border-t border-slate-200 flex items-center justify-between">
                 <div>
                   <span className="font-bold text-rose-700 block">Purge Genuine Research Records</span>
@@ -1323,17 +1374,14 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
                 <button
                   type="button"
                   onClick={() => {
-                    if (window.confirm('Are you sure you want to delete all genuine research participant records? This cannot be undone.')) {
-                      researchStore.clearResearchData();
-                      window.location.reload();
-                    }
+                    researchStore.clearResearchData();
+                    window.location.reload();
                   }}
                   className="px-3.5 py-2 text-xs font-semibold text-rose-700 border border-rose-300 hover:bg-rose-50 rounded-lg transition-colors"
                 >
                   Clear Research Data
                 </button>
               </div>
-
             </div>
           </div>
         </div>

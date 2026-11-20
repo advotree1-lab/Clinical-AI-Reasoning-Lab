@@ -25,7 +25,7 @@ export const Stage8Debriefing: React.FC<Stage8DebriefingProps> = ({
         
         {/* Header Metadata */}
         <div className="flex items-center gap-2 text-xs font-mono text-slate-500 mb-2">
-          <span>STAGE 08 / 08</span>
+          <span>STAGE 07 / 07</span>
           <span aria-hidden="true">·</span>
           <span>SESSION COMPLETION & DEBRIEFING</span>
           <span aria-hidden="true">·</span>
@@ -44,11 +44,11 @@ export const Stage8Debriefing: React.FC<Stage8DebriefingProps> = ({
           </div>
           <div>
             <span className="text-slate-500 block text-[10px] uppercase font-mono">Designation</span>
-            <span className="font-medium text-slate-900">{participant.designation}</span>
+            <span className="font-medium text-slate-900">{participant.designation === 'Other' && participant.designationOther ? participant.designationOther : participant.designation}</span>
           </div>
           <div>
             <span className="text-slate-500 block text-[10px] uppercase font-mono">Specialty</span>
-            <span className="font-medium text-slate-900">{participant.specialty}</span>
+            <span className="font-medium text-slate-900">{participant.specialty === 'Other' && participant.specialtyOther ? participant.specialtyOther : participant.specialty}</span>
           </div>
           <div>
             <span className="text-slate-500 block text-[10px] uppercase font-mono">Dataset Status</span>
@@ -63,21 +63,21 @@ export const Stage8Debriefing: React.FC<Stage8DebriefingProps> = ({
           </h3>
 
           <p className="text-xs text-slate-700 leading-relaxed">
-            During Stage 6 (AI Clinical Simulation), you evaluated five standardized clinical cases. To rigorously assess <strong>automation bias, cognitive offloading, and verification vigilance</strong>, the AI consultation outputs were <strong>pre-calibrated research stimuli</strong>:
+            During Stage 5 (CDSS), you evaluated five standardized clinical cases alongside CDSS suggestions. To rigorously assess <strong>automation bias, cognitive offloading, and verification vigilance</strong>, the CDSS outputs were <strong>pre-calibrated research stimuli</strong>:
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
             <div className="p-3 rounded bg-white border border-slate-200 text-xs">
               <span className="font-bold text-slate-900 block mb-0.5">2 Clinically Appropriate Recommendations</span>
               <p className="text-slate-600 text-[11px] leading-relaxed">
-                Acute STEMI and Diabetic Ketoacidosis cases evaluated baseline diagnostic adoption of standard-of-care AI advice.
+                Hyperosmolar Hyperglycaemic State with Urosepsis/Hypokalaemia (Case 4) and Post-Diarrhoeal Haemolytic Uraemic Syndrome / TMA (Case 5) evaluated appropriate adoption of evidence-based guidance.
               </p>
             </div>
 
             <div className="p-3 rounded bg-white border border-slate-200 text-xs">
               <span className="font-bold text-slate-900 block mb-0.5">3 Deliberately Misleading Recommendations</span>
               <p className="text-slate-600 text-[11px] leading-relaxed">
-                Pulmonary Embolism (diagnostic anchoring), Adrenal Crisis (investigation inversion), and Meningitis (contraindicated lumbar puncture) tested whether clinicians detected safety violations or blindly deferred.
+                Posterior Wall STEMI Equivalent (diagnostic anchoring), Acute MCA Stroke on Apixaban (harmful thrombolysis advice), and Near-Fatal Asthma with Silent Chest (investigation inversion) tested whether clinicians detected safety violations or blindly deferred.
               </p>
             </div>
           </div>
@@ -93,7 +93,7 @@ export const Stage8Debriefing: React.FC<Stage8DebriefingProps> = ({
             Methodological Scope & Limitations
           </span>
           <p className="text-xs text-slate-700 leading-relaxed">
-            This study is a controlled academic simulation. Differences observed across baseline and post-AI vignettes reflect simulated task performance and domain complexity rather than permanent clinical cognitive deskilling. Self-reported survey responses capture subjective clinician attitudes.
+            This study is a controlled academic simulation. Scores across the Vignette Cases reflect simulated independent task performance rather than permanent clinical cognitive deskilling. Self-reported survey responses capture work-related GenAI exposure over the past 3 months.
           </p>
         </div>
 

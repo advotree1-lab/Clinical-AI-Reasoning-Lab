@@ -5,26 +5,26 @@ import {
   AiInteractionRecord,
   VignetteAnswerRecord,
   ResearchProtocolSettings,
-  VignetteScoreBreakdown
+  VignetteScoreBreakdown,
+  CaseStage
 } from '../types';
 import { INITIAL_CLINICAL_CASES } from '../data/clinicalCases';
 import { generateSeedDemoData } from '../data/seedDemoData';
 
-const DEMO_PARTICIPANTS_KEY = 'carl_demo_participants';
-const DEMO_QUESTIONNAIRES_KEY = 'carl_demo_questionnaires';
-const DEMO_AI_INTERACTIONS_KEY = 'carl_demo_ai_interactions';
-const DEMO_VIGNETTES_KEY = 'carl_demo_vignettes';
+const DEMO_PARTICIPANTS_KEY = 'carl_demo_participants_v6';
+const DEMO_QUESTIONNAIRES_KEY = 'carl_demo_questionnaires_v6';
+const DEMO_AI_INTERACTIONS_KEY = 'carl_demo_ai_interactions_v6';
+const DEMO_VIGNETTES_KEY = 'carl_demo_vignettes_v6';
 
-const RESEARCH_PARTICIPANTS_KEY = 'carl_research_participants';
-const RESEARCH_QUESTIONNAIRES_KEY = 'carl_research_questionnaires';
-const RESEARCH_AI_INTERACTIONS_KEY = 'carl_research_ai_interactions';
-const RESEARCH_VIGNETTES_KEY = 'carl_research_vignettes';
+const RESEARCH_PARTICIPANTS_KEY = 'carl_research_participants_v6';
+const RESEARCH_QUESTIONNAIRES_KEY = 'carl_research_questionnaires_v6';
+const RESEARCH_AI_INTERACTIONS_KEY = 'carl_research_ai_interactions_v6';
+const RESEARCH_VIGNETTES_KEY = 'carl_research_vignettes_v6';
 
-const PROTOCOL_SETTINGS_KEY = 'carl_protocol_settings';
-const CASES_KEY = 'carl_clinical_cases';
+const PROTOCOL_SETTINGS_KEY = 'carl_protocol_settings_v6';
+const CASES_KEY = 'carl_clinical_cases_v6';
 
 const DEFAULT_SETTINGS: ResearchProtocolSettings = {
-  baselineAssessmentEnabled: true,
   requireParticipantConsent: true,
   passcode: 'LAB2026',
   institutionName: 'Department of Medicine, Academic Medical College',
@@ -44,10 +44,20 @@ class ResearchStore {
 
   private initStore() {
     try {
-      // Cases
+      // Cases (preserve custom researcher edits while syncing newly added baseline attachments like clinicalImages)
       const storedCases = localStorage.getItem(CASES_KEY);
       if (storedCases) {
-        this.cases = JSON.parse(storedCases);
+        const parsed: ClinicalCase[] = JSON.parse(storedCases);
+        this.cases = parsed.map(stored => {
+          const baseline = INITIAL_CLINICAL_CASES.find(ic => ic.id === stored.id);
+          return baseline
+            ? {
+                ...stored,
+                clinicalImages: stored.clinicalImages ?? baseline.clinicalImages
+              }
+            : stored;
+        });
+        localStorage.setItem(CASES_KEY, JSON.stringify(this.cases));
       } else {
         this.cases = INITIAL_CLINICAL_CASES;
         localStorage.setItem(CASES_KEY, JSON.stringify(this.cases));
@@ -90,7 +100,7 @@ class ResearchStore {
     localStorage.setItem(PROTOCOL_SETTINGS_KEY, JSON.stringify(this.settings));
   }
 
-  public getCases(stage?: 'baseline' | 'ai_simulation' | 'post_ai'): ClinicalCase[] {
+  public getCases(stage?: CaseStage): ClinicalCase[] {
     if (stage) {
       return this.cases.filter(c => c.stage === stage);
     }
@@ -159,8 +169,8 @@ class ResearchStore {
     localStorage.setItem(key, JSON.stringify(list));
   }
 
-  // --- VIGNETTES (BASELINE & POST-AI) ---
-  public getVignetteAnswers(isDemo: boolean, stage?: 'baseline' | 'post_ai'): VignetteAnswerRecord[] {
+  // --- VIGNETTES (POST-AI) ---
+  public getVignetteAnswers(isDemo: boolean, stage?: 'post_ai'): VignetteAnswerRecord[] {
     const key = isDemo ? DEMO_VIGNETTES_KEY : RESEARCH_VIGNETTES_KEY;
     const data = localStorage.getItem(key);
     const list: VignetteAnswerRecord[] = data ? JSON.parse(data) : [];
@@ -197,7 +207,6 @@ class ResearchStore {
       } else {
         item.assessor2Score = score;
       }
-      // compute resolved score
       const s1 = item.assessor1Score?.totalScore;
       const s2 = item.assessor2Score?.totalScore;
       if (s1 !== undefined && s2 !== undefined) {

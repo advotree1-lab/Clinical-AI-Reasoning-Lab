@@ -3,8 +3,17 @@ import {
   QuestionnaireResponse,
   AiInteractionRecord,
   VignetteAnswerRecord,
-  ClinicalCase
+  ClinicalCase,
+  GenAiTaskFrequency
 } from '../types';
+
+const TASK_FREQ_SCORE: Record<GenAiTaskFrequency, number> = {
+  'Never': 1,
+  'Rarely': 2,
+  'Sometimes': 3,
+  'Often': 4,
+  'Very often': 5
+};
 
 export interface ResearchAnalyticsSummary {
   totalEnrolled: number;
@@ -17,43 +26,36 @@ export interface ResearchAnalyticsSummary {
   // Secondary Outcomes
   soundAdviceAcceptanceRate: number; // percentage (0-100)
   meanSoundAcceptedCount: number; // 0 to 2
-  diagnosticSwitchingRate: number; // overall percentage who switched at least once
+  diagnosticSwitchingRate: number;
   switchAwayToMisleadingRate: number;
   switchTowardCorrectRate: number;
   unverifiedMisleadingAcceptanceRate: number;
   initialMeanConfidence: number;
   finalMeanConfidence: number;
   confidenceDelta: number;
-  // Baseline vs Post-AI Unaided Performance
-  baselineMeanScore: number;
-  baselineStdDev: number;
-  postAiMeanScore: number;
+  // Post-AI Unaided Reasoning Performance
+  postAiMeanScore: number; // out of postAiMaxScore
+  postAiMaxScore: number; // 4 marks per post-AI case
   postAiStdDev: number;
-  meanScoreDifference: number; // Post - Baseline
-  pairedTStatApprox: number;
-  pValueApprox: number;
+  postAiMeanPercentage: number;
+  postAiCaseMeans: { caseNumber: number; domain: string; title: string; meanScore: number }[];
   // Inter-Rater Reliability (Assessor 1 vs Assessor 2)
   interRaterAgreementPercentage: number;
   cohensKappaApprox: number;
   totalVignettesScoredByBoth: number;
-  // Cognitive Offloading & Deskilling
-  cognitiveOffloadingAverages: {
-    dependDifferential: number;
-    substituteRecall: number;
-    interpretComplex: number;
-    transferReasoning: number;
-    consultBeforeThinking: number;
-    reduceWorkload: number;
-    verifyBeforeUsing: number;
-  };
-  perceivedDeskillingAverages: {
-    reducedEffort: number;
-    difficultWithoutAi: number;
-    lessConfidentIndependent: number;
-    dependInvestigations: number;
-    affectProblemSolving: number;
-    confidenceChange: number;
-  };
+  // GenAI Exposure & Task-Offloading Survey Metrics
+  genAiAdoptionRate: number; // % who answered Yes to Q1
+  formalTrainingRate: number; // % with formal GenAI training
+  patientInfoEnteredRate: number; // % of GenAI users who entered patient info (>= Once or twice)
+  meanCasesConsultedOutOf10: number; // Q10 mean (0-10)
+  alwaysOrOftenVerifyRate: number; // % of GenAI users verifying Often or Very often (Q11)
+  taskFrequencyAverages: {
+    task: string;
+    meanScore: number; // 1 to 5
+    oftenOrVeryOftenPct: number;
+  }[];
+  consultationStageBreakdown: { stage: string; count: number; percentage: number }[];
+  institutionalPolicyBreakdown: { status: string; count: number; percentage: number }[];
   // Breakdowns
   designationBreakdown: { name: string; count: number; misleadingAcceptanceRate: number }[];
   specialtyBreakdown: { name: string; count: number }[];
@@ -118,7 +120,6 @@ export function computeAnalytics(
 
       const isMis = misleadingCaseIds.has(r.caseId);
       const isSound = soundCaseIds.has(r.caseId);
-
       const agreed = r.aiAgreement === 'Completely agree' || r.aiAgreement === 'Partially agree';
 
       if (isMis) {
@@ -160,7 +161,6 @@ export function computeAnalytics(
     ? Number((totalMisleadingAccepted / participants.length).toFixed(2))
     : 0;
 
-  // Distribution 0, 1, 2, 3
   const distCounts = [0, 0, 0, 0];
   misleadingCountsPerParticipant.forEach(c => {
     const idx = Math.min(3, Math.max(0, c));
@@ -207,22 +207,17 @@ export function computeAnalytics(
 
   const confidenceDelta = Number((finalMeanConfidence - initialMeanConfidence).toFixed(2));
 
-  // Vignette Scores (Baseline vs Post-AI)
-  const baselineByParticipant: Record<string, number> = {};
-  const postByParticipant: Record<string, number> = {};
+  // Post-AI Independent Reasoning Vignette Scores
+  const postCasesList = cases.filter(c => c.stage === 'post_ai');
+  const postAiMaxScore = Math.max(4, postCasesList.length * 4);
 
+  const postByParticipant: Record<string, number> = {};
   vignetteAnswers.forEach(v => {
     const score = v.finalResolvedScore ?? v.assessor1Score?.totalScore ?? 0;
-    if (v.stage === 'baseline') {
-      baselineByParticipant[v.participantId] = (baselineByParticipant[v.participantId] || 0) + score;
-    } else if (v.stage === 'post_ai') {
-      postByParticipant[v.participantId] = (postByParticipant[v.participantId] || 0) + score;
-    }
+    postByParticipant[v.participantId] = (postByParticipant[v.participantId] || 0) + score;
   });
 
-  const baselineScores = Object.values(baselineByParticipant);
   const postScores = Object.values(postByParticipant);
-
   const calcMeanStd = (arr: number[]) => {
     if (arr.length === 0) return { mean: 0, std: 0 };
     const mean = arr.reduce((a, b) => a + b, 0) / arr.length;
@@ -230,23 +225,19 @@ export function computeAnalytics(
     return { mean: Number(mean.toFixed(2)), std: Number(Math.sqrt(variance).toFixed(2)) };
   };
 
-  const bStats = calcMeanStd(baselineScores);
   const pStats = calcMeanStd(postScores);
-
-  // Paired diffs
-  const pairedDiffs: number[] = [];
-  participants.forEach(p => {
-    if (baselineByParticipant[p.id] !== undefined && postByParticipant[p.id] !== undefined) {
-      pairedDiffs.push(postByParticipant[p.id] - baselineByParticipant[p.id]);
-    }
+  const postAiMeanPercentage = Number(((pStats.mean / postAiMaxScore) * 100).toFixed(1));
+  const postAiCaseMeans = postCasesList.map(c => {
+    const answersForCase = vignetteAnswers.filter(v => v.caseId === c.id);
+    const scored = answersForCase.filter(v => (v.finalResolvedScore ?? v.assessor1Score?.totalScore) !== undefined);
+    const sum = scored.reduce((acc, v) => acc + (v.finalResolvedScore ?? v.assessor1Score?.totalScore ?? 0), 0);
+    return {
+      caseNumber: c.caseNumber,
+      domain: c.domain,
+      title: c.title,
+      meanScore: scored.length > 0 ? Number((sum / scored.length).toFixed(2)) : 0
+    };
   });
-
-  const diffStats = calcMeanStd(pairedDiffs);
-  const n = pairedDiffs.length;
-  const standardError = n > 1 && diffStats.std > 0 ? diffStats.std / Math.sqrt(n) : 1;
-  const pairedTStatApprox = Number((diffStats.mean / standardError).toFixed(2));
-  // Rough p-value estimation for presentation
-  const pValueApprox = Math.abs(pairedTStatApprox) > 2.02 ? 0.048 : (Math.abs(pairedTStatApprox) > 1.68 ? 0.098 : 0.34);
 
   // Inter-Rater Reliability (Assessor 1 vs Assessor 2)
   let bothScoredCount = 0;
@@ -269,67 +260,86 @@ export function computeAnalytics(
 
   const interRaterAgreementPercentage = bothScoredCount > 0
     ? Number(((exactAgreementCount / bothScoredCount) * 100).toFixed(1))
-    : 85.0;
+    : 0;
 
   const cohensKappaApprox = bothScoredCount > 0
     ? Number((((primaryAgreementCount / bothScoredCount) - 0.5) / (1 - 0.5)).toFixed(2))
-    : 0.78;
+    : 0;
 
-  // Questionnaire Averages
-  const qCount = questionnaires.length || 1;
-  const sumCog = {
-    dependDifferential: 0,
-    substituteRecall: 0,
-    interpretComplex: 0,
-    transferReasoning: 0,
-    consultBeforeThinking: 0,
-    reduceWorkload: 0,
-    verifyBeforeUsing: 0
-  };
-  const sumDesk = {
-    reducedEffort: 0,
-    difficultWithoutAi: 0,
-    lessConfidentIndependent: 0,
-    dependInvestigations: 0,
-    affectProblemSolving: 0,
-    confidenceChange: 0
-  };
+  // GenAI Exposure & Task-Offloading Questionnaire Analytics
+  const qTotal = questionnaires.length;
+  const genAiUsers = questionnaires.filter(q => q.usedGenAiLast3Months);
+  const userCount = genAiUsers.length;
 
-  questionnaires.forEach(q => {
-    sumCog.dependDifferential += q.cognitiveOffloading.dependDifferential;
-    sumCog.substituteRecall += q.cognitiveOffloading.substituteRecall;
-    sumCog.interpretComplex += q.cognitiveOffloading.interpretComplex;
-    sumCog.transferReasoning += q.cognitiveOffloading.transferReasoning;
-    sumCog.consultBeforeThinking += q.cognitiveOffloading.consultBeforeThinking;
-    sumCog.reduceWorkload += q.cognitiveOffloading.reduceWorkload;
-    sumCog.verifyBeforeUsing += q.cognitiveOffloading.verifyBeforeUsing;
+  const genAiAdoptionRate = qTotal > 0 ? Number(((userCount / qTotal) * 100).toFixed(1)) : 0;
+  const formalTrainingRate = qTotal > 0
+    ? Number(((questionnaires.filter(q => q.formalGenAiTraining).length / qTotal) * 100).toFixed(1))
+    : 0;
 
-    sumDesk.reducedEffort += q.perceivedDeskilling.reducedEffort;
-    sumDesk.difficultWithoutAi += q.perceivedDeskilling.difficultWithoutAi;
-    sumDesk.lessConfidentIndependent += q.perceivedDeskilling.lessConfidentIndependent;
-    sumDesk.dependInvestigations += q.perceivedDeskilling.dependInvestigations;
-    sumDesk.affectProblemSolving += q.perceivedDeskilling.affectProblemSolving;
-    sumDesk.confidenceChange += q.perceivedDeskilling.confidenceChange;
+  const patientInfoEnteredRate = userCount > 0
+    ? Number(((genAiUsers.filter(q => q.enteredPatientInfo && q.enteredPatientInfo !== 'Never').length / userCount) * 100).toFixed(1))
+    : 0;
+
+  const meanCasesConsultedOutOf10 = userCount > 0
+    ? Number((genAiUsers.reduce((acc, q) => acc + (q.last10CasesConsultedCount ?? 0), 0) / userCount).toFixed(1))
+    : 0;
+
+  const alwaysOrOftenVerifyRate = userCount > 0
+    ? Number(((genAiUsers.filter(q => q.verificationFrequency === 'Often' || q.verificationFrequency === 'Very often').length / userCount) * 100).toFixed(1))
+    : 0;
+
+  const taskDefs: { key: keyof NonNullable<QuestionnaireResponse['taskFrequency']>; label: string }[] = [
+    { key: 'differentialDiagnoses', label: 'a. Generating differential diagnoses' },
+    { key: 'interpretingInvestigations', label: 'b. Interpreting investigation results' },
+    { key: 'choosingInvestigations', label: 'c. Choosing investigations' },
+    { key: 'identifyingManagement', label: 'd. Identifying management options' },
+    { key: 'drugDosesAndInteractions', label: 'e. Drug doses and interactions' },
+    { key: 'summarisingLiterature', label: 'f. Summarising literature or guidelines' },
+    { key: 'clinicalDocumentation', label: 'g. Clinical documentation or letters' },
+    { key: 'patientCommunication', label: 'h. Patient communication' }
+  ];
+
+  const taskFrequencyAverages = taskDefs.map(def => {
+    const valid = genAiUsers.filter(q => q.taskFrequency?.[def.key]);
+    if (valid.length === 0) {
+      return { task: def.label, meanScore: 0, oftenOrVeryOftenPct: 0 };
+    }
+    const sum = valid.reduce((acc, q) => acc + TASK_FREQ_SCORE[q.taskFrequency![def.key]], 0);
+    const highCount = valid.filter(q => {
+      const val = q.taskFrequency![def.key];
+      return val === 'Often' || val === 'Very often';
+    }).length;
+    return {
+      task: def.label,
+      meanScore: Number((sum / valid.length).toFixed(2)),
+      oftenOrVeryOftenPct: Number(((highCount / valid.length) * 100).toFixed(1))
+    };
   });
 
-  const cognitiveOffloadingAverages = {
-    dependDifferential: Number((sumCog.dependDifferential / qCount).toFixed(2)),
-    substituteRecall: Number((sumCog.substituteRecall / qCount).toFixed(2)),
-    interpretComplex: Number((sumCog.interpretComplex / qCount).toFixed(2)),
-    transferReasoning: Number((sumCog.transferReasoning / qCount).toFixed(2)),
-    consultBeforeThinking: Number((sumCog.consultBeforeThinking / qCount).toFixed(2)),
-    reduceWorkload: Number((sumCog.reduceWorkload / qCount).toFixed(2)),
-    verifyBeforeUsing: Number((sumCog.verifyBeforeUsing / qCount).toFixed(2))
-  };
+  const stageCounts: Record<string, number> = {};
+  const policyCounts: Record<string, number> = { Yes: 0, No: 0, 'Not sure': 0 };
+  genAiUsers.forEach(q => {
+    if (q.reasoningConsultationStage) {
+      stageCounts[q.reasoningConsultationStage] = (stageCounts[q.reasoningConsultationStage] || 0) + 1;
+    }
+    if (q.institutionalPolicy) {
+      policyCounts[q.institutionalPolicy] = (policyCounts[q.institutionalPolicy] || 0) + 1;
+    }
+  });
 
-  const perceivedDeskillingAverages = {
-    reducedEffort: Number((sumDesk.reducedEffort / qCount).toFixed(2)),
-    difficultWithoutAi: Number((sumDesk.difficultWithoutAi / qCount).toFixed(2)),
-    lessConfidentIndependent: Number((sumDesk.lessConfidentIndependent / qCount).toFixed(2)),
-    dependInvestigations: Number((sumDesk.dependInvestigations / qCount).toFixed(2)),
-    affectProblemSolving: Number((sumDesk.affectProblemSolving / qCount).toFixed(2)),
-    confidenceChange: Number((sumDesk.confidenceChange / qCount).toFixed(2))
-  };
+  const consultationStageBreakdown = Object.entries(stageCounts)
+    .map(([stage, count]) => ({
+      stage,
+      count,
+      percentage: userCount > 0 ? Number(((count / userCount) * 100).toFixed(1)) : 0
+    }))
+    .sort((a, b) => b.count - a.count);
+
+  const institutionalPolicyBreakdown = Object.entries(policyCounts).map(([status, count]) => ({
+    status,
+    count,
+    percentage: userCount > 0 ? Number(((count / userCount) * 100).toFixed(1)) : 0
+  }));
 
   // Designation breakdown
   const desMap: Record<string, { count: number; misleadingAccepted: number; misleadingTotal: number }> = {};
@@ -397,18 +407,22 @@ export function computeAnalytics(
     initialMeanConfidence,
     finalMeanConfidence,
     confidenceDelta,
-    baselineMeanScore: bStats.mean,
-    baselineStdDev: bStats.std,
     postAiMeanScore: pStats.mean,
+    postAiMaxScore,
     postAiStdDev: pStats.std,
-    meanScoreDifference: diffStats.mean,
-    pairedTStatApprox,
-    pValueApprox,
+    postAiMeanPercentage,
+    postAiCaseMeans,
     interRaterAgreementPercentage,
     cohensKappaApprox,
     totalVignettesScoredByBoth: bothScoredCount,
-    cognitiveOffloadingAverages,
-    perceivedDeskillingAverages,
+    genAiAdoptionRate,
+    formalTrainingRate,
+    patientInfoEnteredRate,
+    meanCasesConsultedOutOf10,
+    alwaysOrOftenVerifyRate,
+    taskFrequencyAverages,
+    consultationStageBreakdown,
+    institutionalPolicyBreakdown,
     designationBreakdown,
     specialtyBreakdown,
     caseWiseMisleadingBreakdown
@@ -437,42 +451,28 @@ function getEmptyAnalytics(): ResearchAnalyticsSummary {
     initialMeanConfidence: 0,
     finalMeanConfidence: 0,
     confidenceDelta: 0,
-    baselineMeanScore: 0,
-    baselineStdDev: 0,
     postAiMeanScore: 0,
+    postAiMaxScore: 24,
     postAiStdDev: 0,
-    meanScoreDifference: 0,
-    pairedTStatApprox: 0,
-    pValueApprox: 1,
+    postAiMeanPercentage: 0,
+    postAiCaseMeans: [],
     interRaterAgreementPercentage: 0,
     cohensKappaApprox: 0,
     totalVignettesScoredByBoth: 0,
-    cognitiveOffloadingAverages: {
-      dependDifferential: 0,
-      substituteRecall: 0,
-      interpretComplex: 0,
-      transferReasoning: 0,
-      consultBeforeThinking: 0,
-      reduceWorkload: 0,
-      verifyBeforeUsing: 0
-    },
-    perceivedDeskillingAverages: {
-      reducedEffort: 0,
-      difficultWithoutAi: 0,
-      lessConfidentIndependent: 0,
-      dependInvestigations: 0,
-      affectProblemSolving: 0,
-      confidenceChange: 0
-    },
+    genAiAdoptionRate: 0,
+    formalTrainingRate: 0,
+    patientInfoEnteredRate: 0,
+    meanCasesConsultedOutOf10: 0,
+    alwaysOrOftenVerifyRate: 0,
+    taskFrequencyAverages: [],
+    consultationStageBreakdown: [],
+    institutionalPolicyBreakdown: [],
     designationBreakdown: [],
     specialtyBreakdown: [],
     caseWiseMisleadingBreakdown: []
   };
 }
 
-// ==========================================
-// CSV & SPSS EXPORT GENERATION UTILITIES
-// ==========================================
 export function exportToCsv(filename: string, rows: Record<string, any>[]) {
   if (!rows || rows.length === 0) return;
   const headers = Object.keys(rows[0]);
@@ -481,7 +481,7 @@ export function exportToCsv(filename: string, rows: Record<string, any>[]) {
     ...rows.map(row =>
       headers
         .map(h => {
-          let val = row[h];
+          const val = row[h];
           if (val === undefined || val === null) return '""';
           if (typeof val === 'string') {
             return `"${val.replace(/"/g, '""')}"`;

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ArrowRight, ArrowLeft } from 'lucide-react';
 import { ClinicalCase, Participant, VignetteAnswerRecord } from '../../types';
+import { ClinicalImageGallery } from '../common/ClinicalImageGallery';
 
 interface Stage7PostAiAssessmentProps {
   cases: ClinicalCase[];
@@ -58,36 +59,47 @@ export const Stage7PostAiAssessment: React.FC<Stage7PostAiAssessmentProps> = ({
   };
 
   const handleNext = () => {
-    if (!isCurrentValid()) return;
-
     if (currentCaseIndex < cases.length - 1) {
       setCurrentCaseIndex(currentCaseIndex + 1);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
-      const finalRecords: VignetteAnswerRecord[] = cases.map(c => {
-        const a = answers[c.id] || currentAnswer;
-        const actualDiagnosis = a.mostLikelyDiagnosis === 'Other'
+      handleCompleteAll();
+    }
+  };
+
+  const handleCompleteAll = () => {
+    const finalRecords: VignetteAnswerRecord[] = cases.map(c => {
+      const a = answers[c.id] || {
+        mostLikelyDiagnosis: c.mcqOptions[0],
+        customOtherDiagnosis: '',
+        differential1: '',
+        differential2: '',
+        redFlags: '',
+        nextStep: '',
+        confidence: 3
+      };
+      const actualDiagnosis =
+        a.mostLikelyDiagnosis === 'Other' && a.customOtherDiagnosis.trim()
           ? a.customOtherDiagnosis.trim()
           : a.mostLikelyDiagnosis;
 
-        return {
-          id: `post-${participant.id}-${c.id}`,
-          participantId: participant.id,
-          caseId: c.id,
-          stage: 'post_ai',
-          isDemo: isDemoMode,
-          mostLikelyDiagnosis: actualDiagnosis,
-          differential1: a.differential1.trim(),
-          differential2: a.differential2.trim(),
-          redFlags: a.redFlags.trim(),
-          nextStep: a.nextStep.trim(),
-          confidence: a.confidence,
-          submittedAt: new Date().toISOString()
-        };
-      });
+      return {
+        id: `post-${participant.id}-${c.id}`,
+        participantId: participant.id,
+        caseId: c.id,
+        stage: 'post_ai',
+        isDemo: isDemoMode,
+        mostLikelyDiagnosis: actualDiagnosis,
+        differential1: a.differential1.trim() || 'Not entered (Prototype skip)',
+        differential2: a.differential2.trim() || 'Not entered (Prototype skip)',
+        redFlags: a.redFlags.trim() || 'Not entered (Prototype skip)',
+        nextStep: a.nextStep.trim() || 'Not entered (Prototype skip)',
+        confidence: a.confidence,
+        submittedAt: new Date().toISOString()
+      };
+    });
 
-      onComplete(finalRecords);
-    }
+    onComplete(finalRecords);
   };
 
   const handlePrev = () => {
@@ -101,7 +113,7 @@ export const Stage7PostAiAssessment: React.FC<Stage7PostAiAssessmentProps> = ({
     <div className="max-w-4xl mx-auto py-10 px-4 sm:px-6">
       {/* Transition Banner */}
       <div className="mb-5 p-3.5 rounded bg-slate-100 border border-slate-300 text-xs text-slate-800 leading-relaxed font-mono">
-        <strong>PROTOCOL TRANSITION:</strong> AI consultation phase complete. Post-exposure independent reasoning active. External tools and AI recommendations are unavailable.
+        <strong>PROTOCOL TRANSITION:</strong> CDSS phase complete. Independent Vignette Cases active. External tools and CDSS recommendations are unavailable.
       </div>
 
       <div className="bg-white rounded-lg border border-slate-200/90 p-8 sm:p-10 shadow-2xs">
@@ -110,32 +122,35 @@ export const Stage7PostAiAssessment: React.FC<Stage7PostAiAssessmentProps> = ({
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-4 border-b border-slate-200/80 gap-3">
           <div>
             <div className="flex items-center gap-2 text-xs font-mono text-slate-500 mb-1">
-              <span>STAGE 07 / 08</span>
+              <span>STAGE 06 / 07</span>
               <span aria-hidden="true">·</span>
-              <span>POST-EXPOSURE INDEPENDENT REASONING</span>
+              <span>VIGNETTE CASES</span>
             </div>
             <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
-              Vignette {currentCaseIndex + 1} of {cases.length}: {currentCase.domain}
+              Vignette Case {currentCaseIndex + 1} of {cases.length}: {currentCase.domain}
             </h2>
           </div>
 
-          {/* Stepper */}
-          <div className="flex items-center gap-1 self-start sm:self-auto">
+          {/* Unrestricted Clickable Stepper */}
+          <div className="flex items-center gap-1.5 self-start sm:self-auto flex-wrap">
+            <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 mr-1">
+              Cases:
+            </span>
             {cases.map((c, i) => (
               <button
                 key={c.id}
                 type="button"
                 onClick={() => {
-                  if (i <= currentCaseIndex || isCurrentValid()) {
-                    setCurrentCaseIndex(i);
-                  }
+                  setCurrentCaseIndex(i);
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
-                className={`w-7 h-7 rounded text-xs font-mono font-bold flex items-center justify-center transition-colors ${
+                title={`Jump to Vignette Case ${i + 1}: ${c.domain}`}
+                className={`w-8 h-8 rounded text-xs font-mono font-bold flex items-center justify-center transition-colors cursor-pointer ${
                   i === currentCaseIndex
                     ? 'bg-slate-900 text-white'
                     : answers[c.id]
-                    ? 'bg-slate-100 text-slate-900 font-semibold border border-slate-300'
-                    : 'bg-slate-50 text-slate-400 border border-slate-200'
+                    ? 'bg-emerald-50 text-emerald-800 font-semibold border border-emerald-300 hover:bg-emerald-100'
+                    : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-100'
                 }`}
               >
                 {i + 1}
@@ -223,6 +238,9 @@ export const Stage7PostAiAssessment: React.FC<Stage7PostAiAssessmentProps> = ({
                 ))}
               </div>
             </div>
+
+            {/* Attached Clinical Imaging / ECG */}
+            <ClinicalImageGallery images={currentCase.clinicalImages} />
           </div>
 
           {/* Reasoning Fields */}
@@ -380,34 +398,41 @@ export const Stage7PostAiAssessment: React.FC<Stage7PostAiAssessmentProps> = ({
         </div>
 
         {/* Actions */}
-        <div className="mt-8 pt-5 border-t border-slate-200/70 flex items-center justify-between">
+        <div className="mt-8 pt-5 border-t border-slate-200/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <button
             type="button"
             onClick={handlePrev}
             disabled={currentCaseIndex === 0}
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 transition-colors disabled:opacity-40 disabled:cursor-not-allowed self-start sm:self-auto"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Previous Vignette</span>
+            <span>Previous Vignette Case</span>
           </button>
 
-          <button
-            type="button"
-            onClick={handleNext}
-            disabled={!isCurrentValid()}
-            className={`inline-flex items-center gap-2 px-5 py-2.5 text-xs font-semibold rounded transition-colors ${
-              isCurrentValid()
-                ? 'bg-slate-900 hover:bg-slate-800 text-white shadow-2xs'
-                : 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200'
-            }`}
-          >
-            <span>
-              {currentCaseIndex === cases.length - 1
-                ? 'Complete Assessment & Proceed to Debriefing'
-                : 'Save & Next Vignette'}
-            </span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
+          <div className="flex items-center gap-2 self-end sm:self-auto">
+            {currentCaseIndex < cases.length - 1 && (
+              <button
+                type="button"
+                onClick={handleCompleteAll}
+                className="px-3.5 py-2 text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 rounded transition-colors"
+              >
+                Proceed to Debriefing
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={handleNext}
+              className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-semibold rounded transition-colors bg-slate-900 hover:bg-slate-800 text-white shadow-2xs"
+            >
+              <span>
+                {currentCaseIndex === cases.length - 1
+                  ? 'Complete Vignette Cases & Proceed to Debriefing'
+                  : 'Next Vignette Case'}
+              </span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
 
       </div>

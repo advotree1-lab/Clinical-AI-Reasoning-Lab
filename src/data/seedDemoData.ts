@@ -5,7 +5,16 @@ import {
   VignetteAnswerRecord,
   ParticipantDesignation,
   ClinicalSpecialty,
-  InstitutionType
+  YearsSinceMbbsBracket,
+  InstitutionType,
+  GenAiTaskFrequency,
+  GenAiFirstUseDuration,
+  GenAiUsageFrequency,
+  GenAiDailyDuration,
+  GenAiAccessMethod,
+  PatientInfoEntryFrequency,
+  ClinicalReasoningConsultationStage,
+  InstitutionalPolicyStatus
 } from '../types';
 import { INITIAL_CLINICAL_CASES } from './clinicalCases';
 
@@ -18,39 +27,88 @@ interface SeedDataResult {
 
 export function generateSeedDemoData(): SeedDataResult {
   const designations: ParticipantDesignation[] = [
-    'Postgraduate resident', 'Postgraduate resident', 'Postgraduate resident',
-    'Senior resident', 'Senior resident',
-    'Medical officer', 'Medical officer',
-    'Assistant professor', 'Assistant professor',
-    'Associate professor',
+    'Junior Resident', 'Junior Resident', 'Junior Resident',
+    'Senior Resident', 'Senior Resident',
+    'Assistant Professor', 'Assistant Professor',
+    'Associate Professor',
+    'Professor',
     'Consultant', 'Consultant'
   ];
 
   const specialties: ClinicalSpecialty[] = [
-    'General medicine', 'General medicine', 'Emergency medicine',
-    'Cardiology', 'Pulmonology', 'Nephrology', 'General surgery',
-    'Paediatrics', 'Neurology', 'Obstetrics and gynaecology'
+    'General Medicine', 'General Medicine', 'General Medicine',
+    'Emergency Medicine', 'Emergency Medicine',
+    'General Surgery', 'Pediatrics', 'Obstetrics and Gynaecology'
   ];
 
   const institutions: InstitutionType[] = [
-    'Medical college', 'Medical college', 'Government hospital', 'Private hospital'
+    'Teaching hospital', 'Teaching hospital', 'Government hospital', 'Private hospital'
   ];
 
-  const aiToolsList = [
-    ['ChatGPT (GPT-4o)', 'Gemini Advanced'],
-    ['ChatGPT (GPT-4o)'],
-    ['ChatGPT (GPT-4o)', 'Claude 3.5 Sonnet'],
-    ['Gemini Advanced', 'Perplexity Pro'],
-    ['ChatGPT (GPT-4o)', 'Perplexity Pro', 'Claude 3.5 Sonnet'],
-    ['Perplexity Pro']
+  const toolCombinations: string[][] = [
+    ['ChatGPT', 'Google Gemini'],
+    ['ChatGPT'],
+    ['ChatGPT', 'Claude'],
+    ['Google Gemini', 'Perplexity'],
+    ['ChatGPT', 'Microsoft Copilot', 'Perplexity'],
+    ['ChatGPT', 'Google Gemini', 'Claude']
   ];
+
+  const firstUseDurations: GenAiFirstUseDuration[] = [
+    'Less than 3 months',
+    '3–6 months',
+    '6–12 months',
+    'More than 12 months'
+  ];
+
+  const usageFrequencies: GenAiUsageFrequency[] = [
+    'Less than once a week',
+    '1–2 days per week',
+    '3–5 days per week',
+    'Daily',
+    'Several times a day'
+  ];
+
+  const dailyDurations: GenAiDailyDuration[] = [
+    'Less than 10 minutes',
+    '10–30 minutes',
+    '31–60 minutes',
+    'More than 60 minutes'
+  ];
+
+  const accessMethods: GenAiAccessMethod[] = [
+    'Free public version',
+    'Free public version',
+    'Personal paid subscription',
+    'Provided by my hospital/institution',
+    'A combination of the above'
+  ];
+
+  const patientInfoEntries: PatientInfoEntryFrequency[] = [
+    'Never',
+    'Never',
+    'Once or twice',
+    'Sometimes',
+    'Often'
+  ];
+
+  const taskLevels: GenAiTaskFrequency[] = ['Never', 'Rarely', 'Sometimes', 'Often', 'Very often'];
+
+  const consultationStages: ClinicalReasoningConsultationStage[] = [
+    'Before forming my own clinical assessment',
+    'After my initial assessment, to cross-check my thinking',
+    'When uncertain or unable to reach a conclusion',
+    'After making a decision, primarily for documentation',
+    'I do not use GenAI for clinical reasoning'
+  ];
+
+  const policyStatuses: InstitutionalPolicyStatus[] = ['Yes', 'No', 'Not sure'];
 
   const participants: Participant[] = [];
   const questionnaireResponses: QuestionnaireResponse[] = [];
   const aiInteractions: AiInteractionRecord[] = [];
   const vignetteAnswers: VignetteAnswerRecord[] = [];
 
-  const baselineCases = INITIAL_CLINICAL_CASES.filter(c => c.stage === 'baseline');
   const simCases = INITIAL_CLINICAL_CASES.filter(c => c.stage === 'ai_simulation');
   const postCases = INITIAL_CLINICAL_CASES.filter(c => c.stage === 'post_ai');
 
@@ -61,157 +119,103 @@ export function generateSeedDemoData(): SeedDataResult {
     return seed / 4294967296;
   }
 
+  const pickTaskFreq = (biasIdx: number): GenAiTaskFrequency => {
+    const idx = Math.min(4, Math.max(0, Math.round(biasIdx + (rand() - 0.5) * 2.4)));
+    return taskLevels[idx];
+  };
+
   for (let i = 1; i <= 40; i++) {
     const participantId = `demo-doc-${1000 + i}`;
     const code = `DOC-${2000 + i}`;
     const des = designations[(i - 1) % designations.length];
     const spec = specialties[(i - 1) % specialties.length];
     const inst = institutions[(i - 1) % institutions.length];
-    
-    // Years of experience correlated with designation
-    let yearsExp = 2;
-    if (des === 'Postgraduate resident') yearsExp = Math.floor(1 + rand() * 3);
-    else if (des === 'Senior resident') yearsExp = Math.floor(4 + rand() * 3);
-    else if (des === 'Medical officer') yearsExp = Math.floor(2 + rand() * 5);
-    else if (des === 'Assistant professor') yearsExp = Math.floor(6 + rand() * 5);
-    else if (des === 'Associate professor') yearsExp = Math.floor(11 + rand() * 6);
-    else if (des === 'Consultant') yearsExp = Math.floor(8 + rand() * 12);
-    else yearsExp = Math.floor(15 + rand() * 10);
+
+    let mbbsBracket: YearsSinceMbbsBracket = '1–5 years';
+    if (des === 'Junior Resident') mbbsBracket = rand() > 0.35 ? '1–5 years' : 'Less than 1 year';
+    else if (des === 'Senior Resident') mbbsBracket = rand() > 0.4 ? '1–5 years' : '6–10 years';
+    else if (des === 'Assistant Professor') mbbsBracket = rand() > 0.4 ? '6–10 years' : 'More than 10 years';
+    else mbbsBracket = 'More than 10 years';
+
+    const formalTraining = rand() < 0.28;
+    const usedLast3Months = rand() > 0.15; // 85% used GenAI in past 3 months
 
     const participant: Participant = {
       id: participantId,
       code,
       designation: des,
       specialty: spec,
-      yearsSinceMBBS: yearsExp + 1,
-      yearsExperience: yearsExp,
+      yearsSinceMbbsBracket: mbbsBracket,
       institutionType: inst,
-      dailyPatientLoad: Math.floor(25 + rand() * 45),
-      priorAiExposure: rand() > 0.15, // 85% have used some AI
+      formalGenAiTraining: formalTraining,
       consentGiven: true,
       isDemo: true,
       createdAt: new Date(Date.now() - (41 - i) * 86400000 * 0.7).toISOString(),
       completed: true,
-      currentStage: 8
+      currentStage: 7
     };
     participants.push(participant);
 
-    // Questionnaire
-    const isJunior = des === 'Postgraduate resident' || des === 'Medical officer';
-    const offloadBase = isJunior ? 3.6 : 2.8;
-    const deskillBase = isJunior ? 3.4 : 2.5;
-
-    const clamp = (val: number) => Math.min(5, Math.max(1, Math.round(val)));
+    const isJunior = des === 'Junior Resident' || des === 'Senior Resident';
+    const taskBias = isJunior ? 2.6 : 1.9;
 
     const qResp: QuestionnaireResponse = {
       id: `demo-q-${participantId}`,
       participantId,
       isDemo: true,
-      usedAiLast3Months: participant.priorAiExposure,
-      aiToolsUsed: participant.priorAiExposure ? aiToolsList[i % aiToolsList.length] : [],
-      aiFrequency: participant.priorAiExposure
-        ? (rand() > 0.4 ? 'Daily' : (rand() > 0.5 ? 'Several times weekly' : 'Weekly'))
-        : 'Never',
-      primaryPurposes: [
-        'Differential diagnosis formulation',
-        'Clinical information retrieval',
-        rand() > 0.5 ? 'Drug interaction checking' : 'Treatment guidelines review'
-      ],
-      aiTiming: rand() > 0.6 ? 'after' : (rand() > 0.5 ? 'both' : 'before'),
-      complexVsRoutine: rand() > 0.3,
-      verificationFrequency: rand() > 0.3 ? 'Often' : (rand() > 0.5 ? 'Always' : 'Sometimes'),
-      verificationResources: ['UpToDate', 'Clinical Practice Guidelines', 'PubMed / Medline'],
-      cognitiveOffloading: {
-        dependDifferential: clamp(offloadBase + (rand() - 0.5) * 1.6),
-        substituteRecall: clamp(offloadBase - 0.3 + (rand() - 0.5) * 1.5),
-        interpretComplex: clamp(offloadBase + (rand() - 0.5) * 1.4),
-        transferReasoning: clamp(offloadBase - 0.5 + (rand() - 0.5) * 1.4),
-        consultBeforeThinking: clamp(offloadBase - 0.6 + (rand() - 0.5) * 1.5),
-        reduceWorkload: clamp(offloadBase + 0.6 + (rand() - 0.5) * 1.2),
-        verifyBeforeUsing: clamp(4.2 + (rand() - 0.5) * 1.2)
-      },
-      perceivedDeskilling: {
-        reducedEffort: clamp(deskillBase + (rand() - 0.5) * 1.5),
-        difficultWithoutAi: clamp(deskillBase - 0.4 + (rand() - 0.5) * 1.4),
-        lessConfidentIndependent: clamp(deskillBase - 0.3 + (rand() - 0.5) * 1.4),
-        dependInvestigations: clamp(deskillBase + (rand() - 0.5) * 1.3),
-        affectProblemSolving: clamp(deskillBase + 0.2 + (rand() - 0.5) * 1.5),
-        confidenceChange: clamp(3.0 + (rand() - 0.5) * 1.2)
-      },
+      designation: des,
+      specialty: spec,
+      yearsSinceMbbsBracket: mbbsBracket,
+      hospitalType: inst,
+      formalGenAiTraining: formalTraining,
+      usedGenAiLast3Months: usedLast3Months,
+      ...(usedLast3Months
+        ? {
+            firstUseDuration: firstUseDurations[Math.floor(rand() * firstUseDurations.length)],
+            usageFrequency: usageFrequencies[Math.min(4, Math.floor(rand() * (isJunior ? 5 : 4)))],
+            dailyTimeSpent: dailyDurations[Math.floor(rand() * dailyDurations.length)],
+            toolsUsed: toolCombinations[i % toolCombinations.length],
+            accessMethod: accessMethods[Math.floor(rand() * accessMethods.length)],
+            enteredPatientInfo: patientInfoEntries[Math.floor(rand() * patientInfoEntries.length)],
+            taskFrequency: {
+              differentialDiagnoses: pickTaskFreq(taskBias),
+              interpretingInvestigations: pickTaskFreq(taskBias - 0.3),
+              choosingInvestigations: pickTaskFreq(taskBias - 0.4),
+              identifyingManagement: pickTaskFreq(taskBias - 0.1),
+              drugDosesAndInteractions: pickTaskFreq(taskBias + 0.2),
+              summarisingLiterature: pickTaskFreq(taskBias + 0.5),
+              clinicalDocumentation: pickTaskFreq(taskBias - 0.2),
+              patientCommunication: pickTaskFreq(taskBias - 0.8)
+            },
+            reasoningConsultationStage: isJunior
+              ? consultationStages[rand() < 0.35 ? 0 : rand() < 0.7 ? 1 : 2]
+              : consultationStages[rand() < 0.6 ? 1 : rand() < 0.85 ? 2 : 3],
+            last10CasesConsultedCount: isJunior ? Math.floor(2 + rand() * 6) : Math.floor(1 + rand() * 4),
+            verificationFrequency: isJunior
+              ? taskLevels[Math.min(4, Math.max(1, Math.round(2.8 + (rand() - 0.5) * 2)))]
+              : taskLevels[Math.min(4, Math.max(2, Math.round(3.6 + (rand() - 0.5) * 1.5)))],
+            institutionalPolicy: policyStatuses[Math.floor(rand() * policyStatuses.length)]
+          }
+        : {}),
       createdAt: participant.createdAt
     };
     questionnaireResponses.push(qResp);
 
-    // Baseline Cases (5 cases)
-    baselineCases.forEach(bCase => {
-      // Junior doctors score ~2.8-3.3, Senior doctors score ~3.2-3.8 out of 4
-      const pCorrectProb = isJunior ? 0.72 : 0.88;
-      const primaryMark = rand() < pCorrectProb ? 1 : (rand() < 0.5 ? 0.5 : 0);
-      const diffMark = rand() < 0.75 ? 1 : 0.5;
-      const redMark = rand() < 0.78 ? 1 : 0.5;
-      const nextMark = rand() < 0.80 ? 1 : (rand() < 0.6 ? 0.5 : 0);
-      const totalScore = primaryMark + diffMark + redMark + nextMark;
-
-      // Simulated Assessor 2 with slight variance for inter-rater reliability demonstration
-      const a2Primary = primaryMark;
-      const a2Diff = rand() < 0.85 ? diffMark : (diffMark === 1 ? 0.5 : 1);
-      const a2Red = rand() < 0.90 ? redMark : (redMark === 1 ? 0.5 : 1);
-      const a2Next = rand() < 0.88 ? nextMark : (nextMark === 1 ? 0.5 : 0.5);
-      const a2Total = a2Primary + a2Diff + a2Red + a2Next;
-
-      const vAnswer: VignetteAnswerRecord = {
-        id: `demo-base-${participantId}-${bCase.id}`,
-        participantId,
-        caseId: bCase.id,
-        stage: 'baseline',
-        isDemo: true,
-        mostLikelyDiagnosis: primaryMark === 1 ? bCase.goldStandardDiagnosis : bCase.mcqOptions[1],
-        differential1: bCase.differentialDiagnosisKeys[0],
-        differential2: bCase.differentialDiagnosisKeys[1],
-        redFlags: bCase.redFlagKeys[0] + '; ' + bCase.redFlagKeys[1],
-        nextStep: bCase.nextManagementStepKey,
-        confidence: Math.round(3 + rand() * 2),
-        assessor1Score: {
-          primaryDiagnosisMark: primaryMark,
-          differentialsMark: diffMark,
-          redFlagsMark: redMark,
-          nextStepMark: nextMark,
-          totalScore,
-          assessorName: 'Dr. S. K. Mehta (Assessor 1)',
-          scoredAt: participant.createdAt
-        },
-        assessor2Score: {
-          primaryDiagnosisMark: a2Primary,
-          differentialsMark: a2Diff,
-          redFlagsMark: a2Red,
-          nextStepMark: a2Next,
-          totalScore: a2Total,
-          assessorName: 'Prof. R. V. Raman (Assessor 2)',
-          scoredAt: participant.createdAt
-        },
-        finalResolvedScore: (totalScore + a2Total) / 2,
-        submittedAt: participant.createdAt
-      };
-      vignetteAnswers.push(vAnswer);
-    });
+    const clamp = (val: number) => Math.min(5, Math.max(1, Math.round(val)));
 
     // AI Simulation Cases (5 cases)
     simCases.forEach(sCase => {
       const stimulus = sCase.aiStimulus!;
       const isMisleading = stimulus.isMisleading;
 
-      // Initial response formed independently
       const initialCorrect = rand() < (isJunior ? 0.70 : 0.88);
       const initialDiagnosis = initialCorrect
         ? sCase.goldStandardDiagnosis
         : sCase.mcqOptions[1];
       const initialConfidence = clamp(3 + Math.round(rand() * 2));
 
-      // Probability of accepting recommendation:
-      // If appropriate: ~88% acceptance
-      // If misleading: ~40% acceptance (automation bias!), higher in juniors (~48%) than consultants (~28%)
       let acceptedAi = false;
-      let aiAgreement: any = 'Disagree';
+      let aiAgreement: AiInteractionRecord['aiAgreement'] = 'Disagree';
 
       if (!isMisleading) {
         acceptedAi = rand() < (isJunior ? 0.86 : 0.94);
@@ -226,19 +230,16 @@ export function generateSeedDemoData(): SeedDataResult {
         }
       }
 
-      // Final diagnosis logic
       let finalDiagnosis = initialDiagnosis;
       let switchedDiagnosis = false;
       let switchedTowardsCorrect = false;
 
       if (acceptedAi && isMisleading) {
-        // Succumbed to misleading AI -> switched to AI recommendation
         finalDiagnosis = stimulus.diagnosis;
         switchedDiagnosis = initialDiagnosis !== finalDiagnosis;
         switchedTowardsCorrect = false;
       } else if (acceptedAi && !isMisleading) {
         if (!initialCorrect) {
-          // AI helped correct an initial error
           finalDiagnosis = sCase.goldStandardDiagnosis;
           switchedDiagnosis = true;
           switchedTowardsCorrect = true;
@@ -247,7 +248,6 @@ export function generateSeedDemoData(): SeedDataResult {
           switchedDiagnosis = false;
         }
       } else {
-        // Disagreed or uncertain
         finalDiagnosis = initialDiagnosis;
         switchedDiagnosis = false;
       }

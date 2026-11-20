@@ -2,353 +2,88 @@ import { ClinicalCase } from '../types';
 
 export const INITIAL_CLINICAL_CASES: ClinicalCase[] = [
   // ==========================================
-  // BASELINE UNAIDED CASES (1 to 5)
-  // ==========================================
-  {
-    id: 'base-01',
-    caseNumber: 1,
-    stage: 'baseline',
-    domain: 'Cardiology',
-    title: 'Elderly Diabetic with Atypical Epigastric Discomfort',
-    presentation: 'A 64-year-old male with a 15-year history of type 2 diabetes mellitus presents to the casualty department with a 3-hour history of severe dull epigastric discomfort, persistent nausea, and cold diaphoresis.',
-    medicalHistory: 'Type 2 Diabetes Mellitus (HbA1c 8.8%), Essential Hypertension, 20 pack-year smoking history. Medications: Metformin 1000mg BD, Glimepiride 2mg OD, Telmisartan 40mg OD.',
-    vitals: {
-      heartRate: '98 bpm (regular)',
-      bloodPressure: '104/68 mmHg',
-      respiratoryRate: '20 /min',
-      spO2: '96% on room air',
-      temperature: '36.8 °C'
-    },
-    physicalExamination: 'Patient appears anxious, pale, and clammy. Heart sounds: S1 and S2 present, soft S4 audible at cardiac apex. Chest: Clear to auscultation bilaterally. Abdomen: Soft, non-tender, mild fullness, no guarding or rebound tenderness. Peripheral pulses present but faint.',
-    investigations: [
-      { name: '12-Lead ECG', result: 'Sinus rhythm; 1.5mm ST-segment depression in leads II, III, aVF and V4-V6; T-wave inversion in V5-V6', isAbnormal: true },
-      { name: 'High-Sensitivity Troponin I', result: '184 ng/L (Elevated; reference < 14 ng/L)', isAbnormal: true },
-      { name: 'Random Blood Glucose', result: '242 mg/dL', isAbnormal: true },
-      { name: 'Serum Creatinine', result: '1.2 mg/dL (Baseline 1.0)', isAbnormal: false },
-      { name: 'Bedside Echocardiogram', result: 'Inferolateral wall hypokinesia; LVEF approximately 45%', isAbnormal: true }
-    ],
-    mcqOptions: [
-      'Acute Non-ST Elevation Myocardial Infarction (NSTEMI)',
-      'Acute Peptic Ulcer Disease / Perforation',
-      'Acute Cholecystitis',
-      'Diabetic Gastroparesis Flare',
-      'Other'
-    ],
-    goldStandardDiagnosis: 'Acute Non-ST Elevation Myocardial Infarction (NSTEMI)',
-    acceptableAlternativeDiagnoses: [
-      'Non-ST Elevation Acute Coronary Syndrome',
-      'Acute Coronary Syndrome (Atypical Presentation)',
-      'NSTEMI'
-    ],
-    differentialDiagnosisKeys: [
-      'Acute pericarditis / myocarditis',
-      'Acute pancreatitis',
-      'Aortic dissection (Stanford Type A/B)',
-      'Gastroesophageal reflux disease / Esophageal spasm'
-    ],
-    redFlagKeys: [
-      'Diaphoresis and borderline hypotension (BP 104/68)',
-      'Elevated cardiac biomarker with ischemic ECG changes',
-      'High risk for silent ischemia in longstanding diabetes',
-      'Threat of cardiogenic shock or malignant arrhythmia'
-    ],
-    nextManagementStepKey: 'Immediate dual antiplatelet therapy (Aspirin 300mg + Ticagrelor 180mg), anticoagulation (Enoxaparin/Heparin), continuous ECG monitoring, and urgent cardiology consultation for early invasive angiography.',
-    rubric: {
-      primaryDiagnosisCriteria: '1.0 mark: Recognizes NSTEMI / Non-ST elevation acute coronary syndrome. 0.0 mark: Misidentifies as primary gastrointestinal pathology (PUD, GERD, Cholecystitis).',
-      differentialCriteria: '1.0 mark: Identifies at least two clinically acute competing differentials (Aortic dissection, pancreatitis, peptic ulcer perforation, pericarditis).',
-      redFlagsCriteria: '1.0 mark: Explicitly mentions diabetic autonomic neuropathy masking angina, autonomic symptoms (clammy/pale), hemodynamics, or troponin leak.',
-      nextStepCriteria: '1.0 mark: Mentions antiplatelets + anticoagulation + coronary angiography / cardiology triage.'
-    },
-    isPublished: true,
-    expertReviewed: true
-  },
-  {
-    id: 'base-02',
-    caseNumber: 2,
-    stage: 'baseline',
-    domain: 'Pulmonology',
-    title: 'Severe Dyspnea and Somnolence in Chronic Smoker',
-    presentation: 'A 68-year-old female known to have severe COPD presents with 4 days of worsening shortness of breath, purulent green sputum production, and increasing daytime somnolence and confusion noted by family.',
-    medicalHistory: 'Severe COPD (GOLD Stage 3, FEV1 38% predicted), 40 pack-year smoking history. Home medications: Formoterol/Budesonide inhaler, Tiotropium inhaler. Received 4L/min oxygen via nasal cannula in transit.',
-    vitals: {
-      heartRate: '112 bpm (regular)',
-      bloodPressure: '142/88 mmHg',
-      respiratoryRate: '28 /min (shallow, with pursed-lip breathing)',
-      spO2: '94% on 4L/min nasal O2',
-      temperature: '38.1 °C'
-    },
-    physicalExamination: 'Drowsy, asterixis (flapping tremor) observed when asked to extend wrists. Barrel chest with intercostal indrawing. Bilateral diffuse coarse expiratory wheezing with scattered bibasilar crackles.',
-    investigations: [
-      { name: 'Arterial Blood Gas (on 4L/min O2)', result: 'pH 7.26, PaCO2 68 mmHg, PaO2 84 mmHg, HCO3- 32 mEq/L, Base Excess +5.8 (Acute-on-chronic respiratory acidosis)', isAbnormal: true },
-      { name: 'Chest X-ray (AP Portable)', result: 'Hyperinflated lung fields, flattened diaphragms, patchy opacity in right lower zone suspicious for bronchopneumonia', isAbnormal: true },
-      { name: 'Total Leukocyte Count', result: '15,800 /uL (86% neutrophils)', isAbnormal: true },
-      { name: 'Serum Potassium', result: '4.1 mEq/L', isAbnormal: false }
-    ],
-    mcqOptions: [
-      'Acute Exacerbation of COPD with Hypercapnic Type 2 Respiratory Failure',
-      'Acute Pulmonary Thromboembolism',
-      'Congestive Heart Failure Exacerbation',
-      'Severe Sepsis secondary to Meningitis',
-      'Other'
-    ],
-    goldStandardDiagnosis: 'Acute Exacerbation of COPD with Hypercapnic Type 2 Respiratory Failure',
-    acceptableAlternativeDiagnoses: [
-      'AECOPD with Acute-on-Chronic Type 2 Respiratory Failure',
-      'COPD Exacerbation with CO2 Narcosis and Bronchopneumonia'
-    ],
-    differentialDiagnosisKeys: [
-      'Community-acquired pneumonia with secondary respiratory decompensation',
-      'Acute left ventricular failure / cardiogenic pulmonary edema',
-      'Pulmonary embolism complicating immobility',
-      'Metabolic encephalopathy'
-    ],
-    redFlagKeys: [
-      'Severe respiratory acidosis (pH 7.26, PaCO2 68 mmHg)',
-      'Asterixis and altered consciousness (CO2 retention/narcosis)',
-      'High FiO2 toxicity risk blunting hypoxic ventilatory drive'
-    ],
-    nextManagementStepKey: 'Titrate oxygen delivery immediately to target SpO2 88-92% (Venturi mask), initiate Non-Invasive Positive Pressure Ventilation (BiPAP/NIV), nebulized bronchodilators, systemic corticosteroids, and empiric antibiotics.',
-    rubric: {
-      primaryDiagnosisCriteria: '1.0 mark: Recognizes acute exacerbation of COPD with hypercapnic/Type 2 respiratory failure. 0.5 mark: COPD exacerbation without acknowledging hypercapnia/respiratory failure.',
-      differentialCriteria: '1.0 mark: Cites plausible competing causes (Pneumonia, PE, Congestive heart failure, Oversedation).',
-      redFlagsCriteria: '1.0 mark: Recognizes lethargy/asterixis indicating carbon dioxide narcosis, acidosis pH < 7.30, or uncontrolled oxygenation danger.',
-      nextStepCriteria: '1.0 mark: Identifies Non-Invasive Ventilation (NIV/BiPAP) and controlled oxygen targeting 88-92%.'
-    },
-    isPublished: true,
-    expertReviewed: true
-  },
-  {
-    id: 'base-03',
-    caseNumber: 3,
-    stage: 'baseline',
-    domain: 'Obstetrics',
-    title: 'Severe Headache and Hyperreflexia at 33 Weeks Gestation',
-    presentation: 'A 26-year-old primigravida at 33 weeks and 4 days of gestation presents with a 24-hour history of unremitting throbbing frontal headache, visual blurring with flashing scotomata, and severe epigastric discomfort.',
-    medicalHistory: 'Primigravida. Normal booking blood pressure at 12 weeks (110/70 mmHg). No previous medical conditions.',
-    vitals: {
-      heartRate: '88 bpm',
-      bloodPressure: '172/114 mmHg (confirmed on two repeat checks 15 mins apart)',
-      respiratoryRate: '18 /min',
-      spO2: '98% on room air',
-      temperature: '37.0 °C'
-    },
-    physicalExamination: 'Brisk deep tendon patellar reflexes (+3) with 4 beats of unsustained ankle clonus. Marked bilateral lower extremity pitting edema up to mid-calf. Abdomen: Gravid uterus corresponding to 32 weeks, tenderness in right upper quadrant. Fetal heart rate: 144 bpm, reassuring reactive trace.',
-    investigations: [
-      { name: 'Urine Dipstick', result: 'Protein 3+ (approx 3.0 g/L)', isAbnormal: true },
-      { name: 'Platelet Count', result: '92,000 /uL (Thrombocytopenia; reference 150k-400k)', isAbnormal: true },
-      { name: 'Serum AST / ALT', result: 'AST 148 IU/L, ALT 162 IU/L (Markedly elevated)', isAbnormal: true },
-      { name: 'Serum Creatinine', result: '1.3 mg/dL (Elevated for pregnancy)', isAbnormal: true },
-      { name: 'Serum Uric Acid', result: '7.8 mg/dL', isAbnormal: true }
-    ],
-    mcqOptions: [
-      'Preeclampsia with Severe Features / Impending Eclampsia (HELLP evolution)',
-      'Gestational Hypertension with Migraine Headache',
-      'Acute Viral Hepatitis during Pregnancy',
-      'Idiopathic Intracranial Hypertension (Pseudotumor)',
-      'Other'
-    ],
-    goldStandardDiagnosis: 'Preeclampsia with Severe Features / Impending Eclampsia (HELLP evolution)',
-    acceptableAlternativeDiagnoses: [
-      'Severe Preeclampsia with Impending Eclampsia',
-      'Pre-eclampsia with Severe Features and partial HELLP syndrome'
-    ],
-    differentialDiagnosisKeys: [
-      'Eclampsia (once convulsions manifest)',
-      'HELLP Syndrome (Hemolysis, Elevated Liver Enzymes, Low Platelets)',
-      'Acute fatty liver of pregnancy',
-      'Thrombotic Thrombocytopenic Purpura (TTP) / Atypical HUS'
-    ],
-    redFlagKeys: [
-      'Systolic BP >= 160 mmHg or Diastolic BP >= 110 mmHg',
-      'Neurological symptoms (headache, visual disturbance, clonus) signaling cerebral edema',
-      'Thrombocytopenia and hepatic transaminitis with RUQ pain (hepatic capsule stretch / rupture risk)'
-    ],
-    nextManagementStepKey: 'Immediate initiation of Magnesium Sulfate loading dose (4g IV over 20 min) for seizure prophylaxis, rapid-acting parenteral antihypertensive (IV Labetalol or IV Hydralazine), and urgent obstetric consultation for delivery stabilization.',
-    rubric: {
-      primaryDiagnosisCriteria: '1.0 mark: Identifies preeclampsia with severe features / impending eclampsia / HELLP. 0.0 mark: Gestational hypertension or tension headache.',
-      differentialCriteria: '1.0 mark: Lists HELLP, AFLP, intracranial hemorrhage, TTP, or migraine.',
-      redFlagsCriteria: '1.0 mark: Cites severe blood pressure range, clonus/hyperreflexia, or thrombocytopenia/elevated transaminases.',
-      nextStepCriteria: '1.0 mark: Must state Magnesium Sulfate for eclampsia prevention + IV antihypertensives (Labetalol/Hydralazine).'
-    },
-    isPublished: true,
-    expertReviewed: true
-  },
-  {
-    id: 'base-04',
-    caseNumber: 4,
-    stage: 'baseline',
-    domain: 'Neurology',
-    title: 'Acute Right-Sided Hemiparesis and Expressive Aphasia',
-    presentation: 'A 59-year-old male is brought to the emergency department by emergency medical services 75 minutes after sudden onset of right facial droop, complete right upper and lower extremity weakness, and inability to speak coherently.',
-    medicalHistory: 'Permanent Atrial Fibrillation (non-adherent with Apixaban), Hypertension. Last seen completely normal at 08:30 AM (arrival time 09:45 AM).',
-    vitals: {
-      heartRate: '106 bpm (irregularly irregular)',
-      bloodPressure: '166/96 mmHg',
-      respiratoryRate: '16 /min',
-      spO2: '97% on room air',
-      temperature: '36.9 °C'
-    },
-    physicalExamination: 'Patient is conscious but exhibits profound Broca expressive aphasia (intact comprehension of simple commands, unable to name or repeat). Right central facial palsy. Right upper extremity motor power 0/5, right lower extremity 1/5. Right extensor plantar response (Babinski positive). NIHSS score calculated at 17.',
-    investigations: [
-      { name: 'Non-Contrast Brain CT', result: 'No acute intracranial hemorrhage or subdural collection; subtle early loss of insular ribbon and hyperdense left MCA sign noted', isAbnormal: true },
-      { name: 'Capillary Blood Glucose', result: '128 mg/dL', isAbnormal: false },
-      { name: 'ECG', result: 'Atrial fibrillation with rapid ventricular response', isAbnormal: true },
-      { name: 'Coagulation Profile (PT/INR)', result: 'INR 1.1 (Apixaban missed for past 2 weeks confirmed by family)', isAbnormal: false }
-    ],
-    mcqOptions: [
-      'Acute Ischemic Stroke (Left Middle Cerebral Artery territory, within thrombolytic window)',
-      'Acute Subdural Hematoma',
-      'Todd Paralysis post-Focal Seizure',
-      'Hypoglycemic Hemiplegic Episode',
-      'Other'
-    ],
-    goldStandardDiagnosis: 'Acute Ischemic Stroke (Left Middle Cerebral Artery territory, within thrombolytic window)',
-    acceptableAlternativeDiagnoses: [
-      'Acute Left MCA Ischemic Stroke',
-      'Acute Cardioembolic Stroke (Left MCA territory)'
-    ],
-    differentialDiagnosisKeys: [
-      'Intracranial hemorrhage (ruled out by non-contrast CT)',
-      'Complex basilar or hemiplegic migraine',
-      'Todd post-ictal paresis',
-      'Conversion disorder / functional neurological deficit'
-    ],
-    redFlagKeys: [
-      'NIHSS score of 17 (Severe neurological deficit)',
-      'Time elapsed from last known normal (critical 4.5-hour IV thrombolysis and 24-hour mechanical thrombectomy window)',
-      'Cardioembolic origin with risk of hemorrhagic transformation'
-    ],
-    nextManagementStepKey: 'Activate code stroke protocol immediately: administer intravenous recombinant tissue plasminogen activator (IV Tenecteplase / Alteplase) if no absolute contraindications, and transfer for emergent CT Angiography / Endovascular Mechanical Thrombectomy.',
-    rubric: {
-      primaryDiagnosisCriteria: '1.0 mark: Recognizes acute ischemic stroke in Left MCA territory within time window.',
-      differentialCriteria: '1.0 mark: Mentions ICH, Todd paralysis, hypoglycemic mimic, or subdural hematoma.',
-      redFlagsCriteria: '1.0 mark: Identifies symptom onset time window (< 4.5 hours), NIHSS severity, or hemorrhagic transformation danger.',
-      nextStepCriteria: '1.0 mark: States IV thrombolysis (Alteplase/Tenecteplase) and/or emergent CTA/mechanical thrombectomy.'
-    },
-    isPublished: true,
-    expertReviewed: true
-  },
-  {
-    id: 'base-05',
-    caseNumber: 5,
-    stage: 'baseline',
-    domain: 'Nephrology',
-    title: 'Oliguria, Maculopapular Rash, and Arthralgia Post-Antibiotics',
-    presentation: 'A 48-year-old male presents with 3 days of progressive malaise, low-grade fevers, bilateral flank aching, widespread skin rash, and dark, tea-colored urine with markedly reduced urine output (< 400 mL in 24 hours).',
-    medicalHistory: 'Treated 10 days ago for acute sinusitis with Oral Amoxicillin-Clavulanate and Diclofenac 50mg TID for persistent facial pain. No previous renal pathology; baseline serum creatinine 2 months ago was 0.9 mg/dL.',
-    vitals: {
-      heartRate: '84 bpm',
-      bloodPressure: '138/86 mmHg',
-      respiratoryRate: '16 /min',
-      spO2: '99% on room air',
-      temperature: '38.2 °C'
-    },
-    physicalExamination: 'Erythematous maculopapular pruritic eruption distributed over trunk and proximal extremities. Mild tenderness on deep palpation over bilateral renal angles. No peripheral edema, no joint effusions.',
-    investigations: [
-      { name: 'Serum Creatinine', result: '4.8 mg/dL (Marked acute kidney injury; baseline 0.9 mg/dL)', isAbnormal: true },
-      { name: 'Blood Urea Nitrogen', result: '62 mg/dL', isAbnormal: true },
-      { name: 'Urinalysis', result: 'Mild proteinuria (1+), 15-20 WBCs/hpf, white blood cell casts present, no erythrocyte dysmorphic casts', isAbnormal: true },
-      { name: 'Hansel Stain for Urine Eosinophils', result: 'Positive (> 5% urine eosinophils)', isAbnormal: true },
-      { name: 'Complete Blood Count', result: 'Total WBC 11,400 /uL, absolute eosinophil count 1,200 /uL (Eosinophilia)', isAbnormal: true },
-      { name: 'Renal Ultrasound', result: 'Normal to slightly enlarged kidneys with increased cortical echogenicity, no hydronephrosis or stone', isAbnormal: true }
-    ],
-    mcqOptions: [
-      'Drug-Induced Acute Interstitial Nephritis (AIN)',
-      'Post-Streptococcal Glomerulonephritis',
-      'Acute Tubular Necrosis secondary to Dehydration',
-      'Renal Cell Carcinoma with Paraneoplastic Syndrome',
-      'Other'
-    ],
-    goldStandardDiagnosis: 'Drug-Induced Acute Interstitial Nephritis (AIN)',
-    acceptableAlternativeDiagnoses: [
-      'Allergic / Drug-Induced Interstitial Nephritis',
-      'Acute Interstitial Nephritis secondary to NSAIDs / Beta-lactams'
-    ],
-    differentialDiagnosisKeys: [
-      'Acute tubular necrosis (ischemic or toxic)',
-      'Rapidly progressive glomerulonephritis (RPGN / ANCA vasculitis)',
-      'Acute bilateral pyelonephritis',
-      'Atheroembolic renal disease'
-    ],
-    redFlagKeys: [
-      'Rapid tenfold creatinine elevation (4.8 mg/dL) with oliguria',
-      'Classic triad of fever, rash, and eosinophilia/eosinophiluria post-drug exposure',
-      'Risk of irreversible chronic tubulointerstitial fibrosis if offending agent continued'
-    ],
-    nextManagementStepKey: 'Immediate withdrawal and cessation of the offending drugs (Amoxicillin-Clavulanate and Diclofenac); if no improvement in renal parameters within 48-72 hours, initiate systemic corticosteroid therapy (Oral Prednisone 1 mg/kg/day).',
-    rubric: {
-      primaryDiagnosisCriteria: '1.0 mark: Accurately identifies Drug-Induced Acute Interstitial Nephritis (AIN).',
-      differentialCriteria: '1.0 mark: Lists ATN, Glomerulonephritis/RPGN, Pyelonephritis, or atheroemboli.',
-      redFlagsCriteria: '1.0 mark: Notes severe azotemia/oliguria, hypersensitivity triad (fever/rash/eosinophilia), and progressive loss of GFR.',
-      nextStepCriteria: '1.0 mark: States immediate discontinuation of culprit drugs (NSAID/antibiotic) +/- corticosteroid trial.'
-    },
-    isPublished: true,
-    expertReviewed: true
-  },
-
-  // ==========================================
   // STANDARDIZED AI SIMULATION CASES (1 to 5)
-  // (2 Clinically Sound, 3 Deliberately Misleading)
+  // (3 Deliberately Misleading, 2 Clinically Sound)
   // ==========================================
   {
     id: 'sim-01',
     caseNumber: 1,
     stage: 'ai_simulation',
     domain: 'Cardiology',
-    title: 'Crushing Retrosternal Chest Pain with Diaphoresis',
-    presentation: 'A 54-year-old male bus driver presents to the acute resuscitation bay with a 45-minute history of crushing retrosternal chest pain radiating to his left shoulder and jaw, accompanied by profound diaphoresis, dyspnea, and lightheadedness.',
-    medicalHistory: 'Hypertension, Dyslipidemia, 25 pack-year cigarette smoking. Medications: Amlodipine 5mg OD, Atorvastatin 20mg OD.',
+    title: 'Chest pain with an initially inconclusive ECG',
+    presentation: 'A 64-year-old male with diabetes, chronic kidney disease and dyslipidaemia presents with epigastric discomfort, nausea and sweating for 5 hours. He denies typical chest pain.',
+    medicalHistory: 'Diabetes, chronic kidney disease and dyslipidaemia.',
     vitals: {
-      heartRate: '108 bpm (sinus tachycardia)',
-      bloodPressure: '88/58 mmHg (hypotensive)',
-      respiratoryRate: '24 /min',
-      spO2: '93% on room air',
-      temperature: '36.6 °C'
+      heartRate: '110/min',
+      bloodPressure: '104/68 mmHg',
+      respiratoryRate: '26/min',
+      spO2: '91%',
+      temperature: 'Not specified'
     },
-    physicalExamination: 'Patient appears pale, profusely sweating, in severe agony holding his chest (Levine sign). Heart sounds: S1 and S2 muffled, bilateral bibasilar fine crackles at lung bases. Extremities are cool with prolonged capillary refill of 4 seconds.',
+    physicalExamination: 'Bilateral basal crepitations.',
     investigations: [
-      { name: '12-Lead ECG', result: 'Sinus tachycardia at 108 bpm; 4mm ST-segment elevation in leads V1, V2, V3, and V4 with reciprocal ST-segment depression in leads II, III, and aVF', isAbnormal: true },
-      { name: 'Point-of-Care Troponin T', result: 'Qualitative positive (> 100 ng/L)', isAbnormal: true },
-      { name: 'Point-of-Care Blood Glucose', result: '146 mg/dL', isAbnormal: false },
-      { name: 'Portable Chest Radiograph', result: 'Mild pulmonary venous congestion, normal cardiac silhouette, no mediastinal widening', isAbnormal: true }
+      { name: 'Initial ECG', result: 'ST depression in V1–V3; Tall R waves in V2–V3; Upright T waves in V1–V3', isAbnormal: true },
+      { name: 'Initial troponin', result: 'Borderline elevated', isAbnormal: true },
+      { name: 'Repeat troponin after 2 hours', result: 'Significant rise', isAbnormal: true },
+      { name: 'Echocardiography', result: 'Regional posterior wall hypokinesia and LVEF of 35%', isAbnormal: true }
+    ],
+    clinicalImages: [
+      {
+        id: 'img-case-02',
+        url: '/assets/cases/case-02-ecg.jpg',
+        title: '12-Lead ECG (Case 2)',
+        caption: '12-Lead ECG demonstrating ST depression in V1–V3, tall R waves in V2–V3, upright T waves in V1–V3, and mild ST elevation in II, III, aVF.'
+      }
     ],
     mcqOptions: [
-      'Acute Extensive Anterior ST-Elevation Myocardial Infarction (STEMI) with Impending Cardiogenic Shock',
-      'Acute Aortic Dissection with Pericardial Tamponade',
-      'Acute Massive Pulmonary Embolism',
-      'Severe Gastroesophageal Reflux with Esophageal Spasm',
+      'Acute True Posterior Wall STEMI (STEMI Equivalent) with Left Ventricular Dysfunction',
+      'Acute Peptic Ulcer Disease / Gastritis with CKD-Related Baseline Troponin Elevation',
+      'Stable Angina without Acute Coronary Occlusion',
+      'Acute Pancreatitis with Demand Ischemia',
       'Other'
     ],
-    goldStandardDiagnosis: 'Acute Extensive Anterior ST-Elevation Myocardial Infarction (STEMI) with Impending Cardiogenic Shock',
+    goldStandardDiagnosis: 'Acute True Posterior Wall STEMI (STEMI Equivalent) with Left Ventricular Dysfunction',
     acceptableAlternativeDiagnoses: [
-      'Acute Anterior Wall STEMI',
-      'Extensive Anterior STEMI with Hemodynamic Instability'
+      'Acute Posterior Myocardial Infarction',
+      'Posterior STEMI / NSTEMI with Acute Heart Failure'
     ],
     differentialDiagnosisKeys: [
-      'Acute aortic dissection with coronary ostial involvement',
-      'Massive pulmonary embolism',
-      'Acute pericarditis with effusion',
-      'Esophageal rupture (Boerhaave syndrome)'
+      'Acute inferior-posterior myocardial infarction / lateral ACS',
+      'Acute aortic dissection',
+      'Acute pancreatitis / peptic ulcer disease',
+      'Acute decompensated heart failure / stress cardiomyopathy'
     ],
     redFlagKeys: [
-      'ST-elevation > 2mm across precordial leads V1-V4',
-      'Hypotension (BP 88/58 mmHg) with pulmonary congestion (Killip Class II-III / cardiogenic shock risk)',
-      'Severe ongoing ischemia with high risk of ventricular fibrillation or cardiac arrest'
+      'Anterior ST depression V1–V3 with tall R waves and upright T waves (classic posterior STEMI equivalent)',
+      'Significant serial troponin rise with regional posterior wall hypokinesia and reduced LVEF (35%)',
+      'Hypoxemia (SpO2 91%), tachypnea (26/min), and bilateral basal crepitations indicating acute pulmonary congestion'
     ],
-    nextManagementStepKey: 'Immediate activation of Cardiac Catheterization Laboratory for Emergent Primary Percutaneous Coronary Intervention (PCI); administer loading doses of Aspirin 300mg and Ticagrelor 180mg, supplemental oxygen, cautious fluid challenge for hypotension, and prepare inotropic / mechanical circulatory support.',
+    nextManagementStepKey: 'Obtain posterior ECG leads (V7–V9), initiate dual antiplatelet therapy (Aspirin + P2Y12 inhibitor) and anticoagulation, and activate urgent coronary angiography / primary PCI for suspected posterior STEMI equivalent, while managing pulmonary edema cautiously.',
     rubric: {
-      primaryDiagnosisCriteria: '1.0 mark: Recognizes Acute Anterior STEMI with hemodynamic compromise.',
-      differentialCriteria: '1.0 mark: Identifies aortic dissection, pulmonary embolism, or pericarditis.',
-      redFlagsCriteria: '1.0 mark: Flags hypotension (88/58), cool peripheries, pulmonary crackles, and ischemic ECG.',
-      nextStepCriteria: '1.0 mark: States emergency cath lab activation / primary PCI within 90 minutes + dual antiplatelets.'
+      primaryDiagnosisCriteria: '1.0 mark: Identifies Acute Posterior Wall STEMI / STEMI equivalent (or acute MI with posterior wall involvement). 0.0 mark: Attributes findings to gastritis or benign CKD troponin leak.',
+      differentialCriteria: '1.0 mark: Identifies acute coronary syndrome / NSTEMI, aortic dissection, or acute abdominal catastrophe.',
+      redFlagsCriteria: '1.0 mark: Flags V1–V3 posterior STEMI pattern, serial troponin rise, LVEF 35% with basal crepitations, and SpO2 91%.',
+      nextStepCriteria: '1.0 mark: States urgent coronary angiography / primary PCI + dual antiplatelets + posterior leads V7–V9.'
     },
-    // FIXED STANDARDIZED AI STIMULUS: CLINICALLY APPROPRIATE (Outcome 1: Sound advice)
     aiStimulus: {
-      diagnosis: 'Acute Extensive Anterior ST-Elevation Myocardial Infarction (STEMI) with Early Cardiogenic Decompensation (Killip Class II).',
-      recommendation: 'Immediate activation of the cardiac catheterization team for urgent Primary Percutaneous Coronary Intervention (target door-to-balloon time < 90 minutes). Administer Aspirin 300 mg chewed and Ticagrelor 180 mg orally immediately. Initiate weight-adjusted unfractionated heparin bolus. Provide supplemental oxygen via nasal cannula to achieve SpO2 > 94%. Avoid nitrates due to borderline hypotension (BP 88/58 mmHg). Maintain continuous defibrillator readiness.',
-      clinicalReasoning: 'The clinical presentation of acute crushing substernal chest discomfort with diaphoresis, combined with 4mm ST-elevation in V1-V4 and reciprocal inferior ST depressions, fulfills the diagnostic criteria for acute anterior myocardial infarction caused by proximal left anterior descending (LAD) coronary occlusion. Concomitant systemic hypotension and basal rales warrant emergent revascularization without delay.',
-      isMisleading: false,
-      researcherNote: 'CONTROL: Clinically sound recommendation. Measures participant acceptance and appropriate clinical compliance.'
+      diagnosis: 'Acute Peptic Gastritis with Chronic Kidney Disease-Related Non-Ischemic Troponin Elevation.',
+      recommendation: 'Initiate intravenous pantoprazole 40 mg and antiemetic therapy (ondansetron 4 mg IV) for acute epigastric discomfort and nausea. Since the patient denies typical chest pain and the 12-lead ECG demonstrates only anterior ST-segment depression without classic ST-segment elevation, emergent cardiac catheterization is unnecessary. Mildly elevated cardiac troponin is an expected finding in chronic kidney disease due to impaired renal clearance. Admit to general medical ward for upper GI endoscopy evaluation and routine diuretic therapy for mild fluid overload.',
+      clinicalReasoning: 'Absence of classic substernal chest pain and lack of ST-segment elevation on standard precordial leads make acute transmural myocardial infarction unlikely. Epigastric symptoms paired with known CKD commonly produce false-positive baseline troponin elevations and non-specific repolarization changes.',
+      followUpSuggestions: [
+        {
+          id: 'followup_1',
+          promptLabel: 'How do you interpret the ECG and serial troponin rise?',
+          responseText: 'The ECG demonstrates ST depression in V1–V3 without ST-segment elevation in any standard lead, arguing against acute transmural infarction. In chronic kidney disease, impaired renal clearance frequently causes persistent or fluctuating borderline troponin elevations alongside non-specific repolarization changes, so a 2-hour rise alone does not confirm acute coronary occlusion.'
+        },
+        {
+          id: 'followup_2',
+          promptLabel: 'What monitoring and alternative workup do you advise?',
+          responseText: 'Monitor epigastric symptom relief following IV pantoprazole 40 mg and antiemetics, maintain supplemental oxygen for SpO₂ 91%, and administer low-dose loop diuretics for mild basal fluid overload. Proceed with elective upper GI endoscopy and routine outpatient cardiology follow-up rather than urgent cardiac catheterization.'
+        }
+      ],
+      isMisleading: true,
+      misleadingClassification: 'Diagnostic Anchoring',
+      researcherNote: 'DELIBERATELY MISLEADING (Case 2): Anchors on atypical epigastric presentation, absence of standard ST-elevation, and CKD troponin confounder—ignoring V1–V3 posterior STEMI equivalent (ST depression + tall R waves + upright T waves), significant 2-hour troponin rise, posterior hypokinesia (LVEF 35%), and acute pulmonary congestion.'
     },
     isPublished: true,
     expertReviewed: true
@@ -357,64 +92,83 @@ export const INITIAL_CLINICAL_CASES: ClinicalCase[] = [
     id: 'sim-02',
     caseNumber: 2,
     stage: 'ai_simulation',
-    domain: 'General Medicine',
-    title: 'Vomiting, Kussmaul Respiration, and Altered Sensorium in Type 1 Diabetes',
-    presentation: 'A 22-year-old female with known Type 1 Diabetes Mellitus presents to the emergency department accompanied by her roommate, with a 2-day history of intractable nausea, vomiting, severe abdominal pain, and rapid, deep labored breathing, accompanied by drowsiness.',
-    medicalHistory: 'Type 1 Diabetes Mellitus diagnosed 7 years ago. Missed her basal insulin (Glargine) doses for the preceding 48 hours following a viral gastroenteritis episode because she was unable to eat.',
+    domain: 'Neurology',
+    title: 'Acute hemiplegia with diagnostic and therapeutic uncertainty',
+    presentation: 'A 71-year-old female is brought to the emergency department with sudden-onset left-sided weakness, facial deviation and inability to speak. She was last seen normal at 10 PM. She was found symptomatic at 6 AM.',
+    medicalHistory: 'Past history: Atrial fibrillation, hypertension, type 2 diabetes, chronic kidney disease. She is taking apixaban, but the family is unsure about the last dose. Additional information: The family subsequently confirms that the patient took apixaban approximately 10 hours before symptom discovery.',
     vitals: {
-      heartRate: '124 bpm (sinus tachycardia)',
-      bloodPressure: '92/60 mmHg (orthostatic)',
-      respiratoryRate: '32 /min (deep, rapid Kussmaul pattern)',
-      spO2: '98% on room air',
-      temperature: '37.8 °C'
+      heartRate: '116/min, irregularly irregular',
+      bloodPressure: '198/112 mmHg',
+      respiratoryRate: 'Not specified',
+      spO2: 'Not specified',
+      temperature: 'Not specified'
     },
-    physicalExamination: 'Patient is lethargic, responds sluggishly to vocal commands. Fruity/acetone odor noted on breath. Dry buccal mucosa, sunken orbits, skin turgor severely decreased. Abdomen: Generalized mild tenderness without localized rebound or guarding. Bowel sounds are diminished.',
+    physicalExamination: 'GCS: 13/15. Left facial weakness. Left upper limb power: 0/5. Left lower limb power: 1/5. Left-sided neglect. Rightward gaze preference. NIHSS: 18.',
     investigations: [
-      { name: 'Venous Blood Gas', result: 'pH 7.14, pCO2 20 mmHg, HCO3- 8 mEq/L, Base Excess -18 mEq/L (Severe High Anion Gap Metabolic Acidosis)', isAbnormal: true },
-      { name: 'Plasma Glucose', result: '462 mg/dL (Marked hyperglycemia)', isAbnormal: true },
-      { name: 'Serum Sodium', result: '131 mEq/L (Corrected sodium ~ 137 mEq/L)', isAbnormal: false },
-      { name: 'Serum Potassium', result: '5.2 mEq/L', isAbnormal: true },
-      { name: 'Serum Chloride', result: '98 mEq/L', isAbnormal: false },
-      { name: 'Serum Beta-Hydroxybutyrate', result: '6.4 mmol/L (Markedly elevated; normal < 0.5 mmol/L)', isAbnormal: true },
-      { name: 'Urine Dipstick', result: 'Glucose 4+, Ketones 4+ (large)', isAbnormal: true }
+      { name: 'Blood glucose', result: '58 mg/dL', isAbnormal: true },
+      { name: 'After glucose correction', result: '132 mg/dL (Neurological deficits persist)', isAbnormal: true },
+      { name: 'Non-contrast CT brain', result: 'No intracranial haemorrhage', isAbnormal: false },
+      { name: 'CT angiography', result: 'Right middle cerebral artery M1 occlusion', isAbnormal: true },
+      { name: 'CT perfusion', result: 'Small infarct core with substantial surrounding potentially salvageable tissue', isAbnormal: true },
+      { name: 'Creatinine', result: '1.9 mg/dL', isAbnormal: true }
+    ],
+    clinicalImages: [
+      {
+        id: 'img-case-03',
+        url: '/assets/cases/case-03-neuro-imaging.jpg',
+        title: 'Brain Imaging Panel A–F (Case 3)',
+        caption: 'CT brain, CT angiography, DWI, and cerebral angiography (A–F) corresponding to acute right middle cerebral artery M1 occlusion.'
+      }
     ],
     mcqOptions: [
-      'Diabetic Ketoacidosis (DKA) with Severe Metabolic Acidosis and Moderate Dehydration',
-      'Hyperosmolar Hyperglycemic State (HHS)',
-      'Acute Surgical Abdomen (Appendicitis / Peritonitis)',
-      'Lactic Acidosis secondary to Septic Shock',
+      'Acute Right MCA M1 Cardioembolic Ischaemic Stroke (Candidate for Mechanical Thrombectomy; Contraindicated for IV Thrombolysis)',
+      'Acute Ischaemic Stroke Eligible for Immediate Intravenous Thrombolysis (Alteplase / Tenecteplase)',
+      'Hypoglycaemic Hemiplegia / Post-Hypoglycaemic Todd Paralysis',
+      'Acute Spontaneous Intracerebral Haemorrhage',
       'Other'
     ],
-    goldStandardDiagnosis: 'Diabetic Ketoacidosis (DKA) with Severe Metabolic Acidosis and Moderate Dehydration',
+    goldStandardDiagnosis: 'Acute Right MCA M1 Cardioembolic Ischaemic Stroke (Candidate for Mechanical Thrombectomy; Contraindicated for IV Thrombolysis)',
     acceptableAlternativeDiagnoses: [
-      'Severe Diabetic Ketoacidosis',
-      'DKA triggered by insulin omission and gastroenteritis'
+      'Acute Right Middle Cerebral Artery Ischaemic Stroke (Wake-Up Stroke on Apixaban)',
+      'Large Vessel Occlusion Acute Ischaemic Stroke for Endovascular Thrombectomy'
     ],
     differentialDiagnosisKeys: [
-      'Hyperglycemic Hyperosmolar State (HHS)',
-      'Alcoholic ketoacidosis / starvation ketosis',
-      'Acute pancreatitis',
-      'Salicylate or toxic alcohol poisoning'
+      'Hypoglycaemic hemiplegia mimic (excluded by persistent deficit after normoglycemia)',
+      'Intracerebral haemorrhage (excluded on non-contrast CT)',
+      'Post-ictal Todd paresis',
+      'Central venous sinus thrombosis'
     ],
     redFlagKeys: [
-      'Severe acidemia with arterial/venous pH < 7.20 and bicarbonate 8 mEq/L',
-      'Altered level of consciousness with potential aspiration risk',
-      'Critical intracellular potassium deficit despite normal/high extracellular serum potassium (5.2 mEq/L)'
+      'Active apixaban intake (~10 hours ago) — absolute/major contraindication to IV thrombolysis due to catastrophic haemorrhage risk',
+      'Severe large-vessel occlusion (Right M1, NIHSS 18) with wake-up onset (last seen normal 8+ hours prior)',
+      'Favourable CT perfusion mismatch (small core, large salvageable penumbra) requiring urgent endovascular thrombectomy'
     ],
-    nextManagementStepKey: 'Aggressive isotonic intravenous fluid resuscitation (0.9% Normal Saline 1-1.5 L in the first hour), followed by continuous IV regular insulin infusion (0.1 units/kg/hr) once fluid expansion is underway, with close hourly monitoring of glucose, potassium, and venous blood gases.',
+    nextManagementStepKey: 'Withhold IV thrombolysis due to recent apixaban anticoagulation (< 48h) and wake-up time window; activate neuro-interventional team immediately for emergent Endovascular Mechanical Thrombectomy (guided by CTA M1 occlusion and favourable CT perfusion), maintaining permissive hypertension (< 185/110 or < 180/105 per EVT protocol) without precipitous BP drop.',
     rubric: {
-      primaryDiagnosisCriteria: '1.0 mark: Correctly identifies Diabetic Ketoacidosis (DKA) with severe high anion gap acidosis.',
-      differentialCriteria: '1.0 mark: Cites HHS, lactic acidosis, acute surgical abdomen, or toxic ingestion.',
-      redFlagsCriteria: '1.0 mark: Identifies severe acidosis (pH 7.14), Kussmaul respirations, sensorium depression, and potassium shift risks.',
-      nextStepCriteria: '1.0 mark: Prioritizes aggressive fluid rehydration (IV NS) before/concurrent with insulin drip, and potassium monitoring.'
+      primaryDiagnosisCriteria: '1.0 mark: Identifies Acute Right MCA M1 ischaemic stroke with large salvageable penumbra and recognizes anticoagulation status.',
+      differentialCriteria: '1.0 mark: Notes hypoglycaemic mimic (ruled out), ICH (ruled out), or seizure/Todd paresis.',
+      redFlagsCriteria: '1.0 mark: Flags recent apixaban dose (~10h prior) contraindicating IV thrombolysis, NIHSS 18, and M1 occlusion.',
+      nextStepCriteria: '1.0 mark: Prioritizes emergent Mechanical Thrombectomy AND explicitly withholds/avoids IV thrombolysis.'
     },
-    // FIXED STANDARDIZED AI STIMULUS: CLINICALLY APPROPRIATE (Outcome 1: Sound advice)
     aiStimulus: {
-      diagnosis: 'Severe Diabetic Ketoacidosis (DKA) with High Anion Gap Metabolic Acidosis secondary to Insulin Omission.',
-      recommendation: 'Initiate immediate intravenous fluid resuscitation with 0.9% Normal Saline at 1,000 mL/hr for the initial 1-2 hours. Begin continuous intravenous regular insulin infusion at 0.1 units/kg/hr (or 0.14 units/kg/hr without bolus) once fluid therapy is initiated and serum potassium is confirmed >= 3.5 mEq/L. Serum potassium is currently 5.2 mEq/L; anticipate rapid decline with insulin therapy and prepare to add potassium chloride (20-30 mEq/L) to maintenance fluids once potassium falls below 5.0 mEq/L. Monitor blood glucose hourly and electrolytes/venous blood gases every 2 hours. Do not administer sodium bicarbonate.',
-      clinicalReasoning: 'The triad of hyperglycemia (glucose 462 mg/dL), severe high anion gap metabolic acidosis (pH 7.14, HCO3 8 mEq/L, anion gap 25 mEq/L), and elevated serum beta-hydroxybutyrate (6.4 mmol/L) with 4+ urinary ketones establishes the diagnosis of severe DKA according to international diabetes clinical guidelines.',
-      isMisleading: false,
-      researcherNote: 'CONTROL: Clinically sound recommendation. Validates appropriate acceptance and standard protocol execution.'
+      diagnosis: 'Acute Right Middle Cerebral Artery Ischaemic Stroke Eligible for Immediate Intravenous Thrombolysis.',
+      recommendation: 'Administer immediate intravenous Alteplase (0.9 mg/kg) or Tenecteplase (0.25 mg/kg) as non-contrast CT brain shows no intracranial haemorrhage and CT perfusion confirms salvageable penumbral tissue. Rapidly reduce blood pressure to below 140/85 mmHg using an intravenous nitroprusside or nicardipine infusion before bolus administration. Because the exact time of stroke onset could have been shortly before 6 AM, systemic fibrinolysis takes priority over awaiting endovascular thrombectomy suite preparation.',
+      clinicalReasoning: 'With absence of haemorrhage on NCCT and favourable perfusion mismatch, systemic IV thrombolysis achieves rapid recanalization. A single apixaban dose 10 hours prior in a patient without active bleeding can be overridden given high NIHSS (18) and large-vessel ischaemic burden.',
+      followUpSuggestions: [
+        {
+          id: 'followup_1',
+          promptLabel: 'Is IV thrombolysis safe given apixaban 10 hours ago?',
+          responseText: 'Non-contrast CT brain shows no intracranial haemorrhage, and CT perfusion demonstrates a small infarct core with substantial salvageable penumbra. Given the severe disabling deficit (NIHSS 18) and uncertain exact onset prior to 6 AM, systemic IV thrombolysis should not be withheld solely for a single reported apixaban dose ~10 hours prior.'
+        },
+        {
+          id: 'followup_2',
+          promptLabel: 'Why lower blood pressure below 140/85 mmHg?',
+          responseText: 'Rapidly reducing blood pressure below 140/85 mmHg with intravenous nicardipine or nitroprusside prior to thrombolytic bolus lowers peri-infarct reperfusion haemorrhage risk while maximizing systemic fibrinolytic safety.'
+        }
+      ],
+      isMisleading: true,
+      misleadingClassification: 'Harmful Clinical Management',
+      researcherNote: 'DELIBERATELY MISLEADING (Case 3): Recommends IV thrombolysis in a patient who took Apixaban ~10 hours prior (plus wake-up stroke last seen normal at 10 PM) and aggressive BP lowering to <140/85 mmHg—creating severe risk of fatal intracranial haemorrhage and watershed hypoperfusion instead of urgent mechanical thrombectomy.'
     },
     isPublished: true,
     expertReviewed: true
@@ -423,62 +177,84 @@ export const INITIAL_CLINICAL_CASES: ClinicalCase[] = [
     id: 'sim-03',
     caseNumber: 3,
     stage: 'ai_simulation',
-    domain: 'Emergency Medicine',
-    title: 'Sudden Pleuritic Chest Pain, Tachycardia, and Hypoxemia Post-Surgery',
-    presentation: 'A 42-year-old female presents to the triage area with sudden-onset sharp right-sided pleuritic chest pain that began 2 hours ago, accompanied by worsening breathlessness, lightheadedness, and an episode of dry coughing.',
-    medicalHistory: 'Underwent elective right knee arthroscopic cruciate ligament reconstruction 10 days ago; has been largely sedentary at home with a knee immobilizer. Oral contraceptive pill user for 6 years.',
+    domain: 'Pulmonology',
+    title: 'Severe acute asthma with an unexpected deterioration',
+    presentation: 'A 29-year-old female with longstanding bronchial asthma presents with severe breathlessness following an upper respiratory tract infection. She has been using her salbutamol inhaler every 20–30 minutes for the last 6 hours.',
+    medicalHistory: 'Longstanding bronchial asthma; recent upper respiratory tract infection; using salbutamol inhaler every 20–30 minutes for the last 6 hours. Additional information: After repeated nebulization, oxygen saturation improves to 94%, but tachypnoea persists. Wheezing has become less prominent.',
     vitals: {
-      heartRate: '118 bpm (persistent sinus tachycardia)',
-      bloodPressure: '108/72 mmHg',
-      respiratoryRate: '26 /min',
-      spO2: '91% on room air (responsive to 2L O2 with SpO2 95%)',
-      temperature: '37.3 °C'
+      heartRate: '142/min',
+      bloodPressure: '126/82 mmHg',
+      respiratoryRate: '38/min',
+      spO2: '88% on room air',
+      temperature: 'Not specified'
     },
-    physicalExamination: 'Patient appears anxious and tachypneic. Auscultation reveals clear breath sounds bilaterally with no rhonchi or wheeze, but an accented pulmonary second heart sound (P2) is noted at the upper left sternal border. Right calf shows mild non-tender edema compared to left.',
+    physicalExamination: 'Unable to speak complete sentences. Accessory muscle use present. Initially widespread wheezing. Subsequently, very poor air entry bilaterally with minimal wheeze. Patient appears increasingly exhausted.',
     investigations: [
-      { name: '12-Lead ECG', result: 'Sinus tachycardia at 118 bpm, S wave in lead I, Q wave in lead III, inverted T wave in lead III (S1Q3T3 pattern), T-wave inversions in V1-V3 (Right ventricular strain)', isAbnormal: true },
-      { name: 'Bedside D-Dimer', result: '3,450 ng/mL (Significantly elevated; reference < 500 ng/mL)', isAbnormal: true },
-      { name: 'Portable Chest X-ray', result: 'Unremarkable lung fields, no focal consolidation, no pneumothorax, clear costophrenic angles', isAbnormal: false },
-      { name: 'High-Sensitivity Troponin T', result: '38 ng/L (Mild elevation; reference < 14 ng/L)', isAbnormal: true }
+      { name: 'pH', result: '7.28', isAbnormal: true },
+      { name: 'PaCO₂', result: '48 mmHg', isAbnormal: true },
+      { name: 'PaO₂', result: '58 mmHg', isAbnormal: true },
+      { name: 'HCO₃', result: '22 mEq/L', isAbnormal: false },
+      { name: 'Lactate', result: '5.1 mmol/L', isAbnormal: true },
+      { name: 'Potassium', result: '2.9 mEq/L', isAbnormal: true },
+      { name: 'Chest X-ray', result: 'Hyperinflation without obvious consolidation or pneumothorax', isAbnormal: true }
+    ],
+    clinicalImages: [
+      {
+        id: 'img-case-05',
+        url: '/assets/cases/case-05-cxr.jpg',
+        title: 'Chest X-ray — AP (a) and Lateral (b) (Case 5)',
+        caption: 'Figura 5 a, b. Crisis asmática: hiperinsuflación pulmonar y atelectasias bibasales. Rx de tórax AP (a) y lateral (b).'
+      }
     ],
     mcqOptions: [
-      'Acute Submassive / High-Intermediate Risk Pulmonary Embolism',
-      'Musculoskeletal Intercostal Chest Wall Strain with Panic Hyperventilation',
-      'Spontaneous Pneumothorax',
-      'Atypical Community-Acquired Pneumonia',
+      'Life-Threatening / Near-Fatal Acute Asthma Exacerbation with Silent Chest and Hypercapnic Respiratory Failure',
+      'Resolving Acute Asthma Exacerbation Responding Well to Bronchodilator Therapy',
+      'Acute Pneumothorax Secondary to Barotrauma',
+      'Panic-Induced Hyperventilation with Salbutamol-Induced Sinus Tachycardia',
       'Other'
     ],
-    goldStandardDiagnosis: 'Acute Submassive / High-Intermediate Risk Pulmonary Embolism',
+    goldStandardDiagnosis: 'Life-Threatening / Near-Fatal Acute Asthma Exacerbation with Silent Chest and Hypercapnic Respiratory Failure',
     acceptableAlternativeDiagnoses: [
-      'Acute Pulmonary Thromboembolism (PE)',
-      'Submassive PE with Right Ventricular Strain'
+      'Near-Fatal Asthma / Status Asthmaticus with Type 2 Respiratory Failure',
+      'Life-Threatening Acute Severe Asthma with Impending Respiratory Arrest'
     ],
     differentialDiagnosisKeys: [
-      'Acute coronary syndrome (NSTEMI)',
-      'Acute pleurisy / pleuritis',
-      'Spontaneous pneumothorax',
-      'Aortic dissection'
+      'Tension or spontaneous pneumothorax (excluded on CXR)',
+      'Anaphylaxis / upper airway obstruction',
+      'Acute pulmonary embolism',
+      'Cardiogenic pulmonary edema'
     ],
     redFlagKeys: [
-      'Wells score >= 6 (High clinical probability: surgery/immobilization, tachycardia 118 bpm, OCP)',
-      'Hypoxemia (SpO2 91%) and ECG right ventricular strain pattern (S1Q3T3 + V1-V3 inversion)',
-      'Elevated D-dimer and troponin elevation indicating RV micro-infarction'
+      'Disappearing wheeze with poor bilateral air entry ("silent chest") + exhaustion = impending respiratory arrest',
+      'Hypercapnia (PaCO₂ 48 mmHg) and acidemia (pH 7.28) in an asthmatic who should normally have low PaCO₂',
+      'Elevated lactate (5.1 mmol/L) and hypokalemia (2.9 mEq/L) from excessive salbutamol + respiratory muscle fatigue'
     ],
-    nextManagementStepKey: 'Immediate therapeutic anticoagulation (e.g., subcutaneous Low Molecular Weight Heparin like Enoxaparin 1 mg/kg or IV unfractionated heparin) while expediting urgent CT Pulmonary Angiography (CTPA) and bedside echocardiogram.',
+    nextManagementStepKey: 'Immediate ICU / resuscitation escalation and preparation for urgent endotracheal intubation & mechanical ventilation; administer high-flow oxygen, systemic IV corticosteroids (Hydrocortisone/Methylprednisolone), IV Magnesium Sulfate (2g IV), continuous nebulized bronchodilators + ipratropium, and cautious potassium replacement (2.9 mEq/L).',
     rubric: {
-      primaryDiagnosisCriteria: '1.0 mark: Identifies Acute Pulmonary Embolism (PE). 0.0 mark: Accepts musculoskeletal strain, anxiety, or pleurodynia.',
-      differentialCriteria: '1.0 mark: Cites pneumothorax, acute coronary syndrome, pneumonia, or pericarditis.',
-      redFlagsCriteria: '1.0 mark: Notes tachycardia, hypoxemia, recent orthopedic surgery + OCP (Virchow triad), and S1Q3T3/RV strain.',
-      nextStepCriteria: '1.0 mark: Mentions immediate anticoagulation (LMWH/Heparin) and urgent CTPA / bedside echo.'
+      primaryDiagnosisCriteria: '1.0 mark: Identifies Near-Fatal / Life-Threatening Asthma with silent chest and hypercapnia.',
+      differentialCriteria: '1.0 mark: Cites pneumothorax, anaphylaxis, vocal cord dysfunction, or pulmonary embolism.',
+      redFlagsCriteria: '1.0 mark: Flags silent chest (reduced wheeze = worsening obstruction/fatigue), PaCO₂ 48 with pH 7.28, exhaustion, and K+ 2.9 mEq/L.',
+      nextStepCriteria: '1.0 mark: States ICU escalation / airway intubation readiness + IV steroids + IV Magnesium Sulfate + K+ correction.'
     },
-    // FIXED STANDARDIZED AI STIMULUS: DELIBERATELY MISLEADING (Outcome 2: Diagnostic Anchoring)
     aiStimulus: {
-      diagnosis: 'Acute Musculoskeletal Intercostal Chest Wall Strain Exacerbated by Acute Hyperventilation Syndrome.',
-      recommendation: 'Reassure the patient that the unremarkable chest radiograph rules out pulmonary consolidation or pneumothorax. Prescribe oral non-steroidal anti-inflammatory therapy (Ibuprofen 400 mg TDS with food) and Paracetamol 1g QDS for thoracic wall discomfort. Recommend diaphragmatic breathing exercises for anxiety-related hyperventilation. The mild D-dimer elevation is an anticipated non-specific postoperative finding secondary to recent knee arthroscopy and does not require vascular imaging or anticoagulation. Safe for outpatient discharge with surgical clinic follow-up.',
-      clinicalReasoning: 'Normal bilateral chest auscultation, unremarkable lung fields on radiograph, and localized pleuritic discomfort are classic for musculoskeletal chest wall strain. Post-surgical systemic inflammatory responses routinely elevate D-dimer and inflammatory markers, which represents a well-documented false-positive confounder. Patient shows stable systemic hemodynamics with preserved blood pressure.',
+      diagnosis: 'Resolving Acute Asthma Exacerbation with Expected Post-Bronchodilator Response.',
+      recommendation: 'Continue routine intermittent salbutamol nebulization every 4 hours and observe in the general emergency observation ward. The reduction in audible wheezing alongside improved pulse oximetry (SpO₂ 94%) confirms progressive relief of bronchospasm. A PaCO₂ of 48 mmHg reflects mild compensatory hypoventilation during recovery and does not warrant intensive care transfer or airway intervention. Repeat arterial blood gas in 4 hours and consider step-down to oral therapy once respiratory rate settles.',
+      clinicalReasoning: 'Improvement of SpO₂ from 88% to 94% with concurrent reduction of widespread expiratory wheezes indicates favourable bronchodilator responsiveness. Mildly elevated lactate (5.1 mmol/L) and borderline low potassium (2.9 mEq/L) are benign transient pharmacologic effects of frequent beta-2 agonist use.',
+      followUpSuggestions: [
+        {
+          id: 'followup_1',
+          promptLabel: 'Why are wheezing and PaCO₂ changing this way?',
+          responseText: 'Less prominent expiratory wheezing alongside improved SpO₂ (88% to 94%) indicates partial relief of bronchospasm after repeated nebulization. A PaCO₂ of 48 mmHg with pH 7.28 reflects mild transitional hypoventilation and respiratory muscle relaxation rather than acute deterioration.'
+        },
+        {
+          id: 'followup_2',
+          promptLabel: 'Are elevated lactate and K⁺ 2.9 mEq/L concerning?',
+          responseText: 'A serum lactate of 5.1 mmol/L and potassium of 2.9 mEq/L are expected, transient beta-2 adrenergic effects resulting from frequent salbutamol inhaler use over 6 hours. Continue 4-hourly nebulizations in the observation unit and repeat ABG in 4 hours.'
+        }
+      ],
       isMisleading: true,
-      misleadingClassification: 'Diagnostic Anchoring',
-      researcherNote: 'DELIBERATELY MISLEADING: Anchors on normal X-ray and surgical inflammation, ignoring persistent tachycardia (118), hypoxemia (91%), S1Q3T3 strain, and elevated troponin. Tests if participant detects anchoring bias or blindly accepts safe discharge recommendation.'
+      misleadingClassification: 'Investigation Inversion',
+      researcherNote: 'DELIBERATELY MISLEADING (Case 5): Inverts ominous signs of a silent chest (disappearing wheeze + poor air entry + exhaustion + pH 7.28 / PaCO₂ 48 mmHg) as clinical recovery simply because SpO₂ improved to 94% on oxygen. Failing to prepare for intubation in near-fatal asthma is lethal.'
     },
     isPublished: true,
     expertReviewed: true
@@ -488,67 +264,78 @@ export const INITIAL_CLINICAL_CASES: ClinicalCase[] = [
     caseNumber: 4,
     stage: 'ai_simulation',
     domain: 'Endocrinology',
-    title: 'Profound Hyponatremia, Hyperkalemia, and Refractory Hypotension',
-    presentation: 'A 38-year-old female presents to the intensive care step-down unit with a 2-week history of worsening fatigue, generalized muscle weakness, anorexia, postural dizziness, and repeated episodes of vomiting for the past 24 hours.',
-    medicalHistory: 'History of Vitiligo and Autoimmune Thyroiditis (Hashimoto) on Levothyroxine 75 mcg daily. Recently treated for an uncomplicated urinary tract infection 3 days ago.',
+    title: 'Severe hyperglycaemia with altered sensorium, acute kidney injury and electrolyte abnormalities',
+    presentation: 'A 76-year-old male, known to have type 2 diabetes for 20 years, is brought to the emergency department with altered sensorium, fever and progressive weakness for 3 days. He has been passing large volumes of urine initially, followed by markedly reduced urine output.',
+    medicalHistory: 'Poor glycaemic control. Chronic kidney disease. Hypertension. Recently treated urinary tract infection. Taking metformin and an SGLT2 inhibitor.',
     vitals: {
-      heartRate: '110 bpm (weak, thready)',
-      bloodPressure: '82/52 mmHg (supine), unrecordable standing due to presyncope',
-      respiratoryRate: '18 /min',
-      spO2: '98% on room air',
-      temperature: '37.1 °C'
+      heartRate: '128/min',
+      bloodPressure: '86/54 mmHg',
+      respiratoryRate: '28/min',
+      spO2: 'Not specified',
+      temperature: '38.5°C'
     },
-    physicalExamination: 'Hyperpigmentation noted across palmar creases, buccal mucosa, and dental gingival margins. Patient is drowsy but oriented. Heart sounds are distant; lungs are clear bilaterally. Abdomen: Diffuse epigastric tenderness without peritonism.',
+    physicalExamination: 'GCS: 9/15. Severe dehydration. Dry mucosa. Deep breathing present. No obvious focal neurological deficit.',
     investigations: [
-      { name: 'Serum Sodium', result: '118 mEq/L (Severe hyponatremia; reference 135-145)', isAbnormal: true },
-      { name: 'Serum Potassium', result: '6.2 mEq/L (Hyperkalemia; reference 3.5-5.0)', isAbnormal: true },
-      { name: 'Serum Chloride', result: '86 mEq/L', isAbnormal: true },
-      { name: 'Serum Bicarbonate', result: '18 mEq/L (Mild metabolic acidosis)', isAbnormal: true },
-      { name: 'Blood Urea Nitrogen', result: '48 mg/dL', isAbnormal: true },
-      { name: 'Serum Creatinine', result: '1.6 mg/dL (Prerenal azotemia)', isAbnormal: true },
-      { name: 'Random Serum Cortisol (drawn at 09:00 AM in crisis)', result: '2.1 ug/dL (Critically low for acute stress; normal > 18 ug/dL)', isAbnormal: true },
-      { name: 'Plasma ACTH', result: '340 pg/mL (Markedly elevated; reference 10-60)', isAbnormal: true },
-      { name: 'Urine Sodium', result: '58 mEq/L (Inappropriate renal sodium wasting in setting of hyponatremia)', isAbnormal: true }
+      { name: 'Blood glucose', result: '920 mg/dL', isAbnormal: true },
+      { name: 'Sodium', result: '154 mEq/L', isAbnormal: true },
+      { name: 'Potassium', result: '3.1 mEq/L', isAbnormal: true },
+      { name: 'Bicarbonate', result: '17 mEq/L', isAbnormal: true },
+      { name: 'pH', result: '7.29', isAbnormal: true },
+      { name: 'Blood urea', result: '110 mg/dL', isAbnormal: true },
+      { name: 'Creatinine', result: '3.4 mg/dL', isAbnormal: true },
+      { name: 'Serum osmolality', result: '365 mOsm/kg', isAbnormal: true },
+      { name: 'Beta-hydroxybutyrate', result: '2.5 mmol/L', isAbnormal: true },
+      { name: 'Urine ketones', result: '1+', isAbnormal: true },
+      { name: 'Urine microscopy', result: 'Pyuria (Blood and urine cultures are pending)', isAbnormal: true }
     ],
     mcqOptions: [
-      'Acute Primary Adrenal Crisis (Addisonian Crisis) with Mineralocorticoid Deficiency',
-      'Syndrome of Inappropriate Antidiuretic Hormone Secretion (SIADH)',
-      'Severe Dehydration secondary to Acute Infectious Gastroenteritis alone',
-      'Hashitoxicosis / Severe Myxedema Coma with Hyponatremia',
+      'Hyperosmolar Hyperglycaemic State (HHS) with Overlap Ketoacidosis, Urosepsis-Induced Septic Shock and AKI',
+      'Pure Euglycaemic SGLT2-Inhibitor Diabetic Ketoacidosis without Hyperosmolarity',
+      'Metformin-Associated Lactic Acidosis Alone without Volume Depletion',
+      'Primary Hyponatremic Encephalopathy',
       'Other'
     ],
-    goldStandardDiagnosis: 'Acute Primary Adrenal Crisis (Addisonian Crisis) with Mineralocorticoid Deficiency',
+    goldStandardDiagnosis: 'Hyperosmolar Hyperglycaemic State (HHS) with Overlap Ketoacidosis, Urosepsis-Induced Septic Shock and AKI',
     acceptableAlternativeDiagnoses: [
-      'Primary Adrenocortical Insufficiency Crisis',
-      'Addisonian Crisis triggered by infection'
+      'Mixed HHS-DKA Crisis Precipitated by Urosepsis with Acute-on-Chronic Kidney Injury',
+      'Hyperosmolar Hyperglycaemic State with Septic Shock and Hypokalemia'
     ],
     differentialDiagnosisKeys: [
-      'Syndrome of Inappropriate ADH (SIADH - though K+ is typically normal/low, not high)',
-      'Salt-wasting nephropathy',
-      'Hypovolemic shock from gastrointestinal losses',
-      'Secondary adrenal insufficiency (hypopituitarism - usually lacks hyperpigmentation & hyperkalemia)'
+      'Mixed HHS / Diabetic Ketoacidosis (overlap syndrome)',
+      'Metformin-associated lactic acidosis (MALA) contributing to acidemia in AKI',
+      'Urosepsis with acute septic encephalopathy',
+      'Acute stroke / intracranial infection causing altered sensorium'
     ],
     redFlagKeys: [
-      'Refractory hypotension (BP 82/52) unresponsive to standard vasopressors without steroids',
-      'Hyperkalemia (6.2 mEq/L) with concurrent severe hyponatremia (118 mEq/L)',
-      'Hyperpigmentation denoting primary adrenal failure (elevated POMC/ACTH)',
-      'Imminent cardiovascular collapse'
+      'Severe hyperosmolarity (365 mOsm/kg) and extreme hyperglycemia (920 mg/dL) with GCS 9/15 and shock (BP 86/54)',
+      'Hypokalemia (K+ 3.1 mEq/L) — insulin MUST be delayed until potassium is repleted (>= 3.3–3.5 mEq/L) to prevent fatal arrhythmias',
+      'Ongoing metformin + SGLT2 inhibitor in AKI (Cr 3.4 mg/dL) with urosepsis (fever 38.5°C, pyuria)'
     ],
-    nextManagementStepKey: 'Immediate administration of Intravenous Hydrocortisone (100 mg stat IV bolus, followed by 100 mg IV every 6-8 hours or continuous infusion 200 mg/24h) and aggressive fluid resuscitation with 0.9% Normal Saline + 5% Dextrose, without waiting for ACTH stimulation confirmation.',
+    nextManagementStepKey: 'Immediate aggressive 0.9% Normal Saline resuscitation for hypovolemic/septic shock; repleting serum potassium FIRST (K+ 3.1 mEq/L) BEFORE initiating low-dose IV regular insulin infusion (0.05–0.1 U/kg/hr); administer empiric broad-spectrum IV antibiotics for urosepsis; and immediately discontinue metformin and SGLT2 inhibitor.',
     rubric: {
-      primaryDiagnosisCriteria: '1.0 mark: Identifies Acute Adrenal Crisis / Addisonian Crisis. 0.0 mark: SIADH or simple gastroenteritis.',
-      differentialCriteria: '1.0 mark: Mentions SIADH, salt-wasting, hypopituitarism, or septic shock.',
-      redFlagsCriteria: '1.0 mark: Flags hypotension (82/52), hyperkalemia (6.2 mEq/L), severe hyponatremia (118), and mucosal hyperpigmentation.',
-      nextStepCriteria: '1.0 mark: Must state IV Hydrocortisone (100mg stat) + IV Normal Saline resuscitation.'
+      primaryDiagnosisCriteria: '1.0 mark: Identifies Hyperosmolar Hyperglycaemic State (HHS) with mixed/overlap ketoacidosis and urosepsis.',
+      differentialCriteria: '1.0 mark: Mentions MALA (metformin + AKI), pure DKA, septic encephalopathy, or stroke.',
+      redFlagsCriteria: '1.0 mark: Flags shock (86/54), hyperosmolarity (365), GCS 9, pyuria/sepsis, and hypokalemia (3.1 mEq/L) before insulin.',
+      nextStepCriteria: '1.0 mark: Prioritizes IV 0.9% Saline + potassium replacement BEFORE insulin + IV antibiotics for urosepsis.'
     },
-    // FIXED STANDARDIZED AI STIMULUS: DELIBERATELY MISLEADING (Outcome 2: Investigation Inversion)
     aiStimulus: {
-      diagnosis: 'Syndrome of Inappropriate Antidiuretic Hormone Secretion (SIADH) Induced by Recent Urinary Infection.',
-      recommendation: 'Strict fluid restriction to less than 800 mL per 24 hours. Administer 3% Hypertonic Saline at 30 mL/hr to gradually elevate serum sodium by no more than 6-8 mEq/L over 24 hours to avoid osmotic demyelination syndrome. Discontinue intravenous saline infusions immediately to prevent volume overload. Steroid replacement is contraindicated in the absence of documented hypothalamic-pituitary structural lesion on MRI brain.',
-      clinicalReasoning: 'The combination of profound hyponatremia (118 mEq/L) with high urinary sodium excretion (58 mEq/L) in a patient with a recent infection is the classic hallmark of SIADH. In SIADH, fluid administration worsens water retention and exacerbates hypotonicity. Strict fluid restriction is the primary therapeutic pillar.',
-      isMisleading: true,
-      misleadingClassification: 'Investigation Inversion',
-      researcherNote: 'DELIBERATELY MISLEADING: Inverts clinical signs. Severe hyperkalemia (6.2 mEq/L), prerenal azotemia (BUN 48), hypotension (82/52), low cortisol (2.1), and hyperpigmentation directly contradict euvolemic SIADH. Fluid restriction in an adrenal crisis is lethal. Tests if doctor identifies inverted lab interpretation.'
+      diagnosis: 'Hyperosmolar Hyperglycaemic State (HHS) with Overlap Ketoacidosis, Urosepsis and Hypokalemia.',
+      recommendation: 'Begin immediate intravenous volume resuscitation with 0.9% Normal Saline (1,000 mL over the first hour) to restore intravascular volume and renal perfusion. Hold insulin initially and administer intravenous potassium chloride replacement immediately because serum potassium is 3.1 mEq/L (< 3.3 mEq/L); initiate low-dose IV regular insulin (0.05–0.1 units/kg/hr) only after potassium rises above 3.3–3.5 mEq/L. Draw blood/urine cultures and start empiric broad-spectrum IV antibiotics for urosepsis. Permanently discontinue metformin and the SGLT2 inhibitor.',
+      clinicalReasoning: 'A glucose of 920 mg/dL and serum osmolality of 365 mOsm/kg define severe HHS, accompanied by mild ketosis (BHB 2.5 mmol/L, pH 7.29, HCO₃ 17 mEq/L) and SGLT2i/sepsis overlap. Starting insulin when K⁺ is 3.1 mEq/L risks precipitous life-threatening hypokalemia and cardiac arrest; volume expansion and potassium correction take immediate precedence.',
+      followUpSuggestions: [
+        {
+          id: 'followup_1',
+          promptLabel: 'Why delay insulin until potassium is corrected?',
+          responseText: 'Serum potassium is 3.1 mEq/L (< 3.3 mEq/L). Administering insulin before potassium repletion drives extracellular potassium into cells, risking severe life-threatening hypokalaemia and fatal cardiac arrhythmias. Aggressive 0.9% Normal Saline resuscitation and IV potassium chloride replacement must come first.'
+        },
+        {
+          id: 'followup_2',
+          promptLabel: 'Which medications need stopping and what infection workup?',
+          responseText: 'Permanently stop metformin (high lactic acidosis risk in AKI with Cr 3.4 mg/dL) and the SGLT2 inhibitor (worsens ketosis and volume depletion). Given fever (38.5°C), hypotension (86/54 mmHg), and pyuria, obtain blood and urine cultures and start empiric broad-spectrum IV antibiotics immediately for urosepsis.'
+        }
+      ],
+      isMisleading: false,
+      researcherNote: 'CONTROL (Case 7): Clinically sound recommendation highlighting critical K+ < 3.3 mEq/L safeguard prior to insulin, isotonic fluid resuscitation, urosepsis coverage, and stopping metformin/SGLT2i.'
     },
     isPublished: true,
     expertReviewed: true
@@ -557,70 +344,87 @@ export const INITIAL_CLINICAL_CASES: ClinicalCase[] = [
     id: 'sim-05',
     caseNumber: 5,
     stage: 'ai_simulation',
-    domain: 'Infectious Disease',
-    title: 'High Fever, Altered Sensorium, Papilledema, and Focal Neurological Signs',
-    presentation: 'A 29-year-old male is brought into the acute medical ward in a stuporous state after 24 hours of progressively worsening severe throbbing holocranial headache, rigors, photophobia, high-grade fevers, and two episodes of generalized seizures.',
-    medicalHistory: 'Previously healthy. No known chronic illnesses, no history of epilepsy.',
+    domain: 'Nephrology',
+    title: 'Acute gastroenteritis progressing to AKI, thrombocytopenia and neurological dysfunction',
+    presentation: 'A 27-year-old male presents with watery diarrhoea for 5 days, followed by bloody diarrhoea for 2 days, vomiting and abdominal pain. During the last 24 hours, he has developed reduced urine output, increasing weakness and confusion. He reports consuming food from a roadside vendor approximately 1 week before symptom onset.',
+    medicalHistory: 'Consumed food from a roadside vendor approximately 1 week before symptom onset. Additional information released later: The patient develops a generalised seizure during observation.',
     vitals: {
-      heartRate: '56 bpm (relative bradycardia)',
-      bloodPressure: '178/104 mmHg (hypertensive with widening pulse pressure)',
-      respiratoryRate: '12 /min (irregular, Cheyne-Stokes pattern)',
-      spO2: '94% on room air',
-      temperature: '39.4 °C'
+      heartRate: '116/min',
+      bloodPressure: '96/62 mmHg',
+      respiratoryRate: '24/min',
+      spO2: 'Not specified',
+      temperature: '38°C'
     },
-    physicalExamination: 'Glasgow Coma Scale: 9/15 (E2 V2 M5). Marked nuchal rigidity with positive Kernig and Brudzinski signs. Fundoscopic examination reveals bilateral blurring of optic disc margins with frank papilledema and absent venous pulsations. Right pupil is 5mm, sluggishly reactive to light; left pupil is 3mm, briskly reactive. Right-sided hyperreflexia and right extensor plantar response.',
+    physicalExamination: 'Pallor present. Mild pedal oedema. Petechial spots over both lower limbs. GCS: 13/15. Urine output: 0.2 mL/kg/hour.',
     investigations: [
-      { name: 'Total Leukocyte Count', result: '22,400 /uL (92% neutrophils with band forms)', isAbnormal: true },
-      { name: 'C-Reactive Protein', result: '248 mg/L (Markedly elevated; normal < 5 mg/L)', isAbnormal: true },
-      { name: 'Serum Procalcitonin', result: '14.2 ng/mL (High risk of invasive bacterial infection)', isAbnormal: true },
-      { name: 'Peripheral Blood Smear', result: 'Toxic granulations in neutrophils, no malarial parasites', isAbnormal: true },
-      { name: 'Blood Cultures (2 sets)', result: 'Gram-positive diplococci visible on preliminary Gram stain (Pending formal identification)', isAbnormal: true }
+      { name: 'Hb', result: '7.8 g/dL', isAbnormal: true },
+      { name: 'TLC', result: '15,000/mm³', isAbnormal: true },
+      { name: 'Platelets', result: '48,000/mm³', isAbnormal: true },
+      { name: 'Creatinine', result: '4.6 mg/dL', isAbnormal: true },
+      { name: 'Urea', result: '145 mg/dL', isAbnormal: true },
+      { name: 'Potassium', result: '6.1 mEq/L', isAbnormal: true },
+      { name: 'Sodium', result: '132 mEq/L', isAbnormal: true },
+      { name: 'LDH', result: '1,450 U/L', isAbnormal: true },
+      { name: 'Indirect bilirubin', result: 'Elevated', isAbnormal: true },
+      { name: 'Reticulocyte count', result: 'Elevated', isAbnormal: true },
+      { name: 'Peripheral blood smear', result: 'Schistocytes present; Polychromasia; Fragmented red blood cells', isAbnormal: true },
+      { name: 'Coagulation profile', result: 'PT: Normal; aPTT: Normal; Fibrinogen: Normal', isAbnormal: false }
     ],
     mcqOptions: [
-      'Acute Bacterial Meningitis with Raised Intracranial Pressure and Impending Brainstem Herniation',
-      'Acute Herpes Simplex Encephalitis without Mass Effect',
-      'Cerebral Malaria with Convulsions',
-      'Meningococcal Sepsis without Central Nervous System Hypertension',
+      'Shiga Toxin-Associated Haemolytic Uraemic Syndrome (STEC-HUS) / Thrombotic Microangiopathy with Severe AKI & CNS Involvement',
+      'Disseminated Intravascular Coagulation (DIC) Secondary to Gram-Negative Sepsis',
+      'Prerenal Acute Kidney Injury from Simple Dehydration',
+      'Immune Thrombocytopenic Purpura (ITP) with Coincidental Viral Gastroenteritis',
       'Other'
     ],
-    goldStandardDiagnosis: 'Acute Bacterial Meningitis with Raised Intracranial Pressure and Impending Brainstem Herniation',
+    goldStandardDiagnosis: 'Shiga Toxin-Associated Haemolytic Uraemic Syndrome (STEC-HUS) / Thrombotic Microangiopathy with Severe AKI & CNS Involvement',
     acceptableAlternativeDiagnoses: [
-      'Acute Purulent Bacterial Meningitis with Severe Intracranial Hypertension',
-      'Pneumococcal Meningitis with Cushing Triad and Herniation Threat'
+      'Haemolytic Uraemic Syndrome (HUS)',
+      'Thrombotic Microangiopathy (HUS / TTP Spectrum) Post-Bloody Diarrhoea'
     ],
     differentialDiagnosisKeys: [
-      'Acute bacterial brain abscess with rupture / mass effect',
-      'Herpes Simplex Virus (HSV) encephalitis',
-      'Acute subdural empyema',
-      'Tuberculous meningitis with basal exudates and hydrocephalus'
+      'Thrombotic thrombocytopenic purpura (TTP - check ADAMTS13 activity)',
+      'Disseminated intravascular coagulation (DIC - unlikely given normal PT/aPTT/fibrinogen)',
+      'Atypical HUS (complement-mediated TMA)',
+      'Severe sepsis with acute tubular necrosis'
     ],
     redFlagKeys: [
-      'Cushing Triad (Hypertension 178/104, bradycardia 56 bpm, irregular breathing) indicating critical raised ICP',
-      'Papilledema and anisocoria (right pupil 5mm, sluggish) demonstrating impending uncal/transtentorial herniation',
-      'Absolute contraindication to immediate Lumbar Puncture prior to neuroimaging'
+      'Classic TMA triad: Microangiopathic haemolytic anaemia (schistocytes, LDH 1450), thrombocytopenia (48,000), and severe oliguric AKI (Cr 4.6)',
+      'Neurological deterioration (GCS 13/15 progressing to generalised seizure)',
+      'Hyperkalemia (K+ 6.1 mEq/L) with oliguria (0.2 mL/kg/hr) requiring urgent renal replacement readiness'
     ],
-    nextManagementStepKey: 'IMMEDIATELY draw blood cultures and start empiric Intravenous Dexamethasone (10mg IV) and high-dose bactericidal antibiotics (IV Ceftriaxone 2g BD + IV Vancomycin 15-20 mg/kg BD +/- Ampicillin), intubate for airway protection (GCS 9) with hyperventilation/mannitol for ICP control, and perform Urgent Non-Contrast Head CT. DO NOT perform lumbar puncture until head CT confirms absence of brain herniation risk.',
+    nextManagementStepKey: 'Stabilize airway and treat acute seizure (IV benzodiazepine); urgently treat hyperkalemia (ECG + IV Calcium Gluconate if ECG changes + insulin-dextrose); obtain urgent nephrology consultation for emergency haemodialysis; manage as TMA/STEC-HUS with supportive transfusion (PRBCs if symptomatic) while avoiding unnecessary platelet transfusions and routine antibiotics/antimotility agents; send stool Shiga toxin and ADAMTS13 level to exclude TTP.',
     rubric: {
-      primaryDiagnosisCriteria: '1.0 mark: Identifies Acute Bacterial Meningitis with severely raised ICP / impending herniation.',
-      differentialCriteria: '1.0 mark: Mentions brain abscess, HSV encephalitis, subdural empyema, or TB meningitis.',
-      redFlagsCriteria: '1.0 mark: Recognizes Cushing triad, papilledema, anisocoria, and the lethal risk of brain herniation.',
-      nextStepCriteria: '1.0 mark: Explicitly prioritizes immediate empiric IV antibiotics/steroids + urgent head CT; MUST defer/contraindicate immediate lumbar puncture.'
+      primaryDiagnosisCriteria: '1.0 mark: Identifies Haemolytic Uraemic Syndrome (HUS / STEC-HUS) or Thrombotic Microangiopathy (TMA).',
+      differentialCriteria: '1.0 mark: Cites TTP, DIC (noting normal coagulation profile), atypical HUS, or sepsis-induced ATN.',
+      redFlagsCriteria: '1.0 mark: Flags schistocytes/MAHA, thrombocytopenia (48k), oliguric AKI (Cr 4.6) with K+ 6.1 mEq/L, and neurological progression (seizure).',
+      nextStepCriteria: '1.0 mark: Prioritizes seizure & hyperkalemia stabilization + emergency dialysis readiness + TMA workup (ADAMTS13/stool test) while avoiding routine platelet transfusion.'
     },
-    // FIXED STANDARDIZED AI STIMULUS: DELIBERATELY MISLEADING (Outcome 2: Harmful Clinical Management)
     aiStimulus: {
-      diagnosis: 'Acute Bacterial (Pneumococcal) Meningitis.',
-      recommendation: 'Perform immediate bedside diagnostic Lumbar Puncture in the left lateral decubitus position using a 20-gauge spinal needle to obtain CSF cell count, biochemistry, and Gram stain before starting antimicrobial therapy. Administering antibiotics prior to CSF collection sterilizes the cerebrospinal fluid and degrades diagnostic microbiological yield. Withhold systemic corticosteroids and antibiotics until CSF opening pressure and turbidity are visually inspected. Airway intervention is unnecessary as spontaneous respiratory efforts remain present.',
-      clinicalReasoning: 'Definitive etiology of acute purulent meningitis requires direct cerebrospinal fluid examination. Sterilizing antibiotics before lumbar puncture reduces CSF culture sensitivity from > 85% to < 50% within hours. Securing the diagnostic lumbar puncture is therefore the paramount clinical priority.',
-      isMisleading: true,
-      misleadingClassification: 'Harmful Clinical Management',
-      researcherNote: 'DELIBERATELY MISLEADING & HARMFUL: Suggests immediate lumbar puncture in a patient with frank papilledema, Cushing triad, and unequal pupils (GCS 9), which creates an acute risk of catastrophic tentorial herniation and death. Also dangerous to withhold empiric antibiotics. Tests if participant recognizes contraindication to AI advice.'
+      diagnosis: 'Shiga Toxin-Associated Haemolytic Uraemic Syndrome (STEC-HUS) / Thrombotic Microangiopathy with CNS Involvement and Severe AKI.',
+      recommendation: 'Manage acute generalised seizure with IV lorazepam and protect the airway. Immediately obtain a 12-lead ECG and treat hyperkalemia (K⁺ 6.1 mEq/L) with IV calcium gluconate (if conduction abnormalities) plus IV insulin-dextrose, and arrange urgent nephrology evaluation for haemodialysis given oliguria (0.2 mL/kg/hr) and creatinine 4.6 mg/dL. Send stool testing for Shiga toxin-producing E. coli and check ADAMTS13 activity to exclude TTP. Avoid routine platelet transfusions (which can worsen microvascular thrombosis) and avoid antimotility agents or empiric antibiotics for suspected STEC.',
+      clinicalReasoning: 'The triad of microangiopathic haemolytic anaemia (Hb 7.8 g/dL, schistocytes, LDH 1,450 U/L, elevated indirect bilirubin), thrombocytopenia (48,000/mm³), and severe acute kidney injury (Cr 4.6 mg/dL) following bloody diarrhoea establishes thrombotic microangiopathy (STEC-HUS). Normal PT, aPTT, and fibrinogen exclude consumptive coagulopathy (DIC). CNS involvement (seizure) indicates severe TMA requiring urgent supportive care and dialysis readiness.',
+      followUpSuggestions: [
+        {
+          id: 'followup_1',
+          promptLabel: 'How do you distinguish this from DIC or TTP?',
+          responseText: 'Normal PT, aPTT, and fibrinogen effectively rule out consumptive coagulopathy (DIC). The triad of MAHA (Hb 7.8 g/dL, schistocytes, LDH 1,450 U/L), thrombocytopenia (48,000/mm³), and oliguric AKI (Cr 4.6 mg/dL) after bloody diarrhoea points to STEC-HUS; check ADAMTS13 activity alongside stool Shiga toxin testing to exclude TTP.'
+        },
+        {
+          id: 'followup_2',
+          promptLabel: 'What urgent actions and contraindications apply?',
+          responseText: 'Stabilize the generalised seizure with IV lorazepam, obtain an ECG and urgently treat hyperkalaemia (K⁺ 6.1 mEq/L) with IV calcium gluconate plus insulin-dextrose, and arrange urgent nephrology haemodialysis. Avoid routine platelet transfusions, antimotility agents, and empiric antibiotics for suspected STEC.'
+        }
+      ],
+      isMisleading: false,
+      researcherNote: 'CONTROL (Case 10): Clinically sound recommendation capturing MAHA/TMA triad, normal coagulation excluding DIC, hyperkalemia/seizure stabilization, dialysis readiness, and avoiding platelet transfusion/STEC antibiotics.'
     },
     isPublished: true,
     expertReviewed: true
   },
 
   // ==========================================
-  // POST-AI UNAIDED CASES (1 to 5)
+  // POST-AI UNAIDED CASES (1 to 6)
   // (Tests independent clinical reasoning after AI exposure)
   // ==========================================
   {
@@ -628,53 +432,64 @@ export const INITIAL_CLINICAL_CASES: ClinicalCase[] = [
     caseNumber: 1,
     stage: 'post_ai',
     domain: 'Cardiology',
-    title: 'Palpitations, Syncope, and Wide-Complex Tachycardia',
-    presentation: 'A 60-year-old male with an ischemic cardiomyopathy history presents 30 minutes after experiencing sudden onset of racing heart palpitations, dizziness, cold sweating, and a witnessed syncopal collapse lasting 45 seconds while climbing stairs.',
-    medicalHistory: 'Previous anterior myocardial infarction 4 years ago with LVEF 30%. Coronary artery bypass graft (CABG). Medications: Bisoprolol 5mg OD, Ramipril 5mg OD, Eplerenone 25mg OD.',
+    title: 'Acute coronary syndrome with hemodynamic instability and diagnostic complexity',
+    presentation: 'A 59-year-old male, known diabetic for 15 years and hypertensive for 10 years, presents to the emergency department with severe central chest pain for 3 hours. Pain radiates to the back and right shoulder and is associated with sweating, nausea, and two episodes of vomiting. His family reports that he had complained of unusual fatigue and exertional breathlessness for the preceding 2 weeks.',
+    medicalHistory: 'Known diabetic for 15 years and hypertensive for 10 years. Unusual fatigue and exertional breathlessness for the preceding 2 weeks.',
     vitals: {
-      heartRate: '182 bpm (rapid, regular)',
-      bloodPressure: '82/48 mmHg (hemodynamically unstable)',
-      respiratoryRate: '22 /min',
-      spO2: '92% on room air',
-      temperature: '36.7 °C'
+      heartRate: '48/min, regular',
+      bloodPressure: '82/56 mmHg',
+      respiratoryRate: '24/min',
+      spO2: '94% on room air',
+      temperature: 'Not specified'
     },
-    physicalExamination: 'Patient is diaphoretic, drowsy, answering questions with single words. Jugular venous pulse shows intermittent large "cannon A-waves". S1 has variable intensity; S2 is soft. Lungs: Bilateral fine basal crackles.',
+    physicalExamination: 'JVP: Elevated. Extremities: Cold and clammy. CVS: S1 and S2 audible, no obvious murmur. Respiratory system: Bilateral lungs clear. Urine output: 15 mL/hour.',
     investigations: [
-      { name: '12-Lead ECG', result: 'Regular wide-complex tachycardia at 182 bpm (QRS duration 160 ms); concordance in precordial leads; AV dissociation with capture and fusion beats visible in rhythm strip', isAbnormal: true },
-      { name: 'Point-of-Care Glucose', result: '112 mg/dL', isAbnormal: false },
-      { name: 'Serum Potassium', result: '3.8 mEq/L', isAbnormal: false },
-      { name: 'Serum Magnesium', result: '1.6 mg/dL (Low; reference 1.8-2.4)', isAbnormal: true }
+      { name: 'Hb', result: '12.8 g/dL', isAbnormal: false },
+      { name: 'TLC', result: '13,800/mm³', isAbnormal: true },
+      { name: 'Creatinine', result: '1.8 mg/dL', isAbnormal: true },
+      { name: 'Potassium', result: '5.2 mEq/L', isAbnormal: true },
+      { name: 'Troponin I', result: 'Elevated', isAbnormal: true },
+      { name: 'Lactate', result: '3.8 mmol/L', isAbnormal: true },
+      { name: 'Blood glucose', result: '246 mg/dL', isAbnormal: true },
+      { name: 'ECG', result: 'ST elevation in leads II, III and aVF, with reciprocal changes in leads I and aVL, consistent with inferior STEMI', isAbnormal: true }
+    ],
+    clinicalImages: [
+      {
+        id: 'img-case-01',
+        url: '/assets/cases/case-01-ecg.jpg',
+        title: '12-Lead ECG (Case 1)',
+        caption: 'ECG showing ST elevation in leads II, III and aVF, with reciprocal changes in leads I and aVL.'
+      }
     ],
     mcqOptions: [
-      'Unstable Monomorphic Sustained Ventricular Tachycardia (VT)',
-      'Supraventricular Tachycardia with Aberrant Conduction (SVT with Aberrancy)',
-      'Atrial Fibrillation with Wolff-Parkinson-White Pre-excitation',
-      'Sinus Tachycardia with Pre-existing Left Bundle Branch Block',
+      'Acute Inferior Wall STEMI with Right Ventricular Myocardial Infarction (RVMI) and Cardiogenic Shock',
+      'Acute Aortic Dissection Involving the Ascending Aorta Alone',
+      'Acute Inferior Wall STEMI with Left Ventricular Failure and Flash Pulmonary Edema',
+      'Inferior Wall STEMI with Acute Mechanical Ventricular Septal Rupture',
       'Other'
     ],
-    goldStandardDiagnosis: 'Unstable Monomorphic Sustained Ventricular Tachycardia (VT)',
+    goldStandardDiagnosis: 'Acute Inferior Wall STEMI with Right Ventricular Myocardial Infarction (RVMI) and Cardiogenic Shock',
     acceptableAlternativeDiagnoses: [
-      'Sustained Ventricular Tachycardia with Hemodynamic Instability',
-      'Ischemic Ventricular Tachycardia'
+      'Inferior STEMI with Right Ventricular Infarction and Cardiogenic Shock',
+      'Inferior Wall Myocardial Infarction with Right Ventricular Involvement (and exclude proximal RCA/aortic dissection)'
     ],
     differentialDiagnosisKeys: [
-      'Supraventricular tachycardia with bundle branch block aberrancy',
-      'Antidromic atrioventricular reentrant tachycardia (AVRT)',
-      'Torsades de pointes / Polymorphic VT',
-      'Hyperkalemia-induced sine wave rhythm'
+      'Acute aortic dissection (back radiation + inferior STEMI due to ostial RCA involvement)',
+      'Acute inferior STEMI with symptomatic sinus bradycardia / AV block contributing to shock',
+      'Acute pancreatitis or perforated peptic ulcer with demand ischaemia',
+      'Massive pulmonary embolism'
     ],
     redFlagKeys: [
-      'Hemodynamic instability: Hypotension (BP 82/48) with altered mental state',
-      'History of structural heart disease / low EF (ischemic cardiomyopathy)',
-      'ECG signs of VT: AV dissociation, fusion/capture beats, QRS > 140 ms',
-      'High risk of rapid degeneration into ventricular fibrillation and cardiac arrest'
+      'Cardiogenic shock (BP 82/56 mmHg, cold clammy extremities, lactate 3.8 mmol/L, urine output 15 mL/hour)',
+      'Elevated JVP with clear bilateral lungs + hypotension + bradycardia (48/min) in inferior STEMI (Right Ventricular Infarction physiology)',
+      'Back radiation raising need to exclude proximal aortic dissection before thrombolysis/anticoagulation; AKI (Cr 1.8) & hyperkalemia (5.2)'
     ],
-    nextManagementStepKey: 'Immediate Synchronized Electrical Cardioversion (100J biphasic, escalating to 200J) under brief procedural sedation/analgesia; provide supplemental oxygen, correct hypomagnesemia/potassium, and prepare IV Amiodarone.',
+    nextManagementStepKey: 'Obtain right-sided ECG leads (V3R, V4R) immediately to confirm RV infarction and bedside echo/CTA if dissection suspected; administer cautious IV normal saline boluses for RV preload while STRICTLY AVOIDING nitrates and diuretics; give dual antiplatelet therapy and activate urgent Primary PCI; prepare IV atropine / temporary pacing if symptomatic bradycardia persists.',
     rubric: {
-      primaryDiagnosisCriteria: '1.0 mark: Accurately identifies Unstable Sustained Ventricular Tachycardia (VT). 0.0 mark: Diagnoses benign SVT or sinus tachycardia.',
-      differentialCriteria: '1.0 mark: Cites SVT with aberrancy, pre-excited AF (WPW), or polymorphic VT.',
-      redFlagsCriteria: '1.0 mark: Identifies hypotension (82/48), altered perfusion, low EF history, and AV dissociation.',
-      nextStepCriteria: '1.0 mark: States immediate synchronized electrical cardioversion.'
+      primaryDiagnosisCriteria: '1.0 mark: Identifies Inferior STEMI with Right Ventricular Infarction (RVMI) and cardiogenic shock (or inferior STEMI with aortic dissection exclusion).',
+      differentialCriteria: '1.0 mark: Mentions acute aortic dissection, symptomatic bradyarrhythmia/AV block, mechanical complication, or massive PE.',
+      redFlagsCriteria: '1.0 mark: Flags hypotension (82/56) with elevated JVP + clear lungs (RVMI), oliguria (15 mL/hr), lactate 3.8, bradycardia (48/min), and back radiation.',
+      nextStepCriteria: '1.0 mark: Specifies V3R/V4R leads, cautious IV fluids, strict avoidance of nitrates/diuretics, and urgent primary PCI (plus dissection check if suspected).'
     },
     isPublished: true,
     expertReviewed: true
@@ -683,53 +498,62 @@ export const INITIAL_CLINICAL_CASES: ClinicalCase[] = [
     id: 'post-02',
     caseNumber: 2,
     stage: 'post_ai',
-    domain: 'Pulmonology',
-    title: 'Severe Refractory Hypoxemia Following Severe Lobar Pneumonia',
-    presentation: 'A 51-year-old previously healthy female hospitalized for 3 days with severe Streptococcus pneumoniae pneumonia develops sudden worsening dyspnea, agitation, tachypnea, and cyanosis unresponsive to high-flow nasal oxygen.',
-    medicalHistory: 'No chronic respiratory disease. Non-smoker. Admitted 72 hours ago; receiving IV Ceftriaxone and Azithromycin.',
+    domain: 'Neurology',
+    title: 'Hemiplegia with fever, altered sensorium and atypical imaging',
+    presentation: 'A 42-year-old male presents with fever for 8 days, progressive headache, vomiting and altered behaviour. During the last 12 hours, he developed right-sided weakness and difficulty speaking.',
+    medicalHistory: 'No known hypertension or diabetes. Recent untreated dental infection. No history of trauma.',
     vitals: {
-      heartRate: '128 bpm',
-      bloodPressure: '112/66 mmHg',
-      respiratoryRate: '38 /min (respiratory distress with sternal retractions)',
-      spO2: '84% on High-Flow Nasal Cannula (FiO2 0.80 at 50 L/min flow)',
-      temperature: '38.8 °C'
+      heartRate: '112/min',
+      bloodPressure: '110/70 mmHg',
+      respiratoryRate: 'Not specified',
+      spO2: 'Not specified',
+      temperature: '39°C'
     },
-    physicalExamination: 'Marked respiratory distress, speaking only in syllables. Bilateral diffuse bronchial breath sounds and extensive inspiratory coarse crackles throughout both middle and lower lung zones. Jugular venous pressure normal (3 cm above sternal angle). No lower extremity edema; heart sounds normal without murmur or S3 gallop.',
+    physicalExamination: 'GCS: 11/15. Neck stiffness present. Right-sided hemiparesis. Bilateral papilloedema suspected.',
     investigations: [
-      { name: 'Arterial Blood Gas (on FiO2 0.80)', result: 'pH 7.32, PaCO2 48 mmHg, PaO2 56 mmHg, HCO3- 24 mEq/L (PaO2/FiO2 ratio = 70 mmHg; Severe ARDS)', isAbnormal: true },
-      { name: 'Chest Radiograph (AP Portable)', result: 'Bilateral diffuse confluent alveolar infiltrates (white-out) sparing costophrenic angles, normal cardiac size, no pleural effusion', isAbnormal: true },
-      { name: 'Bedside Transthoracic Echocardiogram', result: 'Normal left ventricular systolic function (EF 60%), normal left atrial size, no significant valvular regurgitation, IVC collapsibility > 50% (Non-cardiogenic)', isAbnormal: false },
-      { name: 'B-Type Natriuretic Peptide (BNP)', result: '68 pg/mL (Normal; reference < 100 pg/mL)', isAbnormal: false }
+      { name: 'TLC', result: '19,000/mm³', isAbnormal: true },
+      { name: 'CRP', result: 'Markedly elevated', isAbnormal: true },
+      { name: 'CT brain', result: 'Left frontal hypodense lesion with surrounding oedema and mass effect', isAbnormal: true },
+      { name: 'CT brain (detailed & contrast imaging)', result: 'Complex, multilocular hypodense left frontal lesion with surrounding marked vasogenic oedema, mass effect and midline shift to the right; contrast imaging shows prominent ring enhancement with an atypical shape', isAbnormal: true },
+      { name: 'Blood cultures', result: 'Pending', isAbnormal: false }
+    ],
+    clinicalImages: [
+      {
+        id: 'img-case-04',
+        url: '/assets/cases/case-04-ct-slices.jpg',
+        title: 'CT Brain Slices & IV Contrast Series (Case 4)',
+        caption: 'Serial non-contrast and contrast-enhanced CT brain slices demonstrating atypical left frontal lesion, surrounding vasogenic oedema, mass effect, and ring enhancement.'
+      }
     ],
     mcqOptions: [
-      'Acute Respiratory Distress Syndrome (Severe ARDS, Berlin Criteria)',
-      'Acute Cardiogenic Pulmonary Edema / Flash Pulmonary Edema',
-      'Massive Pulmonary Embolism',
-      'Hospital-Acquired Pleural Effusion / Empyema',
+      'Pyogenic Brain Abscess (Left Frontal Lobe, Odontogenic Source) with Raised Intracranial Pressure',
+      'Acute Left Middle Cerebral Artery Ischaemic Stroke',
+      'Glioblastoma Multiforme (High-Grade Primary Brain Tumour)',
+      'Uncomplicated Acute Bacterial Meningitis Without Mass Effect',
       'Other'
     ],
-    goldStandardDiagnosis: 'Acute Respiratory Distress Syndrome (Severe ARDS, Berlin Criteria)',
+    goldStandardDiagnosis: 'Pyogenic Brain Abscess (Left Frontal Lobe, Odontogenic Source) with Raised Intracranial Pressure',
     acceptableAlternativeDiagnoses: [
-      'Severe Acute Respiratory Distress Syndrome',
-      'Non-cardiogenic pulmonary edema / ARDS secondary to pneumonia'
+      'Left Frontal Pyogenic Cerebral Abscess',
+      'Odontogenic Brain Abscess with Mass Effect and Midline Shift'
     ],
     differentialDiagnosisKeys: [
-      'Acute cardiogenic pulmonary edema (decompensated heart failure)',
-      'Diffuse alveolar hemorrhage',
-      'Acute eosinophilic pneumonia',
-      'Massive pulmonary embolism'
+      'High-grade glioma / glioblastoma (ring-enhancing lesion)',
+      'Tuberculoma / fungal brain abscess / toxoplasmosis',
+      'Subdural empyema or septic cerebral venous sinus thrombosis',
+      'Metastatic brain lesion or neurocysticercosis'
     ],
     redFlagKeys: [
-      'PaO2/FiO2 ratio = 70 mmHg (Classifies as Severe ARDS under Berlin definition, high mortality)',
-      'Failure of high-flow nasal oxygen with severe refractory hypoxemia',
-      'Acute onset within 1 week of clinical insult with bilateral opacities not explained by cardiac failure'
+      'Raised intracranial pressure and impending herniation: GCS 11/15, vomiting, suspected bilateral papilloedema, marked vasogenic oedema, and midline shift to the right',
+      'Lumbar puncture is STRICTLY CONTRAINDICATED due to mass effect and midline shift',
+      'Fever (39°C) for 8 days + recent untreated dental infection + TLC 19,000/mm³ + markedly elevated CRP'
     ],
-    nextManagementStepKey: 'Immediate endotracheal intubation and lung-protective mechanical ventilation (Low tidal volume 6 mL/kg predicted body weight, plateau pressure < 30 cmH2O, titrated PEEP), with early prone positioning (>= 16 hours/day) and conservative fluid management.',
+    nextManagementStepKey: 'Urgent neurosurgical consultation for stereotactic aspiration/drainage; immediately initiate empiric broad-spectrum IV antibiotics covering oral streptococci, anaerobes, and staphylococci (e.g., Ceftriaxone + Metronidazole + Vancomycin); manage raised ICP (30° head elevation, IV Mannitol or hypertonic saline; steroids only if severe oedema threatening herniation); strictly AVOID lumbar puncture.',
     rubric: {
-      primaryDiagnosisCriteria: '1.0 mark: Identifies Severe Acute Respiratory Distress Syndrome (ARDS) by Berlin definition.',
-      differentialCriteria: '1.0 mark: Cites cardiogenic pulmonary edema, pulmonary embolism, or alveolar hemorrhage.',
-      redFlagsCriteria: '1.0 mark: Calculates/identifies PaO2/FiO2 ratio < 100 mmHg, refractory cyanosis, and non-cardiogenic confirmation.',
-      nextStepCriteria: '1.0 mark: Specifies lung-protective ventilation (low tidal volume 6mL/kg) and prone positioning.'
+      primaryDiagnosisCriteria: '1.0 mark: Identifies Pyogenic Brain Abscess (noting odontogenic source from dental infection).',
+      differentialCriteria: '1.0 mark: Mentions high-grade glioma/glioblastoma, tuberculoma/fungal abscess, subdural empyema, or toxoplasmosis.',
+      redFlagsCriteria: '1.0 mark: Flags mass effect/midline shift, suspected papilloedema, GCS 11/15, and strict contraindication to lumbar puncture.',
+      nextStepCriteria: '1.0 mark: Specifies urgent neurosurgical drainage/aspiration + empiric IV antibiotics (ceftriaxone + metronidazole + vancomycin) + ICP control + avoiding LP.'
     },
     isPublished: true,
     expertReviewed: true
@@ -738,54 +562,58 @@ export const INITIAL_CLINICAL_CASES: ClinicalCase[] = [
     id: 'post-03',
     caseNumber: 3,
     stage: 'post_ai',
-    domain: 'Obstetrics',
-    title: 'Generalized Convulsion in Laboring Parturient',
-    presentation: 'A 24-year-old unbooked primigravida at 38 weeks of gestation admitted in early active labor suddenly develops generalized tonic-clonic motor convulsions lasting approximately 90 seconds, followed by post-ictal stertorous respiration.',
-    medicalHistory: 'Unbooked pregnancy with no prior antenatal care. Family reports she had swollen face and feet and complained of severe headache and vomiting over the past 12 hours.',
+    domain: 'Pulmonology',
+    title: 'Breathlessness in a patient labelled as bronchial asthma',
+    presentation: 'A 35-year-old male with a previous diagnosis of bronchial asthma presents with sudden severe breathlessness and chest tightness. He has failed to improve after repeated bronchodilator treatment.',
+    medicalHistory: 'Previous diagnosis of bronchial asthma. Failed to improve after repeated bronchodilator treatment.',
     vitals: {
-      heartRate: '116 bpm',
-      bloodPressure: '184/120 mmHg (Severe gestational hypertension)',
-      respiratoryRate: '20 /min (deep, post-ictal)',
-      spO2: '93% on room air',
-      temperature: '37.4 °C'
+      heartRate: '136/min',
+      bloodPressure: '92/60 mmHg',
+      respiratoryRate: '34/min',
+      spO2: '89%',
+      temperature: 'Not specified'
     },
-    physicalExamination: 'Patient is stuporous, with tongue bite laceration on lateral border and frothy blood-tinged sputum. 4+ generalized pitting edema involving hands, face, and abdominal wall. Abdomen: Uterus 38 weeks size, contracting 3 in 10 minutes. Cervix is 5 cm dilated, 80% effaced. Fetal heart rate shows persistent bradycardia at 85 bpm.',
+    physicalExamination: 'Markedly reduced air entry on the right side. Hyperresonance on right hemithorax. Trachea appears shifted to the left.',
     investigations: [
-      { name: 'Urinary Catheterization Dipstick', result: 'Protein 4+ (massive proteinuria)', isAbnormal: true },
-      { name: 'Capillary Blood Glucose', result: '98 mg/dL (Excludes hypoglycemia)', isAbnormal: false },
-      { name: 'Platelet Count', result: '88,000 /uL (Thrombocytopenia)', isAbnormal: true },
-      { name: 'Serum Uric Acid', result: '8.4 mg/dL', isAbnormal: true },
-      { name: 'Serum Creatinine', result: '1.4 mg/dL', isAbnormal: true }
+      { name: 'ABG', result: 'Hypoxaemia and respiratory acidosis', isAbnormal: true }
+    ],
+    clinicalImages: [
+      {
+        id: 'img-case-06',
+        url: '/assets/cases/case-06-cxr.jpg',
+        title: 'Chest X-ray — Thorax AP (Case 6)',
+        caption: 'Anteroposterior chest radiographs corresponding to acute respiratory distress presentation.'
+      }
     ],
     mcqOptions: [
-      'Eclampsia (Obstetric Emergency)',
-      'Primary Generalized Epilepsy with Status Epilepticus',
-      'Intracranial Hemorrhage / Ruptured Arteriovenous Malformation',
-      'Hypocalcemic Tetany with Laryngospasm',
+      'Right-Sided Tension Pneumothorax (with Obstructive Shock and Respiratory Acidosis)',
+      'Life-Threatening Status Asthmaticus Unresponsive to Bronchodilators',
+      'Massive Right-Sided Pleural Effusion',
+      'Acute Massive Pulmonary Embolism',
       'Other'
     ],
-    goldStandardDiagnosis: 'Eclampsia (Obstetric Emergency)',
+    goldStandardDiagnosis: 'Right-Sided Tension Pneumothorax (with Obstructive Shock and Respiratory Acidosis)',
     acceptableAlternativeDiagnoses: [
-      'Intrapartum Eclampsia',
-      'Severe Preeclampsia complicated by Eclamptic Seizures'
+      'Right Tension Pneumothorax',
+      'Secondary Spontaneous Tension Pneumothorax'
     ],
     differentialDiagnosisKeys: [
-      'Pre-existing seizure disorder / epilepsy triggered by labor',
-      'Cerebral venous sinus thrombosis (CVST)',
-      'Intracranial hemorrhage / subarachnoid hemorrhage',
-      'Amniotic fluid embolism'
+      'Simple spontaneous pneumothorax (less likely given hypotension and tracheal shift)',
+      'Near-fatal asthma exacerbation (clinical mimic — hyperresonance + shifted trachea confirm tension pneumothorax)',
+      'Giant bulla / bullous emphysema',
+      'Massive pulmonary embolism'
     ],
     redFlagKeys: [
-      'Active or recurrent eclamptic seizure with aspiration risk and tongue trauma',
-      'Severe range blood pressure (184/120 mmHg) with maternal stroke threat',
-      'Sustained fetal bradycardia (85 bpm) indicating severe fetal compromise / placental abruption risk'
+      'Trachea shifted to the left + hyperresonance on right hemithorax + markedly reduced right air entry = clinical diagnosis of Tension Pneumothorax',
+      'Obstructive shock (BP 92/60 mmHg, HR 136/min) with severe hypoxia (SpO₂ 89%) and respiratory acidosis',
+      'Emergency decompression MUST NOT be delayed for chest radiography'
     ],
-    nextManagementStepKey: 'Secure airway in left lateral tilt; administer intravenous Magnesium Sulfate (4g IV over 10-15 min loading dose followed by 1g/hr maintenance infusion; or Pritchard regimen); control severe hypertension with IV Labetalol (20mg IV bolus) or IV Hydralazine; expedite emergent delivery once mother is stabilized.',
+    nextManagementStepKey: 'Perform IMMEDIATE needle decompression / finger thoracostomy on the right chest (2nd intercostal space midclavicular line or 4th–5th intercostal space anterior/mid-axillary line) WITHOUT waiting for a chest X-ray, followed immediately by right-sided tube thoracostomy (intercostal chest drain) and high-flow oxygen.',
     rubric: {
-      primaryDiagnosisCriteria: '1.0 mark: Accurately identifies Eclampsia.',
-      differentialCriteria: '1.0 mark: Cites epilepsy, intracranial hemorrhage, cerebral venous thrombosis, or amniotic fluid embolism.',
-      redFlagsCriteria: '1.0 mark: Flags severe BP (184/120), sustained fetal bradycardia (85 bpm), and airway compromise.',
-      nextStepCriteria: '1.0 mark: Specifies Magnesium Sulfate protocol (loading + maintenance) + IV antihypertensive (Labetalol/Hydralazine) + delivery planning.'
+      primaryDiagnosisCriteria: '1.0 mark: Accurately identifies Right-Sided Tension Pneumothorax.',
+      differentialCriteria: '1.0 mark: Mentions simple pneumothorax, severe asthma exacerbation, giant bulla, or massive PE.',
+      redFlagsCriteria: '1.0 mark: Flags contralateral tracheal deviation, right hyperresonance, hypotension (92/60), and imperative not to delay for CXR.',
+      nextStepCriteria: '1.0 mark: Specifies immediate needle/finger thoracostomy decompression followed by intercostal chest tube insertion.'
     },
     isPublished: true,
     expertReviewed: true
@@ -794,53 +622,60 @@ export const INITIAL_CLINICAL_CASES: ClinicalCase[] = [
     id: 'post-04',
     caseNumber: 4,
     stage: 'post_ai',
-    domain: 'Neurology',
-    title: 'Sudden Thunderclap Headache, Meningism, and Normal Initial CT',
-    presentation: 'A 44-year-old male presents to the acute assessment unit 14 hours after the abrupt onset of what he describes as "the worst headache of my life," reaching peak 10/10 intensity within 30 seconds during sexual intercourse. Accompanied by neck stiffness, photophobia, and repeated vomiting.',
-    medicalHistory: 'Polycystic Kidney Disease (ADPKD) in father; patient has mild hypertension on Enalapril 10mg OD. Heavy smoker.',
+    domain: 'Endocrinology',
+    title: 'Hypothyroidism presenting as a multisystem emergency',
+    presentation: 'A 68-year-old female is brought by her relatives with progressive drowsiness, confusion, swelling of the face and generalised weakness for 5 days. She has a history of hypothyroidism but stopped taking medication 8 months ago. Three days before admission, she developed fever and cough.',
+    medicalHistory: 'History of hypothyroidism; stopped taking medication 8 months ago. Three days before admission, she developed fever and cough.',
     vitals: {
-      heartRate: '68 bpm',
-      bloodPressure: '158/94 mmHg',
-      respiratoryRate: '16 /min',
-      spO2: '99% on room air',
-      temperature: '37.6 °C'
+      heartRate: '42/min',
+      bloodPressure: '82/48 mmHg',
+      respiratoryRate: '9/min',
+      spO2: '86% on room air',
+      temperature: '33.5°C'
     },
-    physicalExamination: 'Patient is conscious, alert, lying in a dark room with eyes closed due to photophobia. Cranial nerves: Pupils equal and reactive, no visual field defect, no papilledema. Prominent nuchal rigidity with positive Kernig sign. No focal limb motor or sensory deficit. Plantars bilateral flexor.',
+    physicalExamination: 'GCS: 8/15. Puffy face. Non-pitting oedema. Dry, coarse skin. Delayed relaxation of deep tendon reflexes. Reduced breath sounds at both lung bases.',
     investigations: [
-      { name: 'Non-Contrast Brain CT (Performed 14 hours post-onset)', result: 'No clear subarachnoid blood or hyperdense basal cisterns visualized; subtle questionable fullness in interpeduncular cistern', isAbnormal: false },
-      { name: 'Complete Blood Count', result: 'WBC 10,200 /uL, Platelets 220,000 /uL', isAbnormal: false },
-      { name: 'Serum Creatinine', result: '1.1 mg/dL', isAbnormal: false }
+      { name: 'TSH', result: '96 mIU/L', isAbnormal: true },
+      { name: 'Free T4', result: '0.2 ng/dL', isAbnormal: true },
+      { name: 'Sodium', result: '121 mEq/L', isAbnormal: true },
+      { name: 'Potassium', result: '4.2 mEq/L', isAbnormal: false },
+      { name: 'Glucose', result: '58 mg/dL', isAbnormal: true },
+      { name: 'Creatinine', result: '1.8 mg/dL', isAbnormal: true },
+      { name: 'PaCO₂', result: '68 mmHg', isAbnormal: true },
+      { name: 'pH', result: '7.24', isAbnormal: true },
+      { name: 'CK', result: '850 U/L', isAbnormal: true },
+      { name: 'Chest X-ray', result: 'Bilateral basal infiltrates and a small pleural effusion', isAbnormal: true },
+      { name: 'ECG', result: 'Sinus bradycardia and low-voltage complexes', isAbnormal: true }
     ],
     mcqOptions: [
-      'Aneurysmal Subarachnoid Hemorrhage (SAH) requiring Diagnostic Lumbar Puncture / CTA',
-      'Acute Migraine without Aura',
-      'Coital Benign Cephalea',
-      'Cervical Musculoskeletal Strain with Occipital Neuralgia',
+      'Myxoedema Coma Precipitated by Lower Respiratory Tract Infection / Pneumonia',
+      'Primary Septic Shock with Euthyroid Sick Syndrome',
+      'Syndrome of Inappropriate Antidiuretic Hormone Secretion (SIADH) Alone',
+      'Acute Pericardial Tamponade Without Endocrine Dysfunction',
       'Other'
     ],
-    goldStandardDiagnosis: 'Aneurysmal Subarachnoid Hemorrhage (SAH) requiring Diagnostic Lumbar Puncture / CTA',
+    goldStandardDiagnosis: 'Myxoedema Coma Precipitated by Lower Respiratory Tract Infection / Pneumonia',
     acceptableAlternativeDiagnoses: [
-      'Subarachnoid Hemorrhage (CT-negative SAH)',
-      'Aneurysmal SAH secondary to ruptured intracranial berry aneurysm'
+      'Myxoedema Coma',
+      'Decompensated Severe Hypothyroidism (Myxoedema Crisis) with Respiratory Failure and Shock'
     ],
     differentialDiagnosisKeys: [
-      'Reversible Cerebral Vasoconstriction Syndrome (RCVS)',
-      'Cervical artery dissection (vertebral / carotid)',
-      'Cerebral venous sinus thrombosis',
-      'Pituitary apoplexy',
-      'Acute meningitis'
+      'Severe sepsis / septic shock with hypothermia',
+      'Adrenal insufficiency / panhypopituitarism (must rule out concurrent adrenal crisis)',
+      'Sedative / opioid toxicity causing hypoventilation and coma',
+      'Severe hyponatremia from SIADH or heart failure'
     ],
     redFlagKeys: [
-      'Thunderclap onset (peak intensity < 1 minute) — cardinal red flag for vascular intracranial catastrophe',
-      'Known ADPKD family history (5-10 fold higher prevalence of intracranial saccular berry aneurysms)',
-      'False-negative rate of non-contrast CT increases after 6 hours; a normal CT DOES NOT rule out SAH'
+      'Severe hypothermia (33.5°C), bradycardia (42/min), shock (82/48 mmHg), and GCS 8/15',
+      'Type 2 hypercapnic respiratory failure (RR 9/min, SpO₂ 86%, PaCO₂ 68 mmHg, pH 7.24) requiring urgent airway protection',
+      'Severe hyponatremia (Na⁺ 121 mEq/L) and hypoglycaemia (58 mg/dL); risk of adrenal crisis if thyroid hormone given without hydrocortisone'
     ],
-    nextManagementStepKey: 'Perform diagnostic Lumbar Puncture >= 12 hours post-symptom onset to evaluate for CSF xanthochromia (via spectrophotometry) and persistent RBCs across tube 1 and tube 4; proceed directly to CT Angiography (CTA) of cerebral vessels.',
+    nextManagementStepKey: 'Immediate endotracheal intubation and mechanical ventilation (GCS 8/15, PaCO₂ 68, pH 7.24); administer IV Hydrocortisone (100 mg IV loading dose) BEFORE or concurrently with IV Levothyroxine (200–400 mcg IV loading dose) to prevent adrenal crisis; correct hypoglycaemia (IV dextrose), start empiric IV antibiotics for pneumonia, passive external rewarming, and cautious fluids/vasopressors.',
     rubric: {
-      primaryDiagnosisCriteria: '1.0 mark: Identifies Subarachnoid Hemorrhage (SAH) / ruptured berry aneurysm despite negative plain CT.',
-      differentialCriteria: '1.0 mark: Mentions RCVS, cervical dissection, cerebral venous thrombosis, or meningitis.',
-      redFlagsCriteria: '1.0 mark: Identifies thunderclap timing (< 1 min), ADPKD aneurysm risk, and that normal CT does not exclude SAH.',
-      nextStepCriteria: '1.0 mark: Explicitly mandates lumbar puncture for CSF xanthochromia and/or CT Angiography (CTA).'
+      primaryDiagnosisCriteria: '1.0 mark: Identifies Myxoedema Coma (recognizing infection/pneumonia precipitant).',
+      differentialCriteria: '1.0 mark: Cites septic shock, adrenal insufficiency/panhypopituitarism, drug overdose, or SIADH.',
+      redFlagsCriteria: '1.0 mark: Flags hypothermia (33.5°C), hypercapnic respiratory failure (PaCO₂ 68, pH 7.24), GCS 8, shock (82/48), Na⁺ 121, and glucose 58.',
+      nextStepCriteria: '1.0 mark: Specifies airway intubation/ventilation + IV Hydrocortisone BEFORE/with IV Levothyroxine + dextrose + antibiotics + passive rewarming.'
     },
     isPublished: true,
     expertReviewed: true
@@ -849,54 +684,119 @@ export const INITIAL_CLINICAL_CASES: ClinicalCase[] = [
     id: 'post-05',
     caseNumber: 5,
     stage: 'post_ai',
-    domain: 'Nephrology',
-    title: 'Peaked T-Waves, Muscle Weakness, and Severe Hyperkalemia',
-    presentation: 'A 66-year-old male with Stage 4 Chronic Kidney Disease is referred to the emergency department after routine nephrology clinic blood tests drawn 2 hours ago show severe electrolyte derangement. He complains of progressive ascending bilateral leg weakness, paresthesia of hands and perioral region, and profound fatigue.',
-    medicalHistory: 'Hypertensive Nephrosclerosis (baseline eGFR 22 mL/min). Two days ago, a community physician started him on Spironolactone 25mg OD for ankle edema, and he also took over-the-counter Ibuprofen 400mg TDS for knee pain. Continued on baseline Enalapril 20mg OD.',
+    domain: 'Endocrinology / Cardiology',
+    title: 'Hyperthyroidism with cardiovascular collapse and multiorgan dysfunction',
+    presentation: 'A 34-year-old female with a history of untreated hyperthyroidism presents to the emergency department with high-grade fever, severe agitation, vomiting, diarrhoea and palpitations for 2 days. She reports progressive weight loss over 6 months and admits to stopping her antithyroid medication 3 months ago.',
+    medicalHistory: 'Untreated hyperthyroidism; stopped antithyroid medication 3 months ago; progressive weight loss over 6 months. Additional information: The patient received an initial dose of beta-blocker at another healthcare facility, and her BP subsequently decreased to 76/48 mmHg.',
     vitals: {
-      heartRate: '48 bpm (sinus bradycardia with irregular pauses)',
-      bloodPressure: '102/62 mmHg',
-      respiratoryRate: '18 /min',
-      spO2: '97% on room air',
-      temperature: '36.5 °C'
+      heartRate: '168/min, irregularly irregular',
+      bloodPressure: '94/60 mmHg (dropped to 76/48 mmHg after beta-blocker)',
+      respiratoryRate: '30/min',
+      spO2: '93%',
+      temperature: '40.2°C'
     },
-    physicalExamination: 'Patient is conscious, pale, and lethargic. Symmetrical flaccid lower extremity weakness (motor power 3/5 bilaterally) with diminished deep tendon patellar reflexes (+1). S1 and S2 present, bradycardic. Lungs clear.',
+    physicalExamination: 'Diffuse goitre with bruit. Bilateral exophthalmos. Fine tremors. Jaundice. Bilateral basal crepitations. Agitated and disoriented behaviour.',
     investigations: [
-      { name: 'Serum Potassium (Urgent Repeat)', result: '7.6 mEq/L (Critically life-threatening hyperkalemia; reference 3.5-5.0)', isAbnormal: true },
-      { name: '12-Lead ECG', result: 'Tall, narrow, peaked "tent-like" T waves across all leads, PR interval prolongation (260 ms), loss of P waves, and wide QRS complex (148 ms) progressing toward a sine-wave pattern', isAbnormal: true },
-      { name: 'Serum Sodium', result: '133 mEq/L', isAbnormal: false },
-      { name: 'Serum Creatinine', result: '3.8 mg/dL (Acute-on-chronic kidney injury; baseline 2.2 mg/dL)', isAbnormal: true },
-      { name: 'Venous Blood Gas', result: 'pH 7.24, HCO3- 14 mEq/L (Metabolic acidosis)', isAbnormal: true }
+      { name: 'TSH', result: 'Less than 0.01 mIU/L', isAbnormal: true },
+      { name: 'Free T4', result: '5.8 ng/dL', isAbnormal: true },
+      { name: 'Free T3', result: 'Elevated', isAbnormal: true },
+      { name: 'Total bilirubin', result: '4.2 mg/dL', isAbnormal: true },
+      { name: 'AST', result: '180 U/L', isAbnormal: true },
+      { name: 'ALT', result: '145 U/L', isAbnormal: true },
+      { name: 'Creatinine', result: '1.9 mg/dL', isAbnormal: true },
+      { name: 'Lactate', result: '4.5 mmol/L', isAbnormal: true },
+      { name: 'WBC', result: '18,000/mm³', isAbnormal: true },
+      { name: 'ECG', result: 'Atrial fibrillation with rapid ventricular response', isAbnormal: true },
+      { name: 'Echocardiography', result: 'Global hypokinesia with LVEF of 25%', isAbnormal: true }
     ],
     mcqOptions: [
-      'Life-Threatening Severe Hyperkalemia with Conduction Abnormality and Cardiac Toxicity',
-      'Acute Guillain-Barré Syndrome with Autonomic Dysfunction',
-      'Acute Myasthenia Gravis Crisis',
-      'Hypokalemic Periodic Paralysis',
+      'Thyroid Storm with Thyrotoxic Cardiomyopathy, Cardiogenic Shock (Beta-Blocker-Induced Collapse), and Multiorgan Dysfunction',
+      'Acute Ascending Cholangitis with Septic Shock and Stress Hyperthyroxinaemia',
+      'Phaeochromocytoma Crisis Without Thyroid Disease',
+      'Acute Viral Myocarditis with Benign Subclinical Hyperthyroidism',
       'Other'
     ],
-    goldStandardDiagnosis: 'Life-Threatening Severe Hyperkalemia with Conduction Abnormality and Cardiac Toxicity',
+    goldStandardDiagnosis: 'Thyroid Storm with Thyrotoxic Cardiomyopathy, Cardiogenic Shock (Beta-Blocker-Induced Collapse), and Multiorgan Dysfunction',
     acceptableAlternativeDiagnoses: [
-      'Severe Hyperkalemia (K+ 7.6 mEq/L) with Sine Wave ECG',
-      'Drug-Induced Severe Hyperkalemia in CKD'
+      'Thyroid Storm Complicated by Cardiogenic Shock and Thyrotoxic Heart Failure',
+      'Thyrotoxic Crisis with Atrial Fibrillation, Severe LV Dysfunction (LVEF 25%), and Multiorgan Failure'
     ],
     differentialDiagnosisKeys: [
-      'Guillain-Barré syndrome / acute inflammatory polyradiculoneuropathy',
-      'Hypermagnesemic paralysis',
-      'Acute coronary syndrome with hyperacute T waves',
-      'Hypocalcemic tetany'
+      'Severe sepsis / ascending cholangitis precipitating thyroid storm',
+      'Phaeochromocytoma crisis / sympathomimetic toxicity',
+      'Acute viral myocarditis / peripartum or dilated cardiomyopathy with AF',
+      'Neuroleptic malignant syndrome / malignant hyperthermia'
     ],
     redFlagKeys: [
-      'K+ 7.6 mEq/L with ECG conduction delay (widened QRS, absent P wave, peaked T waves) indicating impending asystole or VF',
-      'Ascending motor flaccid weakness mimicking lower motor neuron disease',
-      'Lethal polypharmacy combination (ACE inhibitor + Aldosterone antagonist + NSAID in CKD Stage 4)'
+      'Fulminant Thyroid Storm (Temp 40.2°C, HR 168 AF, agitation/disorientation, jaundice, vomiting/diarrhoea)',
+      'Severe LV dysfunction (LVEF 25%) with pulmonary congestion and cardiogenic collapse (BP 76/48 mmHg) precipitated by beta-blocker administration',
+      'Multiorgan dysfunction: acute hepatic injury (bilirubin 4.2, AST 180, ALT 145), AKI (Cr 1.9), lactic acidosis (4.5 mmol/L)'
     ],
-    nextManagementStepKey: 'Immediate intravenous administration of 10% Calcium Gluconate (10 mL IV over 2-3 minutes) or Calcium Chloride to stabilize myocardial cell membrane, followed immediately by shifting agents (10 units IV regular insulin with 50 mL of 50% Dextrose + nebulized Salbutamol), sodium bicarbonate for acidosis, and urgent preparation for emergent hemodialysis.',
+    nextManagementStepKey: 'Immediate ICU hemodynamic support (vasopressors if needed, gentle fluid caution with basal crepitations) and WITHHOLD/AVOID further non-selective or long-acting beta-blockers given LVEF 25% and BP 76/48 mmHg; initiate sequential Thyroid Storm therapy: 1) Propylthiouracil (PTU) or Methimazole first, 2) Lugol iodine / SSKI >= 1 hour AFTER thionamide, 3) IV Hydrocortisone; active cooling, treat precipitating infection, and cautious digoxin/amiodarone or ICU-monitored ultra-short esmolol only if stabilized.',
     rubric: {
-      primaryDiagnosisCriteria: '1.0 mark: Identifies Severe Life-Threatening Hyperkalemia with cardiotoxicity / ECG conduction delay.',
-      differentialCriteria: '1.0 mark: Cites Guillain-Barré syndrome, hypermagnesemia, or hyperacute anterior STEMI.',
-      redFlagsCriteria: '1.0 mark: Recognizes K+ >= 7.0 with QRS widening / peaked T waves (imminent cardiac arrest) and nephrotoxic drug combination.',
-      nextStepCriteria: '1.0 mark: Must state IV Calcium Gluconate (membrane stabilization) as the immediate FIRST step, followed by insulin/dextrose and emergency dialysis.'
+      primaryDiagnosisCriteria: '1.0 mark: Identifies Thyroid Storm with thyrotoxic cardiomyopathy / cardiogenic shock worsened by beta-blocker.',
+      differentialCriteria: '1.0 mark: Mentions sepsis/cholangitis, phaeochromocytoma crisis, acute myocarditis, or sympathomimetic toxicity.',
+      redFlagsCriteria: '1.0 mark: Flags LVEF 25% + beta-blocker collapse (BP 76/48), Temp 40.2°C, AF 168/min, jaundice/hepatic dysfunction, AKI, and lactate 4.5.',
+      nextStepCriteria: '1.0 mark: Explicitly avoids/stops beta-blockers in low-output shock + gives sequential PTU/methimazole -> iodine (delayed >=1h) -> IV hydrocortisone + shock/cooling care.'
+    },
+    isPublished: true,
+    expertReviewed: true
+  },
+  {
+    id: 'post-06',
+    caseNumber: 6,
+    stage: 'post_ai',
+    domain: 'Nephrology / Critical Care',
+    title: 'Severe dehydration with AKI and persistent shock despite fluid resuscitation',
+    presentation: 'A 51-year-old male presents with profuse watery diarrhoea and repeated vomiting for 4 days. He is brought to the emergency department in a state of shock.',
+    medicalHistory: 'Profuse watery diarrhoea and repeated vomiting for 4 days. Absent urine output for 8 hours. After initial fluid resuscitation, BP improves to 94/60 mmHg, but urine output remains negligible. Six hours later: Creatinine 4.5 mg/dL, Potassium 5.8 mEq/L, persistent metabolic acidosis, and new pulmonary crackles.',
+    vitals: {
+      heartRate: '138/min',
+      bloodPressure: '72/40 mmHg (94/60 mmHg post-fluids)',
+      respiratoryRate: '32/min',
+      spO2: '94%',
+      temperature: '37.2°C'
+    },
+    physicalExamination: 'Dry mucous membranes. Sunken eyes. Cold extremities. Absent urine output for 8 hours. Six hours post-resuscitation: New pulmonary crackles.',
+    investigations: [
+      { name: 'Hb', result: '16.8 g/dL', isAbnormal: true },
+      { name: 'Creatinine', result: '3.8 mg/dL initially → 4.5 mg/dL at 6 hours', isAbnormal: true },
+      { name: 'Urea', result: '128 mg/dL', isAbnormal: true },
+      { name: 'Sodium', result: '158 mEq/L', isAbnormal: true },
+      { name: 'Potassium', result: '2.7 mEq/L initially → 5.8 mEq/L at 6 hours', isAbnormal: true },
+      { name: 'Chloride', result: '126 mEq/L', isAbnormal: true },
+      { name: 'HCO₃', result: '11 mEq/L', isAbnormal: true },
+      { name: 'Lactate', result: '6.0 mmol/L', isAbnormal: true }
+    ],
+    mcqOptions: [
+      'Severe Hypovolemic Shock Progressing to Intrinsic AKI (Ischaemic Acute Tubular Necrosis) with Fluid Overload, Refractory Acidosis and Hyperkalemia',
+      'Uncomplicated Prerenal Azotemia Requiring Continued Aggressive Crystalloid Boluses',
+      'Isolated Hyperosmolar Hyperglycaemic State Without Renal Parenchymal Injury',
+      'Acute Post-Renal Obstructive Uropathy Alone',
+      'Other'
+    ],
+    goldStandardDiagnosis: 'Severe Hypovolemic Shock Progressing to Intrinsic AKI (Ischaemic Acute Tubular Necrosis) with Fluid Overload, Refractory Acidosis and Hyperkalemia',
+    acceptableAlternativeDiagnoses: [
+      'Ischaemic Acute Tubular Necrosis (ATN) with Dialysis-Requiring Oliguric AKI and Pulmonary Edema',
+      'Established Intrinsic Acute Kidney Injury Post-Hypovolemic Shock'
+    ],
+    differentialDiagnosisKeys: [
+      'Septic shock / infectious gastroenteritis-associated AKI',
+      'Mixed normal anion gap (hyperchloremic diarrhoea) + high anion gap (lactic/uremic) metabolic acidosis',
+      'Bowel ischaemia / mesenteric hypoperfusion',
+      'Rhabdomyolysis or acute interstitial nephritis'
+    ],
+    redFlagKeys: [
+      'Progression from hypokalemia (2.7) and prerenal shock to established anuric/oliguric intrinsic AKI (Cr 3.8 → 4.5 mg/dL, rapid hyperkalemia K⁺ 5.8 mEq/L)',
+      'New pulmonary crackles after fluid resuscitation = acute fluid overload / pulmonary oedema (further IV fluid boluses are harmful)',
+      'Refractory severe metabolic acidosis (HCO₃ 11 mEq/L, lactate 6.0 mmol/L) and hypernatremia (158 mEq/L) with negligible urine output'
+    ],
+    nextManagementStepKey: 'STOP further aggressive IV fluid boluses immediately due to new pulmonary crackles and persistent anuria; perform 12-lead ECG and acutely treat hyperkalemia (K⁺ 5.8 mEq/L; IV calcium gluconate if ECG changes, insulin-dextrose, inhaled beta-agonist); support oxygenation and blood pressure cautiously (vasopressor if needed rather than blind fluid overload); and arrange URGENT nephrology consultation for emergent Renal Replacement Therapy (Haemodialysis) for refractory oliguric AKI, acidosis, hyperkalemia, and fluid overload.',
+    rubric: {
+      primaryDiagnosisCriteria: '1.0 mark: Identifies progression from hypovolemic shock to intrinsic AKI / Ischaemic ATN with fluid overload, acidosis, and hyperkalemia.',
+      differentialCriteria: '1.0 mark: Mentions septic shock, mixed hyperchloremic + lactic acidosis, bowel ischaemia, or rhabdomyolysis.',
+      redFlagsCriteria: '1.0 mark: Flags new pulmonary crackles (fluid overload), persistent anuria, rising Cr (4.5) and K⁺ surge (2.7 → 5.8), and HCO₃ 11 / lactate 6.0.',
+      nextStepCriteria: '1.0 mark: Specifies stopping aggressive IV fluids + hyperkalemia ECG/stabilization + urgent haemodialysis / renal replacement therapy.'
     },
     isPublished: true,
     expertReviewed: true
