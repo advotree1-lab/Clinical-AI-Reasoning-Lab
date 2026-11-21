@@ -524,14 +524,14 @@ export default function App() {
           <div className="text-xs text-slate-500 font-mono">
             Clinical AI Reasoning Lab · {settings.institutionName}
           </div>
-          <div className="inline-flex items-center gap-2.5">
-            <span className="text-[11px] font-mono uppercase tracking-wider text-slate-500">
+          <div className="inline-flex items-center gap-3 px-3.5 py-2 rounded-lg bg-black border border-slate-800 shadow-2xs">
+            <span className="text-[11px] font-mono uppercase tracking-wider text-slate-300">
               Powered by
             </span>
             <img
               src="/assets/medikyne-logo.png"
               alt="MediKyne — The Intelligence Layer for Healthcare"
-              className="h-11 w-auto object-contain"
+              className="h-10 w-auto object-contain"
             />
           </div>
         </div>

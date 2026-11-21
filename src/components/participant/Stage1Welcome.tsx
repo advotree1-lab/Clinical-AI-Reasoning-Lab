@@ -32,14 +32,14 @@ export const Stage1Welcome: React.FC<Stage1WelcomeProps> = ({
             </h1>
           </div>
 
-          <div className="inline-flex items-center gap-2.5 px-3 py-2 rounded-md border border-slate-200/80 bg-white shrink-0 self-start">
-            <span className="text-[10px] font-mono uppercase tracking-wider text-slate-500">
+          <div className="inline-flex items-center gap-2.5 px-3 py-2 rounded-md border border-slate-800 bg-black shrink-0 self-start shadow-2xs">
+            <span className="text-[10px] font-mono uppercase tracking-wider text-slate-300">
               Powered by
             </span>
             <img
               src="/assets/medikyne-logo.png"
               alt="MediKyne — The Intelligence Layer for Healthcare"
-              className="h-12 w-auto object-contain"
+              className="h-11 w-auto object-contain"
             />
           </div>
         </div>
