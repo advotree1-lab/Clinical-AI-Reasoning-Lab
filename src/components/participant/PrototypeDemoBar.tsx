@@ -29,12 +29,13 @@ export const PrototypeDemoBar: React.FC<PrototypeDemoBarProps> = ({
 
   const stageNames = [
     { num: 1, label: 'Welcome' },
-    { num: 2, label: 'Consent' },
-    { num: 3, label: 'ID & Profile' },
-    { num: 4, label: 'Survey' },
-    { num: 5, label: 'CDSS (5)' },
-    { num: 6, label: 'Vignette Cases (6)' },
-    { num: 7, label: 'Debriefing' }
+    { num: 2, label: 'Eligibility' },
+    { num: 3, label: 'Consent' },
+    { num: 4, label: 'ID & Profile' },
+    { num: 5, label: 'Survey' },
+    { num: 6, label: 'CDSS (5)' },
+    { num: 7, label: 'Vignettes (6)' },
+    { num: 8, label: 'Debriefing' }
   ];
 
   return (

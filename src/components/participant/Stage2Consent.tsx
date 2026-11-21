@@ -5,28 +5,31 @@ interface Stage2ConsentProps {
   onConsent: () => void;
   onBack: () => void;
   protocolNumber: string;
+  isDemoMode: boolean;
 }
 
 export const Stage2Consent: React.FC<Stage2ConsentProps> = ({
   onConsent,
   onBack,
-  protocolNumber
+  protocolNumber,
+  isDemoMode
 }) => {
   const [agreedTerms, setAgreedTerms] = useState(false);
   const [agreedAnonymous, setAgreedAnonymous] = useState(false);
   const [agreedSimulated, setAgreedSimulated] = useState(false);
 
   const canProceed = agreedTerms && agreedAnonymous && agreedSimulated;
+  const isBlocked = !isDemoMode && !canProceed;
 
   return (
     <div className="max-w-3xl mx-auto py-10 px-4 sm:px-6">
       <div className="bg-white rounded-lg border border-slate-200/90 p-8 sm:p-10 shadow-2xs">
         
         {/* Header Metadata */}
-        <div className="flex items-center gap-2 text-xs font-mono text-slate-500 mb-2">
-          <span>STAGE 02 / 07</span>
+        <div className="flex items-center gap-2 text-xs font-mono text-teal-700 mb-2">
+          <span>STAGE 03 / 08</span>
           <span aria-hidden="true">·</span>
-          <span>INFORMED CONSENT & TERMS</span>
+          <span>INFORMED CONSENT &amp; TERMS</span>
         </div>
 
         <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
@@ -116,22 +119,32 @@ export const Stage2Consent: React.FC<Stage2ConsentProps> = ({
         </div>
 
         {/* Actions */}
-        <div className="mt-8 pt-5 border-t border-slate-200/70 flex items-center justify-between">
+        <div className="mt-8 pt-5 border-t border-slate-200/70 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <button
+            type="button"
             onClick={onBack}
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 transition-colors"
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 transition-colors self-start sm:self-auto"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
             <span>Back</span>
           </button>
 
-          <button
-            onClick={onConsent}
-            className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-semibold rounded transition-colors bg-slate-900 hover:bg-slate-800 text-white shadow-2xs"
-          >
-            <span>{canProceed ? 'Confirm Consent & Continue' : 'Continue to Profile'}</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 self-end sm:self-auto">
+            {isBlocked && (
+              <span className="text-[11px] text-slate-500">
+                Please tick all 3 consent confirmations to continue.
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={onConsent}
+              disabled={isBlocked}
+              className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-semibold rounded-lg transition-colors bg-teal-600 hover:bg-teal-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white shadow-2xs cursor-pointer"
+            >
+              <span>{canProceed ? 'Confirm Consent & Continue' : 'Continue to Profile'}</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
 
       </div>

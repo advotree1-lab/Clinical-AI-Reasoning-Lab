@@ -1,25 +1,34 @@
 import React, { useState } from 'react';
 import { ArrowRight, ArrowLeft } from 'lucide-react';
 import {
-  Participant,
   ParticipantDesignation,
   ClinicalSpecialty,
   YearsSinceMbbsBracket,
-  InstitutionType
+  InstitutionType,
+  RecruitmentTokenValidation
 } from '../../types';
+import { EnrollParticipantInput } from '../../services/supabaseResearchService';
 
 interface Stage3RegistrationProps {
-  onRegister: (participant: Participant) => void;
+  onRegister: (input: EnrollParticipantInput) => void | Promise<void>;
   onBack: () => void;
   isDemoMode: boolean;
+  isSubmitting?: boolean;
+  errorMessage?: string | null;
+  referralToken?: string | null;
+  referralValidation?: RecruitmentTokenValidation | null;
 }
 
 export const Stage3Registration: React.FC<Stage3RegistrationProps> = ({
   onRegister,
   onBack,
-  isDemoMode
+  isDemoMode,
+  isSubmitting = false,
+  errorMessage = null,
+  referralToken = null,
+  referralValidation = null
 }) => {
-  const [anonymousCode] = useState(() => `DOC-${Math.floor(1000 + Math.random() * 9000)}`);
+  const [demoCode] = useState(() => `DOC-${Math.floor(1000 + Math.random() * 9000)}`);
 
   const [designation, setDesignation] = useState<ParticipantDesignation>('Junior Resident');
   const [designationOther, setDesignationOther] = useState('');
@@ -32,26 +41,26 @@ export const Stage3Registration: React.FC<Stage3RegistrationProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
 
-    const participant: Participant = {
-      id: `part-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-      code: anonymousCode,
+    const validReferralToken =
+      !isDemoMode && referralToken && referralValidation?.isValid ? referralToken : null;
+
+    onRegister({
       designation,
-      designationOther: designation === 'Other' ? (designationOther.trim() || 'Other (Not specified)') : undefined,
+      designationOther:
+        designation === 'Other' ? designationOther.trim() || 'Other (Not specified)' : undefined,
       specialty,
-      specialtyOther: specialty === 'Other' ? (specialtyOther.trim() || 'Other (Not specified)') : undefined,
+      specialtyOther:
+        specialty === 'Other' ? specialtyOther.trim() || 'Other (Not specified)' : undefined,
       yearsSinceMbbsBracket,
       institutionType,
-      institutionOther: institutionType === 'Other' ? (institutionOther.trim() || 'Other (Not specified)') : undefined,
+      institutionOther:
+        institutionType === 'Other' ? institutionOther.trim() || 'Other (Not specified)' : undefined,
       formalGenAiTraining,
       consentGiven: true,
-      isDemo: isDemoMode,
-      createdAt: new Date().toISOString(),
-      completed: false,
-      currentStage: 4
-    };
-
-    onRegister(participant);
+      referralToken: validReferralToken
+    });
   };
 
   return (
@@ -59,32 +68,55 @@ export const Stage3Registration: React.FC<Stage3RegistrationProps> = ({
       <div className="bg-white rounded-lg border border-slate-200/90 p-8 sm:p-10 shadow-2xs">
         
         {/* Header Metadata */}
-        <div className="flex items-center gap-2 text-xs font-mono text-slate-500 mb-2">
-          <span>STAGE 03 / 07</span>
+        <div className="flex items-center gap-2 text-xs font-mono text-teal-700 mb-2">
+          <span>STAGE 04 / 08</span>
           <span aria-hidden="true">·</span>
-          <span>ANONYMOUS TOKEN & RESPONDENT PROFILE</span>
+          <span>ANONYMOUS TOKEN &amp; RESPONDENT PROFILE</span>
         </div>
 
         <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
-          Participant Token & Respondent Profile
+          Participant Token &amp; Respondent Profile
         </h2>
 
         <p className="mt-2 text-xs text-slate-600 leading-relaxed">
-          Your anonymous research identifier has been generated. Complete your baseline professional profile before proceeding to the GenAI Exposure and Cognitive Offloading Study Questionnaire.
+          {isDemoMode
+            ? 'Your anonymous research identifier has been generated. Complete your baseline professional profile before proceeding to the GenAI Exposure and Cognitive Offloading Study Questionnaire.'
+            : 'Complete your baseline professional profile below. Your unique anonymous research code (DOC-XXXXXX) will be assigned securely by the study database upon enrollment.'}
         </p>
 
         {/* Anonymous ID Strip */}
-        <div className="mt-6 p-4 rounded bg-slate-50 border border-slate-200 flex items-center justify-between">
+        <div className="mt-6 p-4 rounded bg-slate-50 border border-slate-200 flex items-center justify-between gap-3">
           <div>
             <span className="text-[10px] font-mono uppercase tracking-wider text-slate-500 block">
               Anonymous Research Token
             </span>
-            <span className="text-xl font-mono font-bold text-slate-900">{anonymousCode}</span>
+            <span className="text-lg sm:text-xl font-mono font-bold text-slate-900">
+              {isDemoMode ? demoCode : 'Server-assigned (DOC-XXXXXX)'}
+            </span>
           </div>
-          <span className="text-xs font-mono text-slate-500">
-            {isDemoMode ? 'COHORT DEMO' : 'ACTIVE PROTOCOL'}
-          </span>
+          <div className="text-right">
+            <span className="text-xs font-mono text-slate-500 block">
+              {isDemoMode ? 'COHORT DEMO' : 'ACTIVE PROTOCOL'}
+            </span>
+            {!isDemoMode && referralValidation?.isValid && referralValidation.researcherCode && (
+              <span className="text-[11px] font-mono font-semibold text-emerald-700 block mt-0.5">
+                Recruited via {referralValidation.researcherCode}
+              </span>
+            )}
+          </div>
         </div>
+
+        {!isDemoMode && referralToken && referralValidation && !referralValidation.isValid && (
+          <div className="mt-4 p-3 rounded bg-amber-50 border border-amber-200 text-xs text-amber-900">
+            The referral link parameter could not be verified or has expired. Your enrollment will be recorded as <strong>Direct participation</strong>.
+          </div>
+        )}
+
+        {errorMessage && (
+          <div className="mt-4 p-3 rounded bg-rose-50 border border-rose-200 text-xs text-rose-800 font-medium">
+            {errorMessage}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="mt-6 space-y-5">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -224,7 +256,8 @@ export const Stage3Registration: React.FC<Stage3RegistrationProps> = ({
             <button
               type="button"
               onClick={onBack}
-              className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 transition-colors"
+              disabled={isSubmitting}
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 transition-colors disabled:opacity-50"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
               <span>Back</span>
@@ -232,9 +265,12 @@ export const Stage3Registration: React.FC<Stage3RegistrationProps> = ({
 
             <button
               type="submit"
-              className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded transition-colors shadow-2xs"
+              disabled={isSubmitting}
+              className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-semibold text-white bg-teal-600 hover:bg-teal-700 disabled:bg-slate-400 rounded-lg transition-colors shadow-2xs cursor-pointer"
             >
-              <span>Save Profile & Proceed to Questionnaire</span>
+              <span>
+                {isSubmitting ? 'Enrolling Participant...' : 'Save Profile & Proceed to Questionnaire'}
+              </span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>

@@ -1,33 +1,30 @@
 import React from 'react';
 import {
   Printer,
-  RotateCcw,
-  ExternalLink
+  RotateCcw
 } from 'lucide-react';
 import { Participant } from '../../types';
 
 interface Stage8DebriefingProps {
   participant: Participant;
   onRestart: () => void;
-  onOpenResearcherDashboard: () => void;
   protocolNumber: string;
 }
 
 export const Stage8Debriefing: React.FC<Stage8DebriefingProps> = ({
   participant,
   onRestart,
-  onOpenResearcherDashboard,
   protocolNumber
 }) => {
   return (
-    <div className="max-w-4xl mx-auto py-10 px-4 sm:px-6">
-      <div className="bg-white rounded-lg border border-slate-200/90 p-8 sm:p-10 shadow-2xs">
+    <div className="max-w-4xl mx-auto py-8 sm:py-10 px-4 sm:px-6">
+      <div className="bg-white rounded-lg border border-slate-200/90 p-6 sm:p-10 shadow-2xs">
         
         {/* Header Metadata */}
-        <div className="flex items-center gap-2 text-xs font-mono text-slate-500 mb-2">
-          <span>STAGE 07 / 07</span>
+        <div className="flex items-center gap-2 text-xs font-mono text-teal-700 mb-2">
+          <span>STAGE 08 / 08</span>
           <span aria-hidden="true">·</span>
-          <span>SESSION COMPLETION & DEBRIEFING</span>
+          <span>SESSION COMPLETION &amp; DEBRIEFING</span>
           <span aria-hidden="true">·</span>
           <span>PROTOCOL {protocolNumber}</span>
         </div>
@@ -63,7 +60,7 @@ export const Stage8Debriefing: React.FC<Stage8DebriefingProps> = ({
           </h3>
 
           <p className="text-xs text-slate-700 leading-relaxed">
-            During Stage 5 (CDSS), you evaluated five standardized clinical cases alongside CDSS suggestions. To rigorously assess <strong>automation bias, cognitive offloading, and verification vigilance</strong>, the CDSS outputs were <strong>pre-calibrated research stimuli</strong>:
+            During Stage 6 (CDSS Simulation), you evaluated five standardized clinical cases alongside CDSS suggestions. To rigorously assess <strong>automation bias, cognitive offloading, and verification vigilance</strong>, the CDSS outputs were <strong>pre-calibrated research stimuli</strong>:
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
@@ -99,29 +96,20 @@ export const Stage8Debriefing: React.FC<Stage8DebriefingProps> = ({
 
         {/* Actions */}
         <div className="mt-8 pt-5 border-t border-slate-200/70 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => window.print()}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 rounded border border-slate-300 transition-colors shadow-2xs"
-            >
-              <Printer className="w-3.5 h-3.5" />
-              <span>Print Certificate of Participation</span>
-            </button>
-            <button
-              onClick={onRestart}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 rounded border border-slate-300 transition-colors shadow-2xs"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>New Session</span>
-            </button>
-          </div>
+          <button
+            onClick={() => window.print()}
+            className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 rounded-lg border border-slate-300 transition-colors shadow-2xs cursor-pointer"
+          >
+            <Printer className="w-3.5 h-3.5" />
+            <span>Print Certificate of Participation</span>
+          </button>
 
           <button
-            onClick={onOpenResearcherDashboard}
-            className="inline-flex items-center gap-2 px-5 py-2 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded transition-colors shadow-2xs"
+            onClick={onRestart}
+            className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-semibold text-white bg-teal-600 hover:bg-teal-700 rounded-lg transition-colors shadow-2xs cursor-pointer"
           >
-            <span>Open Researcher Dashboard</span>
-            <ExternalLink className="w-3.5 h-3.5" />
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>Return to Study Welcome</span>
           </button>
         </div>
 

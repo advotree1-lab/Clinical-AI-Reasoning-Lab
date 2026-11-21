@@ -17,7 +17,10 @@ const TASK_FREQ_SCORE: Record<GenAiTaskFrequency, number> = {
 
 export interface ResearchAnalyticsSummary {
   totalEnrolled: number;
+  registeredCount: number;
+  inProgressCount: number;
   completedCount: number;
+  abandonedCount: number;
   completionRate: number;
   // Primary Outcome
   primaryMisleadingAcceptanceRate: number; // percentage (0-100)
@@ -33,6 +36,8 @@ export interface ResearchAnalyticsSummary {
   initialMeanConfidence: number;
   finalMeanConfidence: number;
   confidenceDelta: number;
+  meanCdssActiveSeconds: number;
+  meanVignetteActiveSeconds: number;
   // Post-AI Unaided Reasoning Performance
   postAiMeanScore: number; // out of postAiMaxScore
   postAiMaxScore: number; // 4 marks per post-AI case
@@ -74,8 +79,15 @@ export function computeAnalytics(
     return getEmptyAnalytics();
   }
 
-  const completedParticipants = participants.filter(p => p.completed);
+  const completedParticipants = participants.filter(
+    p => p.completed || p.completionStatus === 'completed'
+  );
   const completedCount = completedParticipants.length;
+  const registeredCount = participants.filter(p => p.completionStatus === 'registered').length;
+  const abandonedCount = participants.filter(p => p.completionStatus === 'abandoned').length;
+  const inProgressCount = participants.filter(
+    p => !p.completed && p.completionStatus !== 'registered' && p.completionStatus !== 'abandoned'
+  ).length;
   const completionRate = Number(((completedCount / totalEnrolled) * 100).toFixed(1));
 
   // Sim cases ground truth
@@ -104,8 +116,11 @@ export function computeAnalytics(
   let totalUnverifiedMisleading = 0;
 
   let sumInitialConf = 0;
+  let initialConfCount = 0;
   let sumFinalConf = 0;
   let totalAiInteractions = 0;
+  let sumCdssActive = 0;
+  let cdssTimedCount = 0;
 
   const misleadingCountsPerParticipant: number[] = [];
 
@@ -115,7 +130,14 @@ export function computeAnalytics(
 
     records.forEach(r => {
       totalAiInteractions++;
-      sumInitialConf += r.initialConfidence;
+      if (typeof r.initialConfidence === 'number') {
+        sumInitialConf += r.initialConfidence;
+        initialConfCount++;
+      }
+      if (typeof r.activeSeconds === 'number' && r.activeSeconds > 0) {
+        sumCdssActive += r.activeSeconds;
+        cdssTimedCount++;
+      }
       sumFinalConf += r.finalConfidence;
 
       const isMis = misleadingCaseIds.has(r.caseId);
@@ -124,7 +146,7 @@ export function computeAnalytics(
 
       if (isMis) {
         totalMisleadingExposures++;
-        if (agreed || r.acceptedMisleading) {
+        if (r.acceptedMisleading !== undefined ? r.acceptedMisleading : agreed) {
           totalMisleadingAccepted++;
           pMisleadingCount++;
           if (!r.willVerify) {
@@ -152,6 +174,18 @@ export function computeAnalytics(
 
     misleadingCountsPerParticipant.push(pMisleadingCount);
   });
+
+  const meanCdssActiveSeconds =
+    cdssTimedCount > 0 ? Math.round(sumCdssActive / cdssTimedCount) : 0;
+  const timedVignettes = vignetteAnswers.filter(
+    v => typeof v.activeSeconds === 'number' && v.activeSeconds > 0
+  );
+  const meanVignetteActiveSeconds =
+    timedVignettes.length > 0
+      ? Math.round(
+          timedVignettes.reduce((acc, v) => acc + (v.activeSeconds ?? 0), 0) / timedVignettes.length
+        )
+      : 0;
 
   const primaryMisleadingAcceptanceRate = totalMisleadingExposures > 0
     ? Number(((totalMisleadingAccepted / totalMisleadingExposures) * 100).toFixed(1))
@@ -197,8 +231,8 @@ export function computeAnalytics(
     ? Number(((totalUnverifiedMisleading / totalMisleadingAccepted) * 100).toFixed(1))
     : 0;
 
-  const initialMeanConfidence = totalAiInteractions > 0
-    ? Number((sumInitialConf / totalAiInteractions).toFixed(2))
+  const initialMeanConfidence = initialConfCount > 0
+    ? Number((sumInitialConf / initialConfCount).toFixed(2))
     : 0;
 
   const finalMeanConfidence = totalAiInteractions > 0
@@ -393,7 +427,10 @@ export function computeAnalytics(
 
   return {
     totalEnrolled,
+    registeredCount,
+    inProgressCount,
     completedCount,
+    abandonedCount,
     completionRate,
     primaryMisleadingAcceptanceRate,
     meanMisleadingAcceptedCount,
@@ -407,6 +444,8 @@ export function computeAnalytics(
     initialMeanConfidence,
     finalMeanConfidence,
     confidenceDelta,
+    meanCdssActiveSeconds,
+    meanVignetteActiveSeconds,
     postAiMeanScore: pStats.mean,
     postAiMaxScore,
     postAiStdDev: pStats.std,
@@ -432,7 +471,10 @@ export function computeAnalytics(
 function getEmptyAnalytics(): ResearchAnalyticsSummary {
   return {
     totalEnrolled: 0,
+    registeredCount: 0,
+    inProgressCount: 0,
     completedCount: 0,
+    abandonedCount: 0,
     completionRate: 0,
     primaryMisleadingAcceptanceRate: 0,
     meanMisleadingAcceptedCount: 0,
@@ -451,6 +493,8 @@ function getEmptyAnalytics(): ResearchAnalyticsSummary {
     initialMeanConfidence: 0,
     finalMeanConfidence: 0,
     confidenceDelta: 0,
+    meanCdssActiveSeconds: 0,
+    meanVignetteActiveSeconds: 0,
     postAiMeanScore: 0,
     postAiMaxScore: 24,
     postAiStdDev: 0,
@@ -473,23 +517,31 @@ function getEmptyAnalytics(): ResearchAnalyticsSummary {
   };
 }
 
-export function exportToCsv(filename: string, rows: Record<string, any>[]) {
+function sanitizeCsvString(value: string): string {
+  const safe = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+  return `"${safe.replace(/"/g, '""')}"`;
+}
+
+export function exportToCsv(filename: string, rows: Record<string, unknown>[]) {
   if (!rows || rows.length === 0) return;
   const headers = Object.keys(rows[0]);
   const csvContent = [
-    headers.join(','),
+    headers.map(h => sanitizeCsvString(h)).join(','),
     ...rows.map(row =>
       headers
         .map(h => {
           const val = row[h];
           if (val === undefined || val === null) return '""';
           if (typeof val === 'string') {
-            return `"${val.replace(/"/g, '""')}"`;
+            return sanitizeCsvString(val);
           }
           if (Array.isArray(val)) {
-            return `"${val.join('; ').replace(/"/g, '""')}"`;
+            return sanitizeCsvString(val.join('; '));
           }
-          return val;
+          if (typeof val === 'number' || typeof val === 'boolean') {
+            return String(val);
+          }
+          return sanitizeCsvString(JSON.stringify(val));
         })
         .join(',')
     )
@@ -503,4 +555,5 @@ export function exportToCsv(filename: string, rows: Record<string, any>[]) {
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

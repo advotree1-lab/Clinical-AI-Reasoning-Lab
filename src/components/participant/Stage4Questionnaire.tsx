@@ -20,9 +20,13 @@ import {
 
 interface Stage4QuestionnaireProps {
   participant: Participant;
-  onSubmit: (response: QuestionnaireResponse, updatedParticipant: Participant) => void;
+  existingResponse?: QuestionnaireResponse | null;
+  onSubmit: (response: QuestionnaireResponse, updatedParticipant: Participant) => void | Promise<void>;
+  onContinueNext?: () => void;
   onBack: () => void;
   isDemoMode: boolean;
+  isSubmitting?: boolean;
+  errorMessage?: string | null;
 }
 
 const DESIGNATION_OPTIONS: ParticipantDesignation[] = [
@@ -79,46 +83,94 @@ const TASK_ROWS: { key: keyof GenAiTaskMatrix; code: string; label: string }[] =
 
 export const Stage4Questionnaire: React.FC<Stage4QuestionnaireProps> = ({
   participant,
+  existingResponse = null,
   onSubmit,
+  onContinueNext,
   onBack,
-  isDemoMode
+  isDemoMode,
+  isSubmitting = false,
+  errorMessage = null
 }) => {
-  // SECTION I: RESPONDENT PROFILE (Initialized from Stage 3 participant)
-  const [designation, setDesignation] = useState<ParticipantDesignation>(participant.designation);
-  const [designationOther, setDesignationOther] = useState(participant.designationOther || '');
-  const [specialty, setSpecialty] = useState<ClinicalSpecialty>(participant.specialty);
-  const [specialtyOther, setSpecialtyOther] = useState(participant.specialtyOther || '');
-  const [yearsSinceMbbsBracket, setYearsSinceMbbsBracket] = useState<YearsSinceMbbsBracket>(participant.yearsSinceMbbsBracket);
-  const [hospitalType, setHospitalType] = useState<InstitutionType>(participant.institutionType);
-  const [hospitalTypeOther, setHospitalTypeOther] = useState(participant.institutionOther || '');
-  const [formalGenAiTraining, setFormalGenAiTraining] = useState<boolean>(participant.formalGenAiTraining);
+  const isLockedInLive = !isDemoMode && Boolean(existingResponse);
+
+  // SECTION I: RESPONDENT PROFILE (Initialized from Stage 3 participant or existingResponse)
+  const [designation, setDesignation] = useState<ParticipantDesignation>(
+    existingResponse?.designation ?? participant.designation
+  );
+  const [designationOther, setDesignationOther] = useState(
+    existingResponse?.designationOther ?? participant.designationOther ?? ''
+  );
+  const [specialty, setSpecialty] = useState<ClinicalSpecialty>(
+    existingResponse?.specialty ?? participant.specialty
+  );
+  const [specialtyOther, setSpecialtyOther] = useState(
+    existingResponse?.specialtyOther ?? participant.specialtyOther ?? ''
+  );
+  const [yearsSinceMbbsBracket, setYearsSinceMbbsBracket] = useState<YearsSinceMbbsBracket>(
+    existingResponse?.yearsSinceMbbsBracket ?? participant.yearsSinceMbbsBracket
+  );
+  const [hospitalType, setHospitalType] = useState<InstitutionType>(
+    existingResponse?.hospitalType ?? participant.institutionType
+  );
+  const [hospitalTypeOther, setHospitalTypeOther] = useState(
+    existingResponse?.hospitalTypeOther ?? participant.institutionOther ?? ''
+  );
+  const [formalGenAiTraining, setFormalGenAiTraining] = useState<boolean>(
+    existingResponse?.formalGenAiTraining ?? participant.formalGenAiTraining
+  );
 
   // SECTION II: GENAI EXPOSURE (Q1 - Q12)
-  const [usedGenAiLast3Months, setUsedGenAiLast3Months] = useState<boolean>(true);
-  const [firstUseDuration, setFirstUseDuration] = useState<GenAiFirstUseDuration>('6–12 months');
-  const [usageFrequency, setUsageFrequency] = useState<GenAiUsageFrequency>('3–5 days per week');
-  const [dailyTimeSpent, setDailyTimeSpent] = useState<GenAiDailyDuration>('10–30 minutes');
-  const [toolsUsed, setToolsUsed] = useState<string[]>(['ChatGPT', 'Google Gemini']);
-  const [medicalSpecificToolName, setMedicalSpecificToolName] = useState('');
-  const [otherToolName, setOtherToolName] = useState('');
-  const [accessMethod, setAccessMethod] = useState<GenAiAccessMethod>('Free public version');
-  const [enteredPatientInfo, setEnteredPatientInfo] = useState<PatientInfoEntryFrequency>('Never');
-  const [taskFrequency, setTaskFrequency] = useState<GenAiTaskMatrix>({
-    differentialDiagnoses: 'Sometimes',
-    interpretingInvestigations: 'Sometimes',
-    choosingInvestigations: 'Rarely',
-    identifyingManagement: 'Sometimes',
-    drugDosesAndInteractions: 'Often',
-    summarisingLiterature: 'Often',
-    clinicalDocumentation: 'Rarely',
-    patientCommunication: 'Never'
-  });
-  const [reasoningConsultationStage, setReasoningConsultationStage] = useState<ClinicalReasoningConsultationStage>(
-    'After my initial assessment, to cross-check my thinking'
+  const [usedGenAiLast3Months, setUsedGenAiLast3Months] = useState<boolean>(
+    existingResponse ? existingResponse.usedGenAiLast3Months : true
   );
-  const [last10CasesConsultedCount, setLast10CasesConsultedCount] = useState<number>(3);
-  const [verificationFrequency, setVerificationFrequency] = useState<GenAiTaskFrequency>('Often');
-  const [institutionalPolicy, setInstitutionalPolicy] = useState<InstitutionalPolicyStatus>('Not sure');
+  const [firstUseDuration, setFirstUseDuration] = useState<GenAiFirstUseDuration>(
+    existingResponse?.firstUseDuration ?? '6–12 months'
+  );
+  const [usageFrequency, setUsageFrequency] = useState<GenAiUsageFrequency>(
+    existingResponse?.usageFrequency ?? '3–5 days per week'
+  );
+  const [dailyTimeSpent, setDailyTimeSpent] = useState<GenAiDailyDuration>(
+    existingResponse?.dailyTimeSpent ?? '10–30 minutes'
+  );
+  const [toolsUsed, setToolsUsed] = useState<string[]>(
+    existingResponse?.toolsUsed ?? ['ChatGPT', 'Google Gemini']
+  );
+  const [medicalSpecificToolName, setMedicalSpecificToolName] = useState(
+    existingResponse?.medicalSpecificToolName ?? ''
+  );
+  const [otherToolName, setOtherToolName] = useState(existingResponse?.otherToolName ?? '');
+  const [accessMethod, setAccessMethod] = useState<GenAiAccessMethod>(
+    existingResponse?.accessMethod ?? 'Free public version'
+  );
+  const [enteredPatientInfo, setEnteredPatientInfo] = useState<PatientInfoEntryFrequency>(
+    existingResponse?.enteredPatientInfo ?? 'Never'
+  );
+  const [taskFrequency, setTaskFrequency] = useState<GenAiTaskMatrix>(
+    existingResponse?.taskFrequency ?? {
+      differentialDiagnoses: 'Sometimes',
+      interpretingInvestigations: 'Sometimes',
+      choosingInvestigations: 'Rarely',
+      identifyingManagement: 'Sometimes',
+      drugDosesAndInteractions: 'Often',
+      summarisingLiterature: 'Often',
+      clinicalDocumentation: 'Rarely',
+      patientCommunication: 'Never'
+    }
+  );
+  const [reasoningConsultationStage, setReasoningConsultationStage] =
+    useState<ClinicalReasoningConsultationStage>(
+      existingResponse?.reasoningConsultationStage ??
+        'After my initial assessment, to cross-check my thinking'
+    );
+  const [last10CasesConsultedCount, setLast10CasesConsultedCount] = useState<number>(
+    existingResponse?.last10CasesConsultedCount ?? 3
+  );
+  const [verificationFrequency, setVerificationFrequency] = useState<GenAiTaskFrequency>(
+    existingResponse?.verificationFrequency ?? 'Often'
+  );
+  const [institutionalPolicy, setInstitutionalPolicy] = useState<InstitutionalPolicyStatus>(
+    existingResponse?.institutionalPolicy ?? 'Not sure'
+  );
 
   const toggleTool = (tool: string) => {
     if (toolsUsed.includes(tool)) {
@@ -156,6 +208,11 @@ export const Stage4Questionnaire: React.FC<Stage4QuestionnaireProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+    if (isLockedInLive) {
+      onContinueNext?.();
+      return;
+    }
 
     const updatedParticipant: Participant = {
       ...participant,
@@ -214,8 +271,8 @@ export const Stage4Questionnaire: React.FC<Stage4QuestionnaireProps> = ({
         {/* Header Metadata */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-200/80 gap-2 mb-6">
           <div>
-            <div className="flex items-center gap-2 text-xs font-mono text-slate-500 mb-1">
-              <span>STAGE 04 / 07</span>
+            <div className="flex items-center gap-2 text-xs font-mono text-teal-700 mb-1">
+              <span>STAGE 05 / 08</span>
               <span aria-hidden="true">·</span>
               <span>STUDY QUESTIONNAIRE</span>
             </div>
@@ -227,15 +284,29 @@ export const Stage4Questionnaire: React.FC<Stage4QuestionnaireProps> = ({
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={handleAutoFillSurvey}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded border border-slate-200 transition-colors shrink-0 self-start sm:self-auto"
-            title="Auto-fill representative questionnaire responses"
-          >
-            <span>⚡ Auto-Fill Survey</span>
-          </button>
+          {isDemoMode && (
+            <button
+              type="button"
+              onClick={handleAutoFillSurvey}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded border border-slate-200 transition-colors shrink-0 self-start sm:self-auto"
+              title="Auto-fill representative questionnaire responses"
+            >
+              <span>⚡ Auto-Fill Survey</span>
+            </button>
+          )}
         </div>
+
+        {isLockedInLive && (
+          <div className="mb-6 p-3.5 rounded bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 font-medium">
+            Your Study Questionnaire response has already been submitted and saved. Proceed below to continue to the CDSS stage.
+          </div>
+        )}
+
+        {errorMessage && (
+          <div className="mb-6 p-3.5 rounded bg-rose-50 border border-rose-200 text-xs text-rose-800 font-medium">
+            {errorMessage}
+          </div>
+        )}
 
         {/* Participant Information and Instructions */}
         <div className="mb-8 p-4 rounded bg-slate-50 border border-slate-200 text-xs text-slate-700 space-y-2 leading-relaxed">
@@ -842,21 +913,33 @@ export const Stage4Questionnaire: React.FC<Stage4QuestionnaireProps> = ({
 
           {/* Navigation */}
           <div className="pt-4 border-t border-slate-200/70 flex items-center justify-between">
-            <button
-              type="button"
-              onClick={onBack}
-              className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 transition-colors"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Back</span>
-            </button>
+            {isDemoMode ? (
+              <button
+                type="button"
+                onClick={onBack}
+                disabled={isSubmitting}
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 transition-colors disabled:opacity-50"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>Back</span>
+              </button>
+            ) : (
+              <span className="text-[11px] font-mono text-slate-500">
+                Token: {participant.code}
+              </span>
+            )}
 
             <button
               type="submit"
-              className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded transition-colors shadow-2xs"
+              disabled={isSubmitting}
+              className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-semibold text-white bg-teal-600 hover:bg-teal-700 disabled:bg-slate-400 rounded-lg transition-colors shadow-2xs cursor-pointer"
             >
               <span>
-                {usedGenAiLast3Months
+                {isSubmitting
+                  ? 'Saving Questionnaire...'
+                  : isLockedInLive
+                  ? 'Proceed to CDSS'
+                  : usedGenAiLast3Months
                   ? 'Submit Questionnaire & Proceed to CDSS'
                   : 'Skip to CDSS & Vignette Cases'}
               </span>

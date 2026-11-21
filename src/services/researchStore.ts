@@ -2,31 +2,39 @@ import {
   Participant,
   QuestionnaireResponse,
   ClinicalCase,
+  ParticipantClinicalCase,
   AiInteractionRecord,
   VignetteAnswerRecord,
   ResearchProtocolSettings,
   VignetteScoreBreakdown,
-  CaseStage
+  CaseStage,
+  ParticipantSessionSnapshot,
+  RecruitmentTokenValidation,
+  ResearchEventType,
+  ResearchTeamMember,
+  ResearcherPortalDataset
 } from '../types';
-import { INITIAL_CLINICAL_CASES } from '../data/clinicalCases';
-import { generateSeedDemoData } from '../data/seedDemoData';
+import { PARTICIPANT_DEMO_CASES } from '../data/participantCases';
+import {
+  supabaseResearchService,
+  EnrollParticipantInput,
+  SubmitQuestionnaireInput,
+  SubmitAiInteractionInput,
+  SubmitVignetteAnswerInput,
+  SubmitAssessorScoreInput,
+  CaseTimerOpenResult
+} from './supabaseResearchService';
 
 const DEMO_PARTICIPANTS_KEY = 'carl_demo_participants_v6';
 const DEMO_QUESTIONNAIRES_KEY = 'carl_demo_questionnaires_v6';
 const DEMO_AI_INTERACTIONS_KEY = 'carl_demo_ai_interactions_v6';
 const DEMO_VIGNETTES_KEY = 'carl_demo_vignettes_v6';
 
-const RESEARCH_PARTICIPANTS_KEY = 'carl_research_participants_v6';
-const RESEARCH_QUESTIONNAIRES_KEY = 'carl_research_questionnaires_v6';
-const RESEARCH_AI_INTERACTIONS_KEY = 'carl_research_ai_interactions_v6';
-const RESEARCH_VIGNETTES_KEY = 'carl_research_vignettes_v6';
-
 const PROTOCOL_SETTINGS_KEY = 'carl_protocol_settings_v6';
 const CASES_KEY = 'carl_clinical_cases_v6';
 
 const DEFAULT_SETTINGS: ResearchProtocolSettings = {
   requireParticipantConsent: true,
-  passcode: 'LAB2026',
   institutionName: 'Department of Medicine, Academic Medical College',
   protocolNumber: 'IEC/2026/RES-AI-884',
   primaryInvestigator: 'Dr. Research Fellow & Guide',
@@ -35,54 +43,82 @@ const DEFAULT_SETTINGS: ResearchProtocolSettings = {
 };
 
 class ResearchStore {
-  private cases: ClinicalCase[] = [];
+  private adminCases: ClinicalCase[] = [];
+  private adminLoaded = false;
+  private adminLoadPromise: Promise<void> | null = null;
   private settings: ResearchProtocolSettings = DEFAULT_SETTINGS;
 
   constructor() {
-    this.initStore();
+    this.initSettings();
   }
 
-  private initStore() {
+  private initSettings() {
     try {
-      // Cases (preserve custom researcher edits while syncing newly added baseline attachments like clinicalImages)
-      const storedCases = localStorage.getItem(CASES_KEY);
-      if (storedCases) {
-        const parsed: ClinicalCase[] = JSON.parse(storedCases);
-        this.cases = parsed.map(stored => {
-          const baseline = INITIAL_CLINICAL_CASES.find(ic => ic.id === stored.id);
-          return baseline
-            ? {
-                ...stored,
-                clinicalImages: stored.clinicalImages ?? baseline.clinicalImages
-              }
-            : stored;
-        });
-        localStorage.setItem(CASES_KEY, JSON.stringify(this.cases));
-      } else {
-        this.cases = INITIAL_CLINICAL_CASES;
-        localStorage.setItem(CASES_KEY, JSON.stringify(this.cases));
-      }
-
-      // Settings
       const storedSettings = localStorage.getItem(PROTOCOL_SETTINGS_KEY);
       if (storedSettings) {
         this.settings = { ...DEFAULT_SETTINGS, ...JSON.parse(storedSettings) };
       } else {
         localStorage.setItem(PROTOCOL_SETTINGS_KEY, JSON.stringify(this.settings));
       }
-
-      // Demo data seeding if empty
-      const demoP = localStorage.getItem(DEMO_PARTICIPANTS_KEY);
-      if (!demoP) {
-        this.resetDemoData();
-      }
     } catch (e) {
-      console.warn('Storage init fallback to memory', e);
-      this.cases = INITIAL_CLINICAL_CASES;
+      console.warn('Settings storage init fallback to memory', e);
     }
   }
 
-  public resetDemoData() {
+  /**
+   * Lazily loads full researcher datasets (clinicalCases with answer keys + synthetic 40-doctor cohort)
+   * using dynamic imports so answer keys and rubrics are NEVER bundled into the participant entry chunk.
+   */
+  public async ensureDemoAdminLoaded(): Promise<void> {
+    if (this.adminLoaded) return;
+    if (this.adminLoadPromise) return this.adminLoadPromise;
+
+    this.adminLoadPromise = (async () => {
+      const [{ INITIAL_CLINICAL_CASES }, { generateSeedDemoData }] = await Promise.all([
+        import('../data/clinicalCases'),
+        import('../data/seedDemoData')
+      ]);
+
+      try {
+        const storedCases = localStorage.getItem(CASES_KEY);
+        if (storedCases) {
+          const parsed: ClinicalCase[] = JSON.parse(storedCases);
+          this.adminCases = parsed.map(stored => {
+            const baseline = INITIAL_CLINICAL_CASES.find(ic => ic.id === stored.id);
+            return baseline
+              ? {
+                  ...stored,
+                  clinicalImages: stored.clinicalImages ?? baseline.clinicalImages
+                }
+              : stored;
+          });
+          localStorage.setItem(CASES_KEY, JSON.stringify(this.adminCases));
+        } else {
+          this.adminCases = INITIAL_CLINICAL_CASES;
+          localStorage.setItem(CASES_KEY, JSON.stringify(this.adminCases));
+        }
+
+        const demoP = localStorage.getItem(DEMO_PARTICIPANTS_KEY);
+        if (!demoP) {
+          const seed = generateSeedDemoData();
+          localStorage.setItem(DEMO_PARTICIPANTS_KEY, JSON.stringify(seed.participants));
+          localStorage.setItem(DEMO_QUESTIONNAIRES_KEY, JSON.stringify(seed.questionnaireResponses));
+          localStorage.setItem(DEMO_AI_INTERACTIONS_KEY, JSON.stringify(seed.aiInteractions));
+          localStorage.setItem(DEMO_VIGNETTES_KEY, JSON.stringify(seed.vignetteAnswers));
+        }
+      } catch (e) {
+        console.warn('Demo admin storage init fallback to memory', e);
+        this.adminCases = INITIAL_CLINICAL_CASES;
+      }
+
+      this.adminLoaded = true;
+    })();
+
+    return this.adminLoadPromise;
+  }
+
+  public async resetDemoData(): Promise<void> {
+    const { generateSeedDemoData } = await import('../data/seedDemoData');
     const seed = generateSeedDemoData();
     localStorage.setItem(DEMO_PARTICIPANTS_KEY, JSON.stringify(seed.participants));
     localStorage.setItem(DEMO_QUESTIONNAIRES_KEY, JSON.stringify(seed.questionnaireResponses));
@@ -90,7 +126,7 @@ class ResearchStore {
     localStorage.setItem(DEMO_VIGNETTES_KEY, JSON.stringify(seed.vignetteAnswers));
   }
 
-  // --- PROTOCOL & CASES ---
+  // --- PROTOCOL & PARTICIPANT-SAFE CASES ---
   public getSettings(): ResearchProtocolSettings {
     return { ...this.settings };
   }
@@ -100,79 +136,99 @@ class ResearchStore {
     localStorage.setItem(PROTOCOL_SETTINGS_KEY, JSON.stringify(this.settings));
   }
 
+  /**
+   * Participant-safe case stimuli (zero gold standards, zero misleading flags, zero rubrics).
+   */
+  public getParticipantCases(stage?: CaseStage): ParticipantClinicalCase[] {
+    if (stage) {
+      return PARTICIPANT_DEMO_CASES.filter(c => c.stage === stage);
+    }
+    return [...PARTICIPANT_DEMO_CASES];
+  }
+
+  /**
+   * Full researcher case records (populated only after ensureDemoAdminLoaded()).
+   */
   public getCases(stage?: CaseStage): ClinicalCase[] {
     if (stage) {
-      return this.cases.filter(c => c.stage === stage);
+      return this.adminCases.filter(c => c.stage === stage);
     }
-    return [...this.cases];
+    return [...this.adminCases];
   }
 
   public updateCase(updatedCase: ClinicalCase) {
-    this.cases = this.cases.map(c => c.id === updatedCase.id ? updatedCase : c);
-    localStorage.setItem(CASES_KEY, JSON.stringify(this.cases));
+    this.adminCases = this.adminCases.map(c => (c.id === updatedCase.id ? updatedCase : c));
+    localStorage.setItem(CASES_KEY, JSON.stringify(this.adminCases));
   }
 
-  // --- PARTICIPANTS ---
+  // --- DEMO MODE LOCAL STORAGE (Partitioned from Live Research Mode) ---
   public getParticipants(isDemo: boolean): Participant[] {
-    const key = isDemo ? DEMO_PARTICIPANTS_KEY : RESEARCH_PARTICIPANTS_KEY;
-    const data = localStorage.getItem(key);
+    if (!isDemo) return [];
+    const data = localStorage.getItem(DEMO_PARTICIPANTS_KEY);
     return data ? JSON.parse(data) : [];
   }
 
   public saveParticipant(participant: Participant) {
-    const key = participant.isDemo ? DEMO_PARTICIPANTS_KEY : RESEARCH_PARTICIPANTS_KEY;
-    const list = this.getParticipants(participant.isDemo);
+    if (!participant.isDemo) {
+      throw new Error('Live research participants must be persisted via Supabase RPCs, not localStorage.');
+    }
+    const list = this.getParticipants(true);
     const existingIndex = list.findIndex(p => p.id === participant.id);
     if (existingIndex >= 0) {
       list[existingIndex] = participant;
     } else {
       list.push(participant);
     }
-    localStorage.setItem(key, JSON.stringify(list));
+    localStorage.setItem(DEMO_PARTICIPANTS_KEY, JSON.stringify(list));
   }
 
-  // --- QUESTIONNAIRES ---
   public getQuestionnaires(isDemo: boolean): QuestionnaireResponse[] {
-    const key = isDemo ? DEMO_QUESTIONNAIRES_KEY : RESEARCH_QUESTIONNAIRES_KEY;
-    const data = localStorage.getItem(key);
+    if (!isDemo) return [];
+    const data = localStorage.getItem(DEMO_QUESTIONNAIRES_KEY);
     return data ? JSON.parse(data) : [];
   }
 
   public saveQuestionnaire(resp: QuestionnaireResponse) {
-    const key = resp.isDemo ? DEMO_QUESTIONNAIRES_KEY : RESEARCH_QUESTIONNAIRES_KEY;
-    const list = this.getQuestionnaires(resp.isDemo);
-    const existingIndex = list.findIndex(q => q.id === resp.id || q.participantId === resp.participantId);
+    if (!resp.isDemo) {
+      throw new Error('Live research questionnaires must be persisted via Supabase RPCs, not localStorage.');
+    }
+    const list = this.getQuestionnaires(true);
+    const existingIndex = list.findIndex(
+      q => q.id === resp.id || q.participantId === resp.participantId
+    );
     if (existingIndex >= 0) {
       list[existingIndex] = resp;
     } else {
       list.push(resp);
     }
-    localStorage.setItem(key, JSON.stringify(list));
+    localStorage.setItem(DEMO_QUESTIONNAIRES_KEY, JSON.stringify(list));
   }
 
-  // --- AI INTERACTIONS ---
   public getAiInteractions(isDemo: boolean): AiInteractionRecord[] {
-    const key = isDemo ? DEMO_AI_INTERACTIONS_KEY : RESEARCH_AI_INTERACTIONS_KEY;
-    const data = localStorage.getItem(key);
+    if (!isDemo) return [];
+    const data = localStorage.getItem(DEMO_AI_INTERACTIONS_KEY);
     return data ? JSON.parse(data) : [];
   }
 
   public saveAiInteraction(record: AiInteractionRecord) {
-    const key = record.isDemo ? DEMO_AI_INTERACTIONS_KEY : RESEARCH_AI_INTERACTIONS_KEY;
-    const list = this.getAiInteractions(record.isDemo);
-    const existingIndex = list.findIndex(r => r.participantId === record.participantId && r.caseId === record.caseId);
+    if (!record.isDemo) {
+      throw new Error('Live CDSS interactions must be persisted via Supabase RPCs, not localStorage.');
+    }
+    const list = this.getAiInteractions(true);
+    const existingIndex = list.findIndex(
+      r => r.participantId === record.participantId && r.caseId === record.caseId
+    );
     if (existingIndex >= 0) {
       list[existingIndex] = record;
     } else {
       list.push(record);
     }
-    localStorage.setItem(key, JSON.stringify(list));
+    localStorage.setItem(DEMO_AI_INTERACTIONS_KEY, JSON.stringify(list));
   }
 
-  // --- VIGNETTES (POST-AI) ---
   public getVignetteAnswers(isDemo: boolean, stage?: 'post_ai'): VignetteAnswerRecord[] {
-    const key = isDemo ? DEMO_VIGNETTES_KEY : RESEARCH_VIGNETTES_KEY;
-    const data = localStorage.getItem(key);
+    if (!isDemo) return [];
+    const data = localStorage.getItem(DEMO_VIGNETTES_KEY);
     const list: VignetteAnswerRecord[] = data ? JSON.parse(data) : [];
     if (stage) {
       return list.filter(v => v.stage === stage);
@@ -181,15 +237,19 @@ class ResearchStore {
   }
 
   public saveVignetteAnswer(record: VignetteAnswerRecord) {
-    const key = record.isDemo ? DEMO_VIGNETTES_KEY : RESEARCH_VIGNETTES_KEY;
-    const list = this.getVignetteAnswers(record.isDemo);
-    const existingIndex = list.findIndex(v => v.participantId === record.participantId && v.caseId === record.caseId);
+    if (!record.isDemo) {
+      throw new Error('Live vignette answers must be persisted via Supabase RPCs, not localStorage.');
+    }
+    const list = this.getVignetteAnswers(true);
+    const existingIndex = list.findIndex(
+      v => v.participantId === record.participantId && v.caseId === record.caseId
+    );
     if (existingIndex >= 0) {
       list[existingIndex] = record;
     } else {
       list.push(record);
     }
-    localStorage.setItem(key, JSON.stringify(list));
+    localStorage.setItem(DEMO_VIGNETTES_KEY, JSON.stringify(list));
   }
 
   public scoreVignette(
@@ -198,8 +258,8 @@ class ResearchStore {
     assessorNumber: 1 | 2,
     score: VignetteScoreBreakdown
   ) {
-    const key = isDemo ? DEMO_VIGNETTES_KEY : RESEARCH_VIGNETTES_KEY;
-    const list = this.getVignetteAnswers(isDemo);
+    if (!isDemo) return;
+    const list = this.getVignetteAnswers(true);
     const item = list.find(v => v.id === vignetteId);
     if (item) {
       if (assessorNumber === 1) {
@@ -216,15 +276,120 @@ class ResearchStore {
       } else if (s2 !== undefined) {
         item.finalResolvedScore = s2;
       }
-      localStorage.setItem(key, JSON.stringify(list));
+      localStorage.setItem(DEMO_VIGNETTES_KEY, JSON.stringify(list));
     }
   }
 
-  public clearResearchData() {
-    localStorage.removeItem(RESEARCH_PARTICIPANTS_KEY);
-    localStorage.removeItem(RESEARCH_QUESTIONNAIRES_KEY);
-    localStorage.removeItem(RESEARCH_AI_INTERACTIONS_KEY);
-    localStorage.removeItem(RESEARCH_VIGNETTES_KEY);
+  // --- LIVE RESEARCH MODE (SUPABASE) ---
+  public isLiveSupabaseAvailable(): boolean {
+    return supabaseResearchService.isConfigured();
+  }
+
+  public getSupabaseConfigError(): string | null {
+    return supabaseResearchService.getConfigError();
+  }
+
+  public validateReferralToken(token: string): Promise<RecruitmentTokenValidation> {
+    return supabaseResearchService.validateRecruitmentToken(token);
+  }
+
+  public restoreLiveSession(): Promise<ParticipantSessionSnapshot | null> {
+    return supabaseResearchService.restoreParticipantSession();
+  }
+
+  public loadLiveParticipantCases(): Promise<ParticipantClinicalCase[]> {
+    return supabaseResearchService.fetchPublishedParticipantCases();
+  }
+
+  public enrollLiveParticipant(input: EnrollParticipantInput): Promise<Participant> {
+    return supabaseResearchService.enrollParticipant(input);
+  }
+
+  public submitLiveQuestionnaire(input: SubmitQuestionnaireInput): Promise<QuestionnaireResponse> {
+    return supabaseResearchService.submitQuestionnaire(input);
+  }
+
+  public openLiveCaseSession(participantId: string, caseId: string): Promise<CaseTimerOpenResult> {
+    return supabaseResearchService.openStudyCase(participantId, caseId);
+  }
+
+  public heartbeatLiveCaseTimer(
+    participantId: string,
+    caseId: string,
+    deltaSeconds: number
+  ): Promise<number> {
+    return supabaseResearchService.heartbeatCaseTimer(participantId, caseId, deltaSeconds);
+  }
+
+  public logLiveCdssFollowup(
+    participantId: string,
+    caseId: string,
+    suggestionId: 'followup_1' | 'followup_2'
+  ): Promise<string> {
+    return supabaseResearchService.logCdssFollowup(participantId, caseId, suggestionId);
+  }
+
+  public submitLiveAiInteraction(input: SubmitAiInteractionInput): Promise<AiInteractionRecord> {
+    return supabaseResearchService.submitAiInteraction(input);
+  }
+
+  public completeLiveCdssStage(participantId: string): Promise<string> {
+    return supabaseResearchService.completeCdssStage(participantId);
+  }
+
+  public submitLiveVignetteAnswer(input: SubmitVignetteAnswerInput): Promise<VignetteAnswerRecord> {
+    return supabaseResearchService.submitVignetteAnswer(input);
+  }
+
+  public completeLiveVignetteStage(participantId: string): Promise<string> {
+    return supabaseResearchService.completeVignetteStage(participantId);
+  }
+
+  public refreshLiveParticipant(participantId: string): Promise<Participant | null> {
+    return supabaseResearchService.fetchOwnParticipant(participantId);
+  }
+
+  public logLiveEvent(input: {
+    participantId: string;
+    eventType: ResearchEventType;
+    stage?: number;
+    caseId?: string;
+    payload?: Record<string, unknown>;
+    clientTimestamp?: string;
+  }): Promise<string | null> {
+    return supabaseResearchService.logResearchEvent(input);
+  }
+
+  public resetLiveParticipantSession(): Promise<void> {
+    return supabaseResearchService.resetParticipantAuthSession();
+  }
+
+  public getAuthSessionType(): Promise<'none' | 'anonymous_participant' | 'authenticated_user'> {
+    return supabaseResearchService.getSessionType();
+  }
+
+  public getAuthenticatedTeamMember(): Promise<ResearchTeamMember | null> {
+    return supabaseResearchService.getAuthenticatedTeamMember();
+  }
+
+  public signInTeamMember(email: string, password: string): Promise<ResearchTeamMember> {
+    return supabaseResearchService.signInTeamMember(email, password);
+  }
+
+  public signOutTeamMember(): Promise<void> {
+    return supabaseResearchService.signOutTeamMember();
+  }
+
+  public fetchResearcherPortalDataset(member: ResearchTeamMember): Promise<ResearcherPortalDataset> {
+    return supabaseResearchService.fetchResearcherPortalDataset(member);
+  }
+
+  public submitLiveAssessorScore(input: SubmitAssessorScoreInput): Promise<string> {
+    return supabaseResearchService.submitAssessorScore(input);
+  }
+
+  public piAdjudicateLiveVignette(vignetteAnswerId: string, adjudicatedScore: number): Promise<void> {
+    return supabaseResearchService.piAdjudicateVignette(vignetteAnswerId, adjudicatedScore);
   }
 }
 

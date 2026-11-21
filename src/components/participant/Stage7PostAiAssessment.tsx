@@ -1,36 +1,117 @@
-import React, { useState } from 'react';
-import { ArrowRight, ArrowLeft } from 'lucide-react';
-import { ClinicalCase, Participant, VignetteAnswerRecord } from '../../types';
+import React, { useState, useEffect } from 'react';
+import { ArrowRight, ArrowLeft, Lock } from 'lucide-react';
+import {
+  ParticipantClinicalCase,
+  Participant,
+  VignetteAnswerRecord,
+  ResearchEventType
+} from '../../types';
+import { SubmitVignetteAnswerInput } from '../../services/supabaseResearchService';
 import { ClinicalImageGallery } from '../common/ClinicalImageGallery';
+import { useCaseActiveTimer } from '../../hooks/useCaseActiveTimer';
 
 interface Stage7PostAiAssessmentProps {
-  cases: ClinicalCase[];
+  cases: ParticipantClinicalCase[];
   participant: Participant;
-  onComplete: (answers: VignetteAnswerRecord[]) => void;
   isDemoMode: boolean;
+  initialAnswers?: VignetteAnswerRecord[];
+  onOpenCase?: (caseId: string) => Promise<void> | void;
+  onHeartbeatTimer?: (caseId: string, deltaSeconds: number) => Promise<void> | void;
+  onSubmitCase?: (input: SubmitVignetteAnswerInput) => Promise<VignetteAnswerRecord | void>;
+  onComplete: (answers: VignetteAnswerRecord[]) => void | Promise<void>;
+  onLogEvent?: (
+    eventType: ResearchEventType,
+    caseId?: string,
+    payload?: Record<string, unknown>
+  ) => void;
+}
+
+interface VignetteFormState {
+  mostLikelyDiagnosis: string;
+  customOtherDiagnosis: string;
+  differential1: string;
+  differential2: string;
+  redFlags: string;
+  nextStep: string;
+  confidence: number;
 }
 
 export const Stage7PostAiAssessment: React.FC<Stage7PostAiAssessmentProps> = ({
   cases,
   participant,
+  isDemoMode,
+  initialAnswers = [],
+  onOpenCase,
+  onHeartbeatTimer,
+  onSubmitCase,
   onComplete,
-  isDemoMode
+  onLogEvent
 }) => {
-  const [currentCaseIndex, setCurrentCaseIndex] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, {
-    mostLikelyDiagnosis: string;
-    customOtherDiagnosis: string;
-    differential1: string;
-    differential2: string;
-    redFlags: string;
-    nextStep: string;
-    confidence: number;
-  }>>({});
+  const [submittedAnswers, setSubmittedAnswers] = useState<Record<string, VignetteAnswerRecord>>(() => {
+    const map: Record<string, VignetteAnswerRecord> = {};
+    initialAnswers.forEach(a => {
+      map[a.caseId] = a;
+    });
+    return map;
+  });
+
+  const [currentCaseIndex, setCurrentCaseIndex] = useState(() => {
+    if (cases.length === 0) return 0;
+    const firstUnsubmitted = cases.findIndex(
+      c => !initialAnswers.some(a => a.caseId === c.id)
+    );
+    return firstUnsubmitted >= 0 ? firstUnsubmitted : 0;
+  });
+
+  const [answers, setAnswers] = useState<Record<string, VignetteFormState>>(() => {
+    const map: Record<string, VignetteFormState> = {};
+    initialAnswers.forEach(ans => {
+      const matchedCase = cases.find(c => c.id === ans.caseId);
+      const isOptionMatch = matchedCase?.mcqOptions.includes(ans.mostLikelyDiagnosis);
+      map[ans.caseId] = {
+        mostLikelyDiagnosis: isOptionMatch ? ans.mostLikelyDiagnosis : 'Other',
+        customOtherDiagnosis: isOptionMatch ? '' : ans.mostLikelyDiagnosis,
+        differential1: ans.differential1,
+        differential2: ans.differential2,
+        redFlags: ans.redFlags,
+        nextStep: ans.nextStep,
+        confidence: ans.confidence
+      };
+    });
+    return map;
+  });
+
+  const [isSubmittingCase, setIsSubmittingCase] = useState(false);
+  const [isCompletingStage, setIsCompletingStage] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const currentCase = cases[currentCaseIndex];
+  const currentSubmittedRecord = currentCase ? submittedAnswers[currentCase.id] : undefined;
+  const isCurrentSubmittedLocked = !isDemoMode && Boolean(currentSubmittedRecord);
 
-  const currentAnswer = answers[currentCase.id] || {
-    mostLikelyDiagnosis: currentCase.mcqOptions[0],
+  const { flushCurrent, getLocalTiming } = useCaseActiveTimer({
+    caseId: currentCase?.id,
+    isLocked: isCurrentSubmittedLocked,
+    isDemoMode,
+    onOpenCase,
+    onHeartbeatTimer,
+    onLogEvent
+  });
+
+  useEffect(() => {
+    setErrorMessage(null);
+  }, [currentCaseIndex]);
+
+  if (!currentCase) {
+    return (
+      <div className="max-w-4xl mx-auto py-12 px-4 text-center text-xs text-slate-600">
+        No vignette cases are currently available.
+      </div>
+    );
+  }
+
+  const currentAnswer: VignetteFormState = answers[currentCase.id] || {
+    mostLikelyDiagnosis: currentCase.mcqOptions[0] || 'Other',
     customOtherDiagnosis: '',
     differential1: '',
     differential2: '',
@@ -39,38 +120,92 @@ export const Stage7PostAiAssessment: React.FC<Stage7PostAiAssessmentProps> = ({
     confidence: 3
   };
 
-  const updateCurrentAnswer = (field: string, value: any) => {
+  const updateCurrentAnswer = <K extends keyof VignetteFormState>(
+    field: K,
+    value: VignetteFormState[K]
+  ) => {
+    if (isCurrentSubmittedLocked) return;
+    setErrorMessage(null);
     setAnswers(prev => ({
       ...prev,
       [currentCase.id]: {
-        ...currentAnswer,
+        ...(prev[currentCase.id] || currentAnswer),
         [field]: value
       }
     }));
   };
 
-  const isCurrentValid = () => {
-    const isOther = currentAnswer.mostLikelyDiagnosis === 'Other';
-    if (isOther && !currentAnswer.customOtherDiagnosis.trim()) return false;
-    if (!currentAnswer.differential1.trim() || !currentAnswer.differential2.trim()) return false;
-    if (!currentAnswer.redFlags.trim()) return false;
-    if (!currentAnswer.nextStep.trim()) return false;
-    return true;
+  const validateCurrent = (a: VignetteFormState): string | null => {
+    if (a.mostLikelyDiagnosis === 'Other' && !a.customOtherDiagnosis.trim()) {
+      return 'Please specify your alternative primary diagnosis.';
+    }
+    if (!a.differential1.trim() || !a.differential2.trim()) {
+      return 'Please enter two relevant differential diagnoses before submitting.';
+    }
+    if (!a.redFlags.trim()) {
+      return 'Please identify the critical red flags and risk indicators.';
+    }
+    if (!a.nextStep.trim()) {
+      return 'Please enter the most appropriate next investigation or management step.';
+    }
+    return null;
   };
 
-  const handleNext = () => {
-    if (currentCaseIndex < cases.length - 1) {
-      setCurrentCaseIndex(currentCaseIndex + 1);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    } else {
-      handleCompleteAll();
+  const handleSelectCase = async (idx: number) => {
+    await flushCurrent();
+    setCurrentCaseIndex(idx);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const resolveDiagnosis = (a: VignetteFormState) =>
+    a.mostLikelyDiagnosis === 'Other' && a.customOtherDiagnosis.trim()
+      ? a.customOtherDiagnosis.trim()
+      : a.mostLikelyDiagnosis;
+
+  const handleSubmitCurrentLiveCase = async (): Promise<Record<string, VignetteAnswerRecord> | null> => {
+    const validationErr = validateCurrent(currentAnswer);
+    if (validationErr) {
+      setErrorMessage(validationErr);
+      return null;
+    }
+
+    setErrorMessage(null);
+    setIsSubmittingCase(true);
+    try {
+      await flushCurrent();
+
+      const input: SubmitVignetteAnswerInput = {
+        participantId: participant.id,
+        caseId: currentCase.id,
+        mostLikelyDiagnosis: resolveDiagnosis(currentAnswer),
+        differential1: currentAnswer.differential1.trim(),
+        differential2: currentAnswer.differential2.trim(),
+        redFlags: currentAnswer.redFlags.trim(),
+        nextStep: currentAnswer.nextStep.trim(),
+        confidence: currentAnswer.confidence
+      };
+
+      const saved = onSubmitCase ? await onSubmitCase(input) : undefined;
+      if (saved) {
+        const nextMap = { ...submittedAnswers, [currentCase.id]: saved };
+        setSubmittedAnswers(nextMap);
+        return nextMap;
+      }
+      return submittedAnswers;
+    } catch (err) {
+      setErrorMessage(
+        err instanceof Error ? err.message : 'Unable to save vignette submission. Please retry.'
+      );
+      return null;
+    } finally {
+      setIsSubmittingCase(false);
     }
   };
 
-  const handleCompleteAll = () => {
+  const handleCompleteAllDemo = () => {
     const finalRecords: VignetteAnswerRecord[] = cases.map(c => {
       const a = answers[c.id] || {
-        mostLikelyDiagnosis: c.mcqOptions[0],
+        mostLikelyDiagnosis: c.mcqOptions[0] || 'Other',
         customOtherDiagnosis: '',
         differential1: '',
         differential2: '',
@@ -78,34 +213,82 @@ export const Stage7PostAiAssessment: React.FC<Stage7PostAiAssessmentProps> = ({
         nextStep: '',
         confidence: 3
       };
-      const actualDiagnosis =
-        a.mostLikelyDiagnosis === 'Other' && a.customOtherDiagnosis.trim()
-          ? a.customOtherDiagnosis.trim()
-          : a.mostLikelyDiagnosis;
-
+      const timing = getLocalTiming(c.id);
       return {
         id: `post-${participant.id}-${c.id}`,
         participantId: participant.id,
         caseId: c.id,
         stage: 'post_ai',
-        isDemo: isDemoMode,
-        mostLikelyDiagnosis: actualDiagnosis,
+        isDemo: true,
+        mostLikelyDiagnosis: resolveDiagnosis(a),
         differential1: a.differential1.trim() || 'Not entered (Prototype skip)',
         differential2: a.differential2.trim() || 'Not entered (Prototype skip)',
         redFlags: a.redFlags.trim() || 'Not entered (Prototype skip)',
         nextStep: a.nextStep.trim() || 'Not entered (Prototype skip)',
         confidence: a.confidence,
-        submittedAt: new Date().toISOString()
+        firstDisplayedAt: timing.firstDisplayedAt,
+        lastOpenedAt: timing.lastOpenedAt,
+        activeSeconds: timing.activeSeconds,
+        wallClockSeconds: timing.wallClockSeconds,
+        submittedAt: timing.submittedAt
       };
     });
 
-    onComplete(finalRecords);
+    void onComplete(finalRecords);
+  };
+
+  const allCasesSubmitted = cases.every(c => Boolean(submittedAnswers[c.id]));
+
+  const handleNext = async () => {
+    if (isDemoMode) {
+      await flushCurrent();
+      if (currentCaseIndex < cases.length - 1) {
+        await handleSelectCase(currentCaseIndex + 1);
+      } else {
+        handleCompleteAllDemo();
+      }
+      return;
+    }
+
+    let latestMap = submittedAnswers;
+    if (!isCurrentSubmittedLocked) {
+      const savedMap = await handleSubmitCurrentLiveCase();
+      if (!savedMap) return;
+      latestMap = savedMap;
+    }
+
+    const nextUnsubmittedIdx = cases.findIndex((c, idx) => idx > currentCaseIndex && !latestMap[c.id]);
+    const anyUnsubmittedIdx = cases.findIndex(c => !latestMap[c.id]);
+
+    if (nextUnsubmittedIdx >= 0) {
+      await handleSelectCase(nextUnsubmittedIdx);
+      return;
+    }
+    if (anyUnsubmittedIdx >= 0 && currentCaseIndex < cases.length - 1) {
+      await handleSelectCase(currentCaseIndex + 1);
+      return;
+    }
+    if (anyUnsubmittedIdx >= 0) {
+      await handleSelectCase(anyUnsubmittedIdx);
+      return;
+    }
+
+    setIsCompletingStage(true);
+    setErrorMessage(null);
+    try {
+      await onComplete(cases.map(c => latestMap[c.id]).filter(Boolean));
+    } catch (err) {
+      setErrorMessage(
+        err instanceof Error ? err.message : 'Unable to finalize vignette assessment. Please retry.'
+      );
+    } finally {
+      setIsCompletingStage(false);
+    }
   };
 
   const handlePrev = () => {
     if (currentCaseIndex > 0) {
-      setCurrentCaseIndex(currentCaseIndex - 1);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      void handleSelectCase(currentCaseIndex - 1);
     }
   };
 
@@ -121,34 +304,31 @@ export const Stage7PostAiAssessment: React.FC<Stage7PostAiAssessmentProps> = ({
         {/* Stage Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between pb-4 border-b border-slate-200/80 gap-3">
           <div>
-            <div className="flex items-center gap-2 text-xs font-mono text-slate-500 mb-1">
-              <span>STAGE 06 / 07</span>
+            <div className="flex items-center gap-2 text-xs font-mono text-teal-700 mb-1">
+              <span>STAGE 07 / 08</span>
               <span aria-hidden="true">·</span>
-              <span>VIGNETTE CASES</span>
+              <span>POST-AI VIGNETTE CASES</span>
             </div>
             <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
               Vignette Case {currentCaseIndex + 1} of {cases.length}: {currentCase.domain}
             </h2>
           </div>
 
-          {/* Unrestricted Clickable Stepper */}
+          {/* Clickable Case Stepper */}
           <div className="flex items-center gap-1.5 self-start sm:self-auto flex-wrap">
             <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 mr-1">
-              Cases:
+              Cases ({Object.keys(submittedAnswers).length}/{cases.length}):
             </span>
             {cases.map((c, i) => (
               <button
                 key={c.id}
                 type="button"
-                onClick={() => {
-                  setCurrentCaseIndex(i);
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
+                onClick={() => void handleSelectCase(i)}
                 title={`Jump to Vignette Case ${i + 1}: ${c.domain}`}
                 className={`w-8 h-8 rounded text-xs font-mono font-bold flex items-center justify-center transition-colors cursor-pointer ${
                   i === currentCaseIndex
                     ? 'bg-slate-900 text-white'
-                    : answers[c.id]
+                    : submittedAnswers[c.id] || answers[c.id]
                     ? 'bg-emerald-50 text-emerald-800 font-semibold border border-emerald-300 hover:bg-emerald-100'
                     : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-100'
                 }`}
@@ -173,7 +353,7 @@ export const Stage7PostAiAssessment: React.FC<Stage7PostAiAssessmentProps> = ({
 
             <div>
               <span className="text-[10px] font-mono uppercase tracking-wider text-slate-500 block mb-1">
-                Medical & Treatment History
+                Medical &amp; Treatment History
               </span>
               <p className="text-xs text-slate-700 leading-relaxed">
                 {currentCase.medicalHistory}
@@ -255,23 +435,50 @@ export const Stage7PostAiAssessment: React.FC<Stage7PostAiAssessmentProps> = ({
                 </p>
               </div>
 
-              {/* Auto-Fill Button */}
-              <button
-                type="button"
-                onClick={() => {
-                  updateCurrentAnswer('mostLikelyDiagnosis', currentCase.goldStandardDiagnosis);
-                  updateCurrentAnswer('differential1', currentCase.differentialDiagnosisKeys[0] || 'Competing Differential 1');
-                  updateCurrentAnswer('differential2', currentCase.differentialDiagnosisKeys[1] || 'Competing Differential 2');
-                  updateCurrentAnswer('redFlags', currentCase.redFlagKeys[0] || 'Hemodynamic instability and urgent clinical indicators');
-                  updateCurrentAnswer('nextStep', currentCase.nextManagementStepKey || 'Immediate protocol resuscitation and diagnostic confirmation');
-                  updateCurrentAnswer('confidence', 4);
-                }}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded transition-colors shrink-0 self-start sm:self-auto"
-                title="Fill realistic clinical answers for this case"
-              >
-                <span>⚡ Auto-Fill This Case</span>
-              </button>
+              {isDemoMode && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAnswers(prev => ({
+                      ...prev,
+                      [currentCase.id]: {
+                        mostLikelyDiagnosis: currentCase.mcqOptions[0] || 'Other',
+                        customOtherDiagnosis: '',
+                        differential1: 'Alternative acute etiology',
+                        differential2: 'Secondary systemic condition',
+                        redFlags: 'Hemodynamic instability, neurological compromise, end-organ dysfunction',
+                        nextStep: 'Immediate targeted stabilization and confirmatory diagnostic testing',
+                        confidence: 4
+                      }
+                    }));
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded transition-colors shrink-0 self-start sm:self-auto"
+                  title="Fill sample clinical answers for demo walkthrough"
+                >
+                  <span>⚡ Auto-Fill This Case</span>
+                </button>
+              )}
             </div>
+
+            {isCurrentSubmittedLocked && currentSubmittedRecord && (
+              <div className="p-3.5 rounded bg-emerald-50 border border-emerald-200 flex items-center justify-between gap-2 text-xs text-emerald-900">
+                <div className="flex items-center gap-2 font-medium">
+                  <Lock className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                  <span>Vignette response submitted and locked for blinded expert scoring.</span>
+                </div>
+                {typeof currentSubmittedRecord.activeSeconds === 'number' && (
+                  <span className="font-mono text-[11px] font-semibold text-emerald-800 shrink-0">
+                    Active Time: {currentSubmittedRecord.activeSeconds}s
+                  </span>
+                )}
+              </div>
+            )}
+
+            {errorMessage && (
+              <div className="p-3 rounded bg-rose-50 border border-rose-200 text-xs text-rose-800 font-medium">
+                {errorMessage}
+              </div>
+            )}
 
             {/* 1. Most Likely Diagnosis */}
             <div>
@@ -282,7 +489,9 @@ export const Stage7PostAiAssessment: React.FC<Stage7PostAiAssessmentProps> = ({
                 {currentCase.mcqOptions.map(opt => (
                   <label
                     key={opt}
-                    className={`flex items-center gap-3 p-2.5 rounded border cursor-pointer transition-colors text-xs ${
+                    className={`flex items-center gap-3 p-2.5 rounded border transition-colors text-xs ${
+                      isCurrentSubmittedLocked ? 'cursor-default opacity-85' : 'cursor-pointer'
+                    } ${
                       currentAnswer.mostLikelyDiagnosis === opt
                         ? 'border-slate-900 bg-slate-50 font-semibold text-slate-900'
                         : 'border-slate-200 hover:bg-slate-50 text-slate-700'
@@ -291,6 +500,7 @@ export const Stage7PostAiAssessment: React.FC<Stage7PostAiAssessmentProps> = ({
                     <input
                       type="radio"
                       name={`post-mcq-${currentCase.id}`}
+                      disabled={isCurrentSubmittedLocked}
                       checked={currentAnswer.mostLikelyDiagnosis === opt}
                       onChange={() => updateCurrentAnswer('mostLikelyDiagnosis', opt)}
                       className="text-slate-900 focus:ring-slate-900"
@@ -304,10 +514,11 @@ export const Stage7PostAiAssessment: React.FC<Stage7PostAiAssessmentProps> = ({
                 <div className="mt-2.5">
                   <input
                     type="text"
+                    disabled={isCurrentSubmittedLocked}
                     value={currentAnswer.customOtherDiagnosis}
                     onChange={(e) => updateCurrentAnswer('customOtherDiagnosis', e.target.value)}
                     placeholder="Specify alternative primary diagnosis..."
-                    className="w-full px-3 py-2 rounded border border-slate-300 text-xs text-slate-800"
+                    className="w-full px-3 py-2 rounded border border-slate-300 text-xs text-slate-800 disabled:bg-slate-50"
                   />
                 </div>
               )}
@@ -321,17 +532,19 @@ export const Stage7PostAiAssessment: React.FC<Stage7PostAiAssessmentProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <input
                   type="text"
+                  disabled={isCurrentSubmittedLocked}
                   value={currentAnswer.differential1}
                   onChange={(e) => updateCurrentAnswer('differential1', e.target.value)}
                   placeholder="Differential 1..."
-                  className="w-full px-3 py-2 rounded border border-slate-300 text-xs text-slate-800"
+                  className="w-full px-3 py-2 rounded border border-slate-300 text-xs text-slate-800 disabled:bg-slate-50"
                 />
                 <input
                   type="text"
+                  disabled={isCurrentSubmittedLocked}
                   value={currentAnswer.differential2}
                   onChange={(e) => updateCurrentAnswer('differential2', e.target.value)}
                   placeholder="Differential 2..."
-                  className="w-full px-3 py-2 rounded border border-slate-300 text-xs text-slate-800"
+                  className="w-full px-3 py-2 rounded border border-slate-300 text-xs text-slate-800 disabled:bg-slate-50"
                 />
               </div>
             </div>
@@ -339,14 +552,15 @@ export const Stage7PostAiAssessment: React.FC<Stage7PostAiAssessmentProps> = ({
             {/* 3. Red Flags */}
             <div>
               <label className="block text-xs font-semibold text-slate-800 uppercase tracking-wider mb-1.5 font-mono">
-                3. Critical Red Flags & Risk Indicators (Short Text)
+                3. Critical Red Flags &amp; Risk Indicators (Short Text)
               </label>
               <input
                 type="text"
+                disabled={isCurrentSubmittedLocked}
                 value={currentAnswer.redFlags}
                 onChange={(e) => updateCurrentAnswer('redFlags', e.target.value)}
                 placeholder="Key danger signs, life-threatening complications, or hemodynamic parameters..."
-                className="w-full px-3 py-2 rounded border border-slate-300 text-xs text-slate-800"
+                className="w-full px-3 py-2 rounded border border-slate-300 text-xs text-slate-800 disabled:bg-slate-50"
               />
             </div>
 
@@ -357,10 +571,11 @@ export const Stage7PostAiAssessment: React.FC<Stage7PostAiAssessmentProps> = ({
               </label>
               <input
                 type="text"
+                disabled={isCurrentSubmittedLocked}
                 value={currentAnswer.nextStep}
                 onChange={(e) => updateCurrentAnswer('nextStep', e.target.value)}
                 placeholder="Immediate pharmacotherapy, intervention, or confirmatory test..."
-                className="w-full px-3 py-2 rounded border border-slate-300 text-xs text-slate-800"
+                className="w-full px-3 py-2 rounded border border-slate-300 text-xs text-slate-800 disabled:bg-slate-50"
               />
             </div>
 
@@ -379,12 +594,13 @@ export const Stage7PostAiAssessment: React.FC<Stage7PostAiAssessmentProps> = ({
                   <button
                     key={lvl}
                     type="button"
+                    disabled={isCurrentSubmittedLocked}
                     onClick={() => updateCurrentAnswer('confidence', lvl)}
                     className={`py-2 px-1 text-center rounded border transition-colors text-xs ${
                       currentAnswer.confidence === lvl
                         ? 'bg-slate-900 text-white font-bold border-slate-900'
                         : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-                    }`}
+                    } disabled:opacity-80 disabled:cursor-default`}
                   >
                     <div className="font-mono font-bold">{lvl}</div>
                     <div className="text-[10px] hidden sm:block opacity-80">
@@ -402,7 +618,7 @@ export const Stage7PostAiAssessment: React.FC<Stage7PostAiAssessmentProps> = ({
           <button
             type="button"
             onClick={handlePrev}
-            disabled={currentCaseIndex === 0}
+            disabled={currentCaseIndex === 0 || isSubmittingCase || isCompletingStage}
             className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 transition-colors disabled:opacity-40 disabled:cursor-not-allowed self-start sm:self-auto"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
@@ -410,10 +626,10 @@ export const Stage7PostAiAssessment: React.FC<Stage7PostAiAssessmentProps> = ({
           </button>
 
           <div className="flex items-center gap-2 self-end sm:self-auto">
-            {currentCaseIndex < cases.length - 1 && (
+            {isDemoMode && currentCaseIndex < cases.length - 1 && (
               <button
                 type="button"
-                onClick={handleCompleteAll}
+                onClick={handleCompleteAllDemo}
                 className="px-3.5 py-2 text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 rounded transition-colors"
               >
                 Proceed to Debriefing
@@ -422,13 +638,26 @@ export const Stage7PostAiAssessment: React.FC<Stage7PostAiAssessmentProps> = ({
 
             <button
               type="button"
-              onClick={handleNext}
-              className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-semibold rounded transition-colors bg-slate-900 hover:bg-slate-800 text-white shadow-2xs"
+              disabled={isSubmittingCase || isCompletingStage}
+              onClick={() => void handleNext()}
+              className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-semibold rounded-lg transition-colors bg-teal-600 hover:bg-teal-700 disabled:bg-slate-400 text-white shadow-2xs cursor-pointer"
             >
               <span>
-                {currentCaseIndex === cases.length - 1
-                  ? 'Complete Vignette Cases & Proceed to Debriefing'
-                  : 'Next Vignette Case'}
+                {isSubmittingCase
+                  ? 'Saving Vignette...'
+                  : isCompletingStage
+                  ? 'Completing Study...'
+                  : isDemoMode
+                  ? currentCaseIndex === cases.length - 1
+                    ? 'Complete Vignette Cases & Proceed to Debriefing'
+                    : 'Next Vignette Case'
+                  : isCurrentSubmittedLocked
+                  ? allCasesSubmitted
+                    ? 'Complete Vignette Cases & Proceed to Debriefing'
+                    : 'Next Vignette Case'
+                  : Object.keys(submittedAnswers).length === cases.length - 1
+                  ? 'Submit Final Vignette & Complete Study'
+                  : 'Save & Submit Vignette'}
               </span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>

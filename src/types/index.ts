@@ -1,5 +1,21 @@
 export type Role = 'participant' | 'researcher';
 
+export type TeamMemberRole = 'pi' | 'researcher' | 'assessor';
+
+export type RecruitmentSource = 'direct' | 'team';
+
+export type ParticipantCompletionStatus =
+  | 'registered'
+  | 'in_progress'
+  | 'completed'
+  | 'abandoned';
+
+export type VignetteScoringStatus =
+  | 'pending'
+  | 'partial'
+  | 'dual_scored'
+  | 'adjudicated';
+
 export type ParticipantDesignation =
   | 'Junior Resident'
   | 'Senior Resident'
@@ -78,7 +94,8 @@ export type InstitutionalPolicyStatus = 'Yes' | 'No' | 'Not sure';
 
 export interface Participant {
   id: string; // UUID
-  code: string; // DOC-1042
+  authUserId?: string;
+  code: string; // DOC-001001 (DB) or DOC-XXXX (demo)
   designation: ParticipantDesignation;
   designationOther?: string;
   specialty: ClinicalSpecialty;
@@ -89,6 +106,22 @@ export interface Participant {
   formalGenAiTraining: boolean;
   consentGiven: boolean;
   isDemo: boolean;
+  // Recruitment attribution (immutable after enrollment)
+  recruitmentSource?: RecruitmentSource;
+  recruitedBy?: string | null;
+  researcherCode?: string | null;
+  recruitmentLinkId?: string | null;
+  // Workflow status & server-authoritative milestone timestamps
+  completionStatus?: ParticipantCompletionStatus;
+  consentedAt?: string;
+  registeredAt?: string;
+  questionnaireCompletedAt?: string | null;
+  cdssStartedAt?: string | null;
+  cdssCompletedAt?: string | null;
+  vignettesStartedAt?: string | null;
+  vignettesCompletedAt?: string | null;
+  completedAt?: string | null;
+  lastActivityAt?: string;
   createdAt: string;
   completed: boolean;
   currentStage: number; // 1 to 7
@@ -133,6 +166,7 @@ export interface QuestionnaireResponse {
   last10CasesConsultedCount?: number; // Q10 (0 to 10)
   verificationFrequency?: GenAiTaskFrequency; // Q11
   institutionalPolicy?: InstitutionalPolicyStatus; // Q12
+  submittedAt?: string;
   createdAt: string;
 }
 
@@ -159,12 +193,19 @@ export interface CdssFollowUpSuggestion {
   responseText: string;
 }
 
-export interface AiStimulus {
+/**
+ * Participant-safe CDSS stimulus fields ONLY.
+ * Never includes isMisleading, misleadingClassification, or researcherNote.
+ */
+export interface ParticipantAiStimulus {
   diagnosis: string;
   recommendation: string;
   clinicalReasoning: string;
   followUpSuggestions?: CdssFollowUpSuggestion[];
-  isMisleading: boolean; // Researcher only! Hidden from participant
+}
+
+export interface AiStimulus extends ParticipantAiStimulus {
+  isMisleading: boolean; // Researcher/PI only! Never exposed to participants
   misleadingClassification?: 'Diagnostic Anchoring' | 'Investigation Inversion' | 'Harmful Clinical Management';
   researcherNote?: string;
 }
@@ -176,7 +217,11 @@ export interface ClinicalImage {
   caption?: string;
 }
 
-export interface ClinicalCase {
+/**
+ * Participant-safe clinical case (maps directly to public.clinical_cases).
+ * Contains zero gold standards, answer keys, misleading flags, or scoring rubrics.
+ */
+export interface ParticipantClinicalCase {
   id: string;
   caseNumber: number;
   stage: CaseStage;
@@ -189,6 +234,30 @@ export interface ClinicalCase {
   investigations: ClinicalInvestigation[];
   clinicalImages?: ClinicalImage[];
   mcqOptions: string[];
+  aiStimulus?: ParticipantAiStimulus; // Only present for stage === 'ai_simulation'
+  isPublished: boolean;
+  expertReviewed: boolean;
+}
+
+export interface ClinicalCaseAnswerKey {
+  caseId: string;
+  goldStandardDiagnosis: string;
+  acceptableAlternatives: string[];
+  differentialKeys: string[];
+  redFlagKeys: string[];
+  nextStepKey: string;
+  rubric: {
+    primaryDiagnosisCriteria: string;
+    differentialCriteria: string;
+    redFlagsCriteria: string;
+    nextStepCriteria: string;
+  };
+  isMisleading: boolean;
+  misleadingClassification?: 'Diagnostic Anchoring' | 'Investigation Inversion' | 'Harmful Clinical Management';
+  researcherNote?: string;
+}
+
+export interface ClinicalCase extends ParticipantClinicalCase {
   goldStandardDiagnosis: string;
   acceptableAlternativeDiagnoses: string[];
   differentialDiagnosisKeys: string[];
@@ -201,34 +270,61 @@ export interface ClinicalCase {
     nextStepCriteria: string;
   };
   aiStimulus?: AiStimulus; // Only present for stage === 'ai_simulation'
-  isPublished: boolean;
-  expertReviewed: boolean;
 }
 
 export type AiAgreementLevel = 'Completely agree' | 'Partially agree' | 'Disagree' | 'Uncertain; requires verification';
+
+export interface CaseSessionTimer {
+  id: string;
+  participantId: string;
+  caseId: string;
+  stage: CaseStage;
+  firstDisplayedAt: string;
+  lastOpenedAt: string;
+  lastHeartbeatAt: string;
+  activeSeconds: number;
+  openCount: number;
+  submittedAt?: string | null;
+}
+
+export interface CdssFollowupEvent {
+  id: string;
+  participantId: string;
+  caseId: string;
+  suggestionId: 'followup_1' | 'followup_2';
+  promptLabel: string;
+  responseText: string;
+  clickedAt: string;
+}
 
 export interface AiInteractionRecord {
   id: string;
   participantId: string;
   caseId: string;
   isDemo: boolean;
-  // Initial commitments (Permanently locked)
-  initialDiagnosis: string;
-  initialJustification: string;
-  initialConfidence: number; // 1 to 5
-  initialSubmittedAt: string;
-  // Post-AI commitments
+  // Optional legacy commitments (null in live side-by-side CDSS mode)
+  initialDiagnosis?: string;
+  initialJustification?: string;
+  initialConfidence?: number; // 1 to 5
+  initialSubmittedAt?: string;
+  // Post-CDSS participant evaluation
   aiAgreement: AiAgreementLevel;
   finalDiagnosis: string;
   reasonForDecision: string;
   finalConfidence: number; // 1 to 5
   willVerify: boolean;
   verificationTargets: string;
-  // Derived analytical metrics
   switchedDiagnosis: boolean;
-  switchedTowardsCorrect: boolean;
-  acceptedMisleading: boolean;
-  timeSpentSeconds: number;
+  // Server-computed analytical flags (populated in PI evaluations table & Demo Mode only)
+  switchedTowardsCorrect?: boolean;
+  acceptedMisleading?: boolean;
+  // Server-authoritative timing fields
+  firstDisplayedAt?: string;
+  lastOpenedAt?: string;
+  submittedAt?: string;
+  activeSeconds?: number;
+  wallClockSeconds?: number;
+  timeSpentSeconds?: number; // Demo analytics fallback only
   completedAt: string;
 }
 
@@ -258,15 +354,145 @@ export interface VignetteAnswerRecord {
   assessor1Score?: VignetteScoreBreakdown;
   assessor2Score?: VignetteScoreBreakdown;
   finalResolvedScore?: number; // 0 to 4
+  scoringStatus?: VignetteScoringStatus;
+  piAdjudicatedScore?: number | null;
+  firstDisplayedAt?: string;
+  lastOpenedAt?: string;
+  activeSeconds?: number;
+  wallClockSeconds?: number;
   submittedAt: string;
+}
+
+export type ResearchEventType =
+  | 'session_resumed'
+  | 'stage_entered'
+  | 'case_opened'
+  | 'case_navigated'
+  | 'tab_hidden'
+  | 'tab_visible'
+  | 'page_exit_beacon'
+  | 'cdss_followup_clicked'
+  | 'cdss_submitted'
+  | 'vignette_submitted'
+  | 'questionnaire_submitted'
+  | 'study_completed';
+
+export interface ResearchEventRecord {
+  id?: string;
+  participantId: string;
+  eventType: ResearchEventType;
+  stage?: number;
+  caseId?: string;
+  payload?: Record<string, unknown>;
+  clientTimestamp?: string;
+  serverTimestamp?: string;
+}
+
+export interface RecruitmentTokenValidation {
+  isValid: boolean;
+  researcherCode: string | null;
+  linkLabel: string | null;
+}
+
+export interface ParticipantSessionSnapshot {
+  participant: Participant;
+  questionnaire: QuestionnaireResponse | null;
+  aiInteractions: AiInteractionRecord[];
+  followupEvents: CdssFollowupEvent[];
+  vignetteAnswers: VignetteAnswerRecord[];
+  caseTimers: CaseSessionTimer[];
+}
+
+export interface ResearchTeamMember {
+  id: string;
+  authUserId: string;
+  researcherCode: string;
+  fullName: string;
+  email: string;
+  role: TeamMemberRole;
+  assessorSlot?: 1 | 2 | null;
+  recruitmentTarget: number;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface RecruitmentLink {
+  id: string;
+  researcherId: string;
+  token: string;
+  label?: string | null;
+  isActive: boolean;
+  maxUses?: number | null;
+  usesCount: number;
+  expiresAt?: string | null;
+  createdAt: string;
+}
+
+export interface ResearcherOperationalParticipant {
+  participantId: string;
+  code: string;
+  recruitmentSource: RecruitmentSource;
+  recruitedBy: string | null;
+  researcherCode: string | null;
+  currentStage: number;
+  completionStatus: ParticipantCompletionStatus;
+  completed: boolean;
+  lastActivityAt: string;
+  createdAt: string;
+  completedAt: string | null;
+}
+
+export interface AiInteractionEvaluation {
+  aiInteractionId: string;
+  participantId: string;
+  caseId: string;
+  isMisleading: boolean;
+  matchedGoldStandard: boolean;
+  switchedTowardsCorrect: boolean;
+  acceptedMisleading: boolean;
+  evaluatedAt: string;
+}
+
+export interface AssessorScoreRecord {
+  id: string;
+  vignetteAnswerId: string;
+  assessorId: string;
+  assessorSlot: 1 | 2;
+  primaryDiagnosisMark: number;
+  differentialsMark: number;
+  redFlagsMark: number;
+  nextStepMark: number;
+  totalScore: number;
+  notes?: string;
+  scoredAt: string;
+  updatedAt: string;
+}
+
+export interface ResearcherPortalDataset {
+  member: ResearchTeamMember;
+  operationalParticipants: ResearcherOperationalParticipant[];
+  participants: Participant[];
+  questionnaires: QuestionnaireResponse[];
+  aiInteractions: AiInteractionRecord[];
+  aiEvaluations: AiInteractionEvaluation[];
+  followupEvents: CdssFollowupEvent[];
+  vignetteAnswers: VignetteAnswerRecord[];
+  assessorScores: AssessorScoreRecord[];
+  teamMembers: ResearchTeamMember[];
+  recruitmentLinks: RecruitmentLink[];
+  clinicalCases: ClinicalCase[];
+  participantCases: ParticipantClinicalCase[];
+  researchEvents: ResearchEventRecord[];
+  caseTimers: CaseSessionTimer[];
 }
 
 export interface ResearchProtocolSettings {
   requireParticipantConsent: boolean;
-  passcode: string;
   institutionName: string;
   protocolNumber: string;
   primaryInvestigator: string;
   dataRetentionMonths: number;
   allowDemoToggle: boolean;
 }
+
+
