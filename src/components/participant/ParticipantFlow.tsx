@@ -29,9 +29,13 @@ interface ParticipantFlowProps {
   cases: ParticipantClinicalCase[];
   casesLoading?: boolean;
   casesError?: string | null;
+  initialReferralToken?: string | null;
+  initialReferralValidation?: RecruitmentTokenValidation | null;
+  onCompleteReturnToLogin?: () => void;
 }
 
 const REFERRAL_SESSION_STORAGE_KEY = 'carl_referral_token_v1';
+const SUPERVISED_SESSION_STORAGE_KEY = 'carl_supervised_session_v1';
 
 /**
  * Maps database participants.current_stage (4..7) into the 8-step Participant UI flow:
@@ -52,7 +56,10 @@ export const ParticipantFlow: React.FC<ParticipantFlowProps> = ({
   settings,
   cases,
   casesLoading = false,
-  casesError = null
+  casesError = null,
+  initialReferralToken = undefined,
+  initialReferralValidation = null,
+  onCompleteReturnToLogin
 }) => {
   const [stage, setStage] = useState<number>(1);
   const [currentParticipant, setCurrentParticipant] = useState<Participant | null>(null);
@@ -66,18 +73,16 @@ export const ParticipantFlow: React.FC<ParticipantFlowProps> = ({
   const [stageError, setStageError] = useState<string | null>(null);
 
   const [referralToken, setReferralToken] = useState<string | null>(() => {
+    if (initialReferralToken !== undefined) return initialReferralToken;
     try {
-      const urlToken = new URLSearchParams(window.location.search).get('ref')?.trim();
-      if (urlToken) {
-        sessionStorage.setItem(REFERRAL_SESSION_STORAGE_KEY, urlToken);
-        return urlToken;
-      }
       return sessionStorage.getItem(REFERRAL_SESSION_STORAGE_KEY);
     } catch {
       return null;
     }
   });
-  const [referralValidation, setReferralValidation] = useState<RecruitmentTokenValidation | null>(null);
+  const [referralValidation, setReferralValidation] = useState<RecruitmentTokenValidation | null>(
+    initialReferralValidation
+  );
 
   const simCases = cases.filter(c => c.stage === 'ai_simulation');
   const postAiCases = cases.filter(c => c.stage === 'post_ai');
@@ -597,22 +602,41 @@ export const ParticipantFlow: React.FC<ParticipantFlowProps> = ({
     if (!currentParticipant) return;
     await researchStore.completeLiveVignetteStage(currentParticipant.id);
     const refreshed = await researchStore.refreshLiveParticipant(currentParticipant.id);
-    if (refreshed) setCurrentParticipant(refreshed);
+    if (refreshed) {
+      setCurrentParticipant(refreshed);
+    } else {
+      setCurrentParticipant(prev => (prev ? { ...prev, completed: true, currentStage: 7 } : prev));
+    }
+    logEventSafely('stage_entered', undefined, { targetStage: 7 });
+
+    // End the anonymous Supabase participant session immediately upon study completion
+    try {
+      await researchStore.resetLiveParticipantSession();
+    } catch {
+      // Proceed cleanly to debriefing confirmation
+    }
+    try {
+      sessionStorage.removeItem(REFERRAL_SESSION_STORAGE_KEY);
+      sessionStorage.removeItem(SUPERVISED_SESSION_STORAGE_KEY);
+    } catch {
+      // Ignore storage errors
+    }
+
     setStage(8);
     window.scrollTo({ top: 0, behavior: 'smooth' });
-    logEventSafely('stage_entered', undefined, { targetStage: 7 });
   };
 
-  const handleRestart = async () => {
+  const handleFinishAndReturnToLogin = async () => {
     setStageError(null);
     if (!isDemoMode && researchStore.isLiveSupabaseAvailable()) {
       try {
         await researchStore.resetLiveParticipantSession();
       } catch {
-        // Ignore signout errors when resetting UI
+        // Ignore signout errors when clearing UI
       }
       try {
         sessionStorage.removeItem(REFERRAL_SESSION_STORAGE_KEY);
+        sessionStorage.removeItem(SUPERVISED_SESSION_STORAGE_KEY);
       } catch {
         // Ignore storage errors
       }
@@ -625,7 +649,7 @@ export const ParticipantFlow: React.FC<ParticipantFlowProps> = ({
     setRestoredFollowupEvents([]);
     setRestoredVignetteAnswers([]);
     setStage(1);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    onCompleteReturnToLogin?.();
   };
 
   const stepLabels = [
@@ -715,7 +739,7 @@ export const ParticipantFlow: React.FC<ParticipantFlowProps> = ({
           onJumpToStage={handleJumpToStage}
           onQuickFillStep={handleQuickFillCurrentStep}
           onLoadCompleteSession={handleLoadCompleteSession}
-          onResetSession={() => void handleRestart()}
+          onResetSession={() => void handleFinishAndReturnToLogin()}
           participant={currentParticipant}
         />
       )}
@@ -917,7 +941,7 @@ export const ParticipantFlow: React.FC<ParticipantFlowProps> = ({
         {stage === 8 && currentParticipant && (
           <Stage8Debriefing
             participant={currentParticipant}
-            onRestart={() => void handleRestart()}
+            onCompleteReturnToLogin={() => void handleFinishAndReturnToLogin()}
             protocolNumber={settings.protocolNumber}
           />
         )}

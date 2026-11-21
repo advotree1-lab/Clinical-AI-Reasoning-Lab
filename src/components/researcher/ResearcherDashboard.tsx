@@ -18,7 +18,9 @@ import {
   AlertCircle,
   CheckCircle2,
   ClipboardCheck,
-  ShieldCheck
+  ShieldCheck,
+  UserPlus,
+  ArrowLeft
 } from 'lucide-react';
 import {
   ClinicalCase,
@@ -57,6 +59,9 @@ interface ResearcherDashboardProps {
   onUpdateSettings: (newSettings: Partial<ResearchProtocolSettings>) => void;
   teamMember?: ResearchTeamMember | null;
   onSignOut?: () => Promise<void> | void;
+  onOpenEnrollParticipant?: () => void;
+  onBackToLanding?: () => void;
+  showDemoToggle?: boolean;
   requestedTab?: ResearcherTabId;
   onTabSelected?: (tab: ResearcherTabId) => void;
 }
@@ -111,6 +116,9 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
   onUpdateSettings,
   teamMember = null,
   onSignOut,
+  onOpenEnrollParticipant,
+  onBackToLanding,
+  showDemoToggle = false,
   requestedTab,
   onTabSelected
 }) => {
@@ -611,7 +619,9 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
             )}
           </div>
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
-            Clinical AI Reasoning Lab: Researcher Portal
+            {teamMember?.role === 'pi'
+              ? 'Clinical AI Reasoning Lab: Principal Investigator Dashboard'
+              : 'Clinical AI Reasoning Lab: Researcher Dashboard'}
           </h1>
           <p className="text-xs text-slate-500 mt-0.5">
             {teamMember && !isDemoMode
@@ -621,7 +631,7 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
-          {settings.allowDemoToggle && (
+          {showDemoToggle && settings.allowDemoToggle && (
             <div className="flex items-center p-0.5 bg-slate-100 rounded-lg border border-slate-200 text-xs font-medium">
               <button
                 type="button"
@@ -659,6 +669,26 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
             </button>
           ) : (
             <>
+              {onBackToLanding && (
+                <button
+                  type="button"
+                  onClick={onBackToLanding}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 rounded-lg transition-colors border border-slate-200 cursor-pointer"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>Researcher Options</span>
+                </button>
+              )}
+              {onOpenEnrollParticipant && (
+                <button
+                  type="button"
+                  onClick={onOpenEnrollParticipant}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-white bg-teal-600 hover:bg-teal-700 rounded-lg transition-colors shadow-2xs cursor-pointer"
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  <span>Enroll Participant</span>
+                </button>
+              )}
               <button
                 type="button"
                 disabled={liveLoading}

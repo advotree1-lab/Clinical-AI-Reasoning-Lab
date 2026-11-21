@@ -360,6 +360,10 @@ class ResearchStore {
     return supabaseResearchService.logResearchEvent(input);
   }
 
+  public startFreshAnonymousParticipantSession(): Promise<string> {
+    return supabaseResearchService.startFreshAnonymousParticipantSession();
+  }
+
   public resetLiveParticipantSession(): Promise<void> {
     return supabaseResearchService.resetParticipantAuthSession();
   }
@@ -374,6 +378,18 @@ class ResearchStore {
 
   public signInTeamMember(email: string, password: string): Promise<ResearchTeamMember> {
     return supabaseResearchService.signInTeamMember(email, password);
+  }
+
+  public signInPortalTeamMember(
+    email: string,
+    password: string,
+    portal: 'pi' | 'researcher'
+  ): Promise<ResearchTeamMember> {
+    return supabaseResearchService.signInPortalTeamMember(email, password, portal);
+  }
+
+  public fetchPermittedRecruitmentLinks() {
+    return supabaseResearchService.fetchPermittedRecruitmentLinks();
   }
 
   public signOutTeamMember(): Promise<void> {

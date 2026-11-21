@@ -679,6 +679,16 @@ export const supabaseResearchService = {
     return anonData.user.id;
   },
 
+  /**
+   * Ends any active browser auth session (researcher, PI, or prior participant)
+   * and creates a brand-new anonymous Supabase Auth participant session.
+   */
+  async startFreshAnonymousParticipantSession(): Promise<string> {
+    const client = requireSupabaseClient();
+    await client.auth.signOut();
+    return this.ensureAnonymousParticipantAuth();
+  },
+
   async resetParticipantAuthSession(): Promise<void> {
     const client = requireSupabaseClient();
     const { data: sessionData } = await client.auth.getSession();
@@ -1153,6 +1163,45 @@ export const supabaseResearchService = {
     }
 
     return mapTeamMemberRow(memberRow as ResearchTeamMemberRow);
+  },
+
+  async signInPortalTeamMember(
+    email: string,
+    password: string,
+    portal: 'pi' | 'researcher'
+  ): Promise<ResearchTeamMember> {
+    const member = await this.signInTeamMember(email, password);
+    const client = requireSupabaseClient();
+
+    if (portal === 'pi' && member.role !== 'pi') {
+      await client.auth.signOut();
+      throw new Error(
+        'Access denied: This login portal is strictly restricted to Principal Investigator accounts (role = pi).'
+      );
+    }
+
+    if (portal === 'researcher' && member.role !== 'researcher' && member.role !== 'assessor') {
+      await client.auth.signOut();
+      throw new Error(
+        'Principal Investigator accounts must sign in through the Principal Investigator portal.'
+      );
+    }
+
+    return member;
+  },
+
+  async fetchPermittedRecruitmentLinks(): Promise<RecruitmentLink[]> {
+    const client = requireSupabaseClient();
+    const { data, error } = await client
+      .from('recruitment_links')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      throw new Error(`Failed to load recruitment links: ${error.message}`);
+    }
+
+    return ((data || []) as RecruitmentLinkRow[]).map(mapRecruitmentLinkRow);
   },
 
   async signOutTeamMember(): Promise<void> {

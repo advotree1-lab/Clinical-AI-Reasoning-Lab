@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useCallback, Suspense, lazy } from 'react';
 import {
-  Role,
   ResearchProtocolSettings,
   ParticipantClinicalCase,
-  ResearchTeamMember
+  ResearchTeamMember,
+  RecruitmentTokenValidation
 } from './types';
 import { researchStore } from './services/researchStore';
-import { Navbar } from './components/layout/Navbar';
+import { Navbar, PortalNavbarView } from './components/layout/Navbar';
+import { PublicPortalHome } from './components/home/PublicPortalHome';
 import { ParticipantFlow } from './components/participant/ParticipantFlow';
 
 const ResearcherAuthView = lazy(() =>
@@ -15,274 +16,504 @@ const ResearcherAuthView = lazy(() =>
   }))
 );
 
+const ResearcherLandingView = lazy(() =>
+  import('./components/researcher/ResearcherLandingView').then(m => ({
+    default: m.ResearcherLandingView
+  }))
+);
+
+const EnrollmentPrepView = lazy(() =>
+  import('./components/researcher/EnrollmentPrepView').then(m => ({
+    default: m.EnrollmentPrepView
+  }))
+);
+
 const ResearcherDashboard = lazy(
   () => import('./components/researcher/ResearcherDashboard')
 );
 
-function detectInitialRole(): Role {
-  if (typeof window === 'undefined') return 'participant';
+const REFERRAL_SESSION_STORAGE_KEY = 'carl_referral_token_v1';
+const SUPERVISED_SESSION_STORAGE_KEY = 'carl_supervised_session_v1';
+
+type RequestedRouteIntent =
+  | 'home'
+  | 'pi_login'
+  | 'researcher_login'
+  | 'pi_dashboard'
+  | 'researcher_dashboard'
+  | 'enrollment_prep'
+  | 'participant_attempt';
+
+function detectRequestedRoute(): RequestedRouteIntent {
+  if (typeof window === 'undefined') return 'home';
   const path = window.location.pathname.toLowerCase();
   const hash = window.location.hash.toLowerCase();
   const portalParam = new URLSearchParams(window.location.search).get('portal')?.toLowerCase();
-  if (path.endsWith('/researcher') || hash.includes('researcher') || portalParam === 'researcher') {
-    return 'researcher';
+
+  if (
+    hash.includes('participant') ||
+    path.includes('participant') ||
+    portalParam === 'participant'
+  ) {
+    return 'participant_attempt';
   }
-  return 'participant';
+  if (hash.includes('pi-dashboard')) return 'pi_dashboard';
+  if (hash.includes('pi') || path.endsWith('/pi') || portalParam === 'pi') return 'pi_login';
+  if (hash.includes('enroll')) return 'enrollment_prep';
+  if (hash.includes('researcher-dashboard')) return 'researcher_dashboard';
+  if (
+    hash.includes('researcher') ||
+    path.endsWith('/researcher') ||
+    portalParam === 'researcher'
+  ) {
+    return 'researcher_login';
+  }
+  return 'home';
 }
 
-function detectInitialDemoMode(): boolean {
-  if (typeof window === 'undefined') return true;
-  const params = new URLSearchParams(window.location.search);
-  const modeParam = params.get('mode')?.toLowerCase();
-  if (modeParam === 'demo') return true;
-  if (!researchStore.isLiveSupabaseAvailable()) return true;
-  if (modeParam === 'live' || params.has('ref')) return false;
-  return false;
+function updateUrlHashSafely(targetHash: string) {
+  try {
+    const url = new URL(window.location.href);
+    const normalizedPath = url.pathname.replace(
+      /\/(participant|participant-session|pi|pi-login|pi-dashboard|researcher|researcher-login|researcher-dashboard|enroll|enrollment-prep)\/?$/i,
+      '/'
+    );
+    url.searchParams.delete('portal');
+    const cleanSearch = url.searchParams.toString();
+    const targetUrl = `${normalizedPath || '/'}${cleanSearch ? `?${cleanSearch}` : ''}${targetHash}`;
+    const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    if (currentUrl !== targetUrl) {
+      window.history.replaceState(null, '', targetUrl);
+    }
+  } catch {
+    // Ignore history API restrictions inside sandboxed iframes
+  }
 }
 
 export default function App() {
-  const [currentRole, setCurrentRole] = useState<Role>(() => detectInitialRole());
-  const [isDemoMode, setIsDemoMode] = useState<boolean>(() => detectInitialDemoMode());
+  const [appView, setAppView] = useState<PortalNavbarView>('home');
+  const [authBootstrapped, setAuthBootstrapped] = useState<boolean>(false);
 
   const [settings, setSettings] = useState<ResearchProtocolSettings>(() =>
     researchStore.getSettings()
   );
-  const [participantCases, setParticipantCases] = useState<ParticipantClinicalCase[]>(() =>
-    researchStore.getParticipantCases()
-  );
-  const [liveCasesLoading, setLiveCasesLoading] = useState<boolean>(false);
-  const [liveCasesError, setLiveCasesError] = useState<string | null>(null);
-
-  // Researcher Supabase Auth state (Portal 2)
   const [teamMember, setTeamMember] = useState<ResearchTeamMember | null>(null);
   const [authSessionType, setAuthSessionType] = useState<
     'none' | 'anonymous_participant' | 'authenticated_user'
   >('none');
-  const [authChecking, setAuthChecking] = useState<boolean>(false);
   const [unauthorizedNotice, setUnauthorizedNotice] = useState<string | null>(null);
 
-  // Sync URL hash with active portal
-  useEffect(() => {
-    const onHashChange = () => {
-      if (window.location.hash.toLowerCase().includes('researcher')) {
-        setCurrentRole('researcher');
-      } else if (window.location.hash === '#/' || window.location.hash === '') {
-        setCurrentRole('participant');
-      }
-    };
-    window.addEventListener('hashchange', onHashChange);
-    return () => window.removeEventListener('hashchange', onHashChange);
-  }, []);
+  // Supervised participant session context
+  const [supervisedToken, setSupervisedToken] = useState<string | null>(null);
+  const [supervisedValidation, setSupervisedValidation] =
+    useState<RecruitmentTokenValidation | null>(null);
+  const [participantCases, setParticipantCases] = useState<ParticipantClinicalCase[]>([]);
+  const [liveCasesLoading, setLiveCasesLoading] = useState<boolean>(false);
+  const [liveCasesError, setLiveCasesError] = useState<string | null>(null);
 
-  // Load participant-safe published cases in Live Mode when on Participant Portal
-  useEffect(() => {
-    let active = true;
-
-    if (currentRole !== 'participant') return;
-
-    if (isDemoMode) {
-      setParticipantCases(researchStore.getParticipantCases());
-      setLiveCasesLoading(false);
-      setLiveCasesError(null);
-      return;
-    }
-
-    if (!researchStore.isLiveSupabaseAvailable()) {
-      setLiveCasesLoading(false);
-      setLiveCasesError(null);
-      return;
-    }
-
+  const loadParticipantCasesFromSupabase = useCallback(async () => {
+    if (!researchStore.isLiveSupabaseAvailable()) return;
     setLiveCasesLoading(true);
     setLiveCasesError(null);
-
-    researchStore
-      .loadLiveParticipantCases()
-      .then(loaded => {
-        if (!active) return;
-        if (loaded.length === 0) {
-          setLiveCasesError(
-            'No published clinical cases were found in Supabase clinical_cases. Please verify the SQL migration and case seed ran successfully.'
-          );
-          setParticipantCases([]);
-        } else {
-          setParticipantCases(loaded);
-        }
-      })
-      .catch(err => {
-        if (!active) return;
+    try {
+      const loaded = await researchStore.loadLiveParticipantCases();
+      if (loaded.length === 0) {
         setLiveCasesError(
-          err instanceof Error
-            ? err.message
-            : 'Unable to fetch clinical cases from Supabase.'
+          'No published clinical cases were found in Supabase clinical_cases. Verify the SQL migration and case seed ran successfully.'
         );
-      })
-      .finally(() => {
-        if (active) setLiveCasesLoading(false);
-      });
+        setParticipantCases([]);
+      } else {
+        setParticipantCases(loaded);
+      }
+    } catch (err) {
+      setLiveCasesError(
+        err instanceof Error
+          ? err.message
+          : 'Unable to load published clinical cases from Supabase.'
+      );
+    } finally {
+      setLiveCasesLoading(false);
+    }
+  }, []);
 
-    return () => {
-      active = false;
-    };
-  }, [isDemoMode, currentRole]);
+  const routeWithVerifiedSession = useCallback(async () => {
+    const requested = detectRequestedRoute();
 
-  // Verify researcher auth session whenever entering Researcher Portal in Live Mode
-  const refreshResearcherAuth = useCallback(async () => {
     if (!researchStore.isLiveSupabaseAvailable()) {
       setTeamMember(null);
       setAuthSessionType('none');
-      setUnauthorizedNotice(null);
-      setAuthChecking(false);
+      if (requested === 'pi_login' || requested === 'pi_dashboard') {
+        setAppView('pi_login');
+        updateUrlHashSafely('#/pi-login');
+      } else if (
+        requested === 'researcher_login' ||
+        requested === 'researcher_dashboard' ||
+        requested === 'enrollment_prep'
+      ) {
+        setAppView('researcher_login');
+        updateUrlHashSafely('#/researcher-login');
+      } else {
+        setAppView('home');
+        updateUrlHashSafely('#/');
+      }
+      setAuthBootstrapped(true);
       return;
     }
 
-    setAuthChecking(true);
-    setUnauthorizedNotice(null);
     try {
       const sType = await researchStore.getAuthSessionType();
       setAuthSessionType(sType);
 
-      if (sType !== 'authenticated_user') {
-        setTeamMember(null);
+      if (sType === 'authenticated_user') {
+        const member = await researchStore.getAuthenticatedTeamMember();
+        if (!member) {
+          await researchStore.signOutTeamMember().catch(() => undefined);
+          setTeamMember(null);
+          setAuthSessionType('none');
+          setUnauthorizedNotice(
+            'Access denied: Your Supabase account is not linked to an active record in research_team_members.'
+          );
+          setAppView(
+            requested === 'pi_login' || requested === 'pi_dashboard'
+              ? 'pi_login'
+              : 'researcher_login'
+          );
+          return;
+        }
+
+        setTeamMember(member);
+        setUnauthorizedNotice(null);
+
+        if (member.role === 'pi') {
+          if (requested === 'enrollment_prep') {
+            setAppView('enrollment_prep');
+            updateUrlHashSafely('#/enrollment-prep');
+          } else {
+            setAppView('pi_dashboard');
+            updateUrlHashSafely('#/pi-dashboard');
+          }
+        } else if (member.role === 'researcher') {
+          if (requested === 'enrollment_prep') {
+            setAppView('enrollment_prep');
+            updateUrlHashSafely('#/enrollment-prep');
+          } else if (requested === 'researcher_dashboard') {
+            setAppView('researcher_dashboard');
+            updateUrlHashSafely('#/researcher-dashboard');
+          } else {
+            setAppView('researcher_landing');
+            updateUrlHashSafely('#/researcher');
+          }
+        } else {
+          // role === 'assessor'
+          setAppView('researcher_dashboard');
+          updateUrlHashSafely('#/researcher-dashboard');
+        }
         return;
       }
 
-      const member = await researchStore.getAuthenticatedTeamMember();
-      if (!member) {
+      if (sType === 'anonymous_participant') {
+        // Only allow active supervised participant sessions (mid-study reloads before completion)
+        let hasSupervisedFlag = false;
+        try {
+          hasSupervisedFlag = sessionStorage.getItem(SUPERVISED_SESSION_STORAGE_KEY) === '1';
+        } catch {
+          hasSupervisedFlag = false;
+        }
+
+        const snapshot = await researchStore.restoreLiveSession().catch(() => null);
+        const hasActiveIncompleteParticipant =
+          snapshot !== null && !snapshot.participant.completed;
+
+        if (hasSupervisedFlag || hasActiveIncompleteParticipant) {
+          // If participant tries to manually enter researcher/PI URLs, keep them blocked in participant session
+          setTeamMember(null);
+          setAppView('participant_session');
+          updateUrlHashSafely('#/participant-session');
+          void loadParticipantCasesFromSupabase();
+          return;
+        }
+
+        // Unsolicited or already-completed anonymous session: terminate cleanly and show Public Homepage
+        await researchStore.resetLiveParticipantSession().catch(() => undefined);
+        try {
+          sessionStorage.removeItem(SUPERVISED_SESSION_STORAGE_KEY);
+          sessionStorage.removeItem(REFERRAL_SESSION_STORAGE_KEY);
+        } catch {
+          // Ignore storage errors
+        }
+        setAuthSessionType('none');
         setTeamMember(null);
-        setUnauthorizedNotice(
-          'Your authenticated Supabase account is not an active member of research_team_members. Please contact the Principal Investigator or sign in with an authorised team account.'
-        );
-      } else {
-        setTeamMember(member);
+        setAppView('home');
+        updateUrlHashSafely('#/');
+        return;
       }
-    } catch (err) {
+
+      // sType === 'none' (Unauthenticated visitor):
+      // Block direct access to participant route, enrollment prep, PI dashboard, or researcher dashboard
       setTeamMember(null);
-      setUnauthorizedNotice(
-        err instanceof Error
-          ? err.message
-          : 'Unable to verify researcher session in Supabase.'
-      );
+      if (requested === 'pi_login' || requested === 'pi_dashboard') {
+        setAppView('pi_login');
+        updateUrlHashSafely('#/pi-login');
+      } else if (
+        requested === 'researcher_login' ||
+        requested === 'researcher_dashboard' ||
+        requested === 'enrollment_prep'
+      ) {
+        setAppView('researcher_login');
+        updateUrlHashSafely('#/researcher-login');
+      } else {
+        setAppView('home');
+        updateUrlHashSafely('#/');
+      }
     } finally {
-      setAuthChecking(false);
+      setAuthBootstrapped(true);
     }
-  }, []);
+  }, [loadParticipantCasesFromSupabase]);
 
   useEffect(() => {
-    if (currentRole === 'researcher' && !isDemoMode) {
-      void refreshResearcherAuth();
-    }
-  }, [currentRole, isDemoMode, refreshResearcherAuth]);
+    void routeWithVerifiedSession();
+
+    const handleHashOrPop = () => {
+      void routeWithVerifiedSession();
+    };
+    window.addEventListener('hashchange', handleHashOrPop);
+    window.addEventListener('popstate', handleHashOrPop);
+    return () => {
+      window.removeEventListener('hashchange', handleHashOrPop);
+      window.removeEventListener('popstate', handleHashOrPop);
+    };
+  }, [routeWithVerifiedSession]);
 
   const handleUpdateSettings = (newSettings: Partial<ResearchProtocolSettings>) => {
     researchStore.updateSettings(newSettings);
     setSettings(researchStore.getSettings());
   };
 
-  const handleRoleChange = (targetRole: Role) => {
-    setCurrentRole(targetRole);
-    try {
-      const targetHash = targetRole === 'researcher' ? '#researcher' : '#/';
-      if (window.location.hash !== targetHash) {
-        window.history.pushState(null, '', `${window.location.pathname}${window.location.search}${targetHash}`);
-      }
-    } catch {
-      // Ignore history pushState restrictions in sandboxed iframes
+  const navigateTo = (target: PortalNavbarView, hash: string) => {
+    // Prevent unauthorized client view transitions
+    if (authSessionType === 'anonymous_participant' && target !== 'participant_session') {
+      return;
+    }
+    setAppView(target);
+    updateUrlHashSafely(hash);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleAuthenticated = (member: ResearchTeamMember) => {
+    setTeamMember(member);
+    setAuthSessionType('authenticated_user');
+    setUnauthorizedNotice(null);
+
+    if (member.role === 'pi') {
+      setAppView('pi_dashboard');
+      updateUrlHashSafely('#/pi-dashboard');
+    } else if (member.role === 'researcher') {
+      setAppView('researcher_landing');
+      updateUrlHashSafely('#/researcher');
+    } else {
+      setAppView('researcher_dashboard');
+      updateUrlHashSafely('#/researcher-dashboard');
     }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleToggleDemoMode = (val: boolean) => {
-    setIsDemoMode(val);
-    if (!val && currentRole === 'researcher') {
-      void refreshResearcherAuth();
-    }
-  };
-
-  const handleTeamSignOut = async () => {
+  const handleSignOutTeam = async () => {
     try {
       await researchStore.signOutTeamMember();
     } finally {
       setTeamMember(null);
       setAuthSessionType('none');
       setUnauthorizedNotice(null);
+      setAppView('home');
+      updateUrlHashSafely('#/');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
+  };
+
+  const handleStartSupervisedParticipantSession = async (
+    referralToken: string | null,
+    validation: RecruitmentTokenValidation | null
+  ) => {
+    // Verify active team session server-side right before handoff
+    const currentMember = await researchStore.getAuthenticatedTeamMember();
+    if (!currentMember || (currentMember.role !== 'pi' && currentMember.role !== 'researcher')) {
+      setTeamMember(null);
+      setAuthSessionType('none');
+      setAppView('researcher_login');
+      updateUrlHashSafely('#/researcher-login');
+      throw new Error('Your researcher session expired. Please sign in again before enrolling a participant.');
+    }
+
+    // Store non-secret supervised handoff token & flag before closing researcher session
+    try {
+      if (referralToken) {
+        sessionStorage.setItem(REFERRAL_SESSION_STORAGE_KEY, referralToken);
+      } else {
+        sessionStorage.removeItem(REFERRAL_SESSION_STORAGE_KEY);
+      }
+      sessionStorage.setItem(SUPERVISED_SESSION_STORAGE_KEY, '1');
+    } catch {
+      // Ignore storage errors
+    }
+
+    // End researcher session and start a brand-new anonymous participant Supabase session
+    await researchStore.startFreshAnonymousParticipantSession();
+
+    // Clear all researcher state from memory before showing participant study flow
+    setTeamMember(null);
+    setUnauthorizedNotice(null);
+    setAuthSessionType('anonymous_participant');
+    setSupervisedToken(referralToken);
+    setSupervisedValidation(validation);
+
+    setAppView('participant_session');
+    updateUrlHashSafely('#/participant-session');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    await loadParticipantCasesFromSupabase();
+  };
+
+  const handleParticipantCompleteToLogin = () => {
+    setTeamMember(null);
+    setAuthSessionType('none');
+    setSupervisedToken(null);
+    setSupervisedValidation(null);
+    setParticipantCases([]);
+    setAppView('researcher_login');
+    updateUrlHashSafely('#/researcher-login');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans">
-      {/* Top Bar Navigation */}
       <Navbar
-        currentRole={currentRole}
-        onRoleChange={handleRoleChange}
-        isDemoMode={isDemoMode}
-        onToggleDemoMode={handleToggleDemoMode}
-        allowDemoToggle={settings.allowDemoToggle}
+        appView={appView}
         teamMember={teamMember}
+        onNavigateHome={() => {
+          if (teamMember) {
+            if (teamMember.role === 'pi') navigateTo('pi_dashboard', '#/pi-dashboard');
+            else if (teamMember.role === 'researcher')
+              navigateTo('researcher_landing', '#/researcher');
+            else navigateTo('researcher_dashboard', '#/researcher-dashboard');
+          } else {
+            navigateTo('home', '#/');
+          }
+        }}
+        onSelectPiLogin={() => {
+          setUnauthorizedNotice(null);
+          navigateTo('pi_login', '#/pi-login');
+        }}
+        onSelectResearcherLogin={() => {
+          setUnauthorizedNotice(null);
+          navigateTo('researcher_login', '#/researcher-login');
+        }}
+        onSignOut={() => void handleSignOutTeam()}
       />
 
-      {/* Main Viewport */}
       <div className="flex-1">
-        {currentRole === 'participant' ? (
+        {!authBootstrapped ? (
+          <div className="max-w-md mx-auto py-16 px-4 text-center">
+            <div className="p-6 rounded-xl bg-white border border-slate-200 text-xs font-mono text-slate-600 shadow-2xs">
+              Verifying Clinical AI Reasoning Lab Session...
+            </div>
+          </div>
+        ) : appView === 'home' ? (
+          <PublicPortalHome
+            institutionName={settings.institutionName}
+            protocolNumber={settings.protocolNumber}
+            onSelectPiPortal={() => {
+              setUnauthorizedNotice(null);
+              navigateTo('pi_login', '#/pi-login');
+            }}
+            onSelectResearcherPortal={() => {
+              setUnauthorizedNotice(null);
+              navigateTo('researcher_login', '#/researcher-login');
+            }}
+          />
+        ) : appView === 'participant_session' ? (
           <ParticipantFlow
-            isDemoMode={isDemoMode}
-            onToggleDemoMode={handleToggleDemoMode}
+            isDemoMode={false}
             settings={settings}
             cases={participantCases}
             casesLoading={liveCasesLoading}
             casesError={liveCasesError}
+            initialReferralToken={supervisedToken}
+            initialReferralValidation={supervisedValidation}
+            onCompleteReturnToLogin={handleParticipantCompleteToLogin}
           />
         ) : (
           <Suspense
             fallback={
               <div className="max-w-7xl mx-auto py-12 px-4 text-xs font-mono text-slate-500">
-                Loading Researcher Portal...
+                Loading Portal...
               </div>
             }
           >
-            {isDemoMode ? (
-              <ResearcherDashboard
-                isDemoMode={true}
-                onToggleDemoMode={handleToggleDemoMode}
-                settings={settings}
-                onUpdateSettings={handleUpdateSettings}
-              />
-            ) : authChecking ? (
-              <div className="max-w-md mx-auto py-16 px-4 text-center">
-                <div className="p-6 rounded-xl bg-white border border-slate-200 text-xs font-mono text-slate-600 shadow-2xs">
-                  Verifying Researcher Auth Session &amp; Role...
-                </div>
-              </div>
-            ) : teamMember ? (
-              <ResearcherDashboard
-                isDemoMode={false}
-                onToggleDemoMode={handleToggleDemoMode}
-                settings={settings}
-                onUpdateSettings={handleUpdateSettings}
-                teamMember={teamMember}
-                onSignOut={handleTeamSignOut}
-              />
-            ) : (
+            {(appView === 'pi_login' || appView === 'researcher_login') && (
               <ResearcherAuthView
+                portalType={appView === 'pi_login' ? 'pi' : 'researcher'}
                 isSupabaseAvailable={researchStore.isLiveSupabaseAvailable()}
                 configError={researchStore.getSupabaseConfigError()}
                 sessionType={authSessionType}
                 unauthorizedAccountNotice={unauthorizedNotice}
-                onAuthenticated={member => {
-                  setTeamMember(member);
-                  setAuthSessionType('authenticated_user');
-                  setUnauthorizedNotice(null);
-                }}
-                onSwitchToDemoDashboard={
-                  settings.allowDemoToggle ? () => setIsDemoMode(true) : undefined
-                }
-                onBackToParticipant={() => handleRoleChange('participant')}
+                onAuthenticated={handleAuthenticated}
+                onBackToHome={() => navigateTo('home', '#/')}
                 onSessionCleared={() => {
                   setAuthSessionType('none');
                   setUnauthorizedNotice(null);
                 }}
               />
             )}
+
+            {appView === 'researcher_landing' && teamMember && (
+              <ResearcherLandingView
+                member={teamMember}
+                onOpenDashboard={() =>
+                  navigateTo('researcher_dashboard', '#/researcher-dashboard')
+                }
+                onOpenEnrollParticipant={() =>
+                  navigateTo('enrollment_prep', '#/enrollment-prep')
+                }
+                onSignOut={handleSignOutTeam}
+              />
+            )}
+
+            {appView === 'enrollment_prep' &&
+              teamMember &&
+              (teamMember.role === 'pi' || teamMember.role === 'researcher') && (
+                <EnrollmentPrepView
+                  member={teamMember}
+                  onBack={() =>
+                    teamMember.role === 'pi'
+                      ? navigateTo('pi_dashboard', '#/pi-dashboard')
+                      : navigateTo('researcher_landing', '#/researcher')
+                  }
+                  onStartParticipantSession={handleStartSupervisedParticipantSession}
+                />
+              )}
+
+            {(appView === 'pi_dashboard' || appView === 'researcher_dashboard') &&
+              teamMember && (
+                <ResearcherDashboard
+                  isDemoMode={false}
+                  onToggleDemoMode={() => undefined}
+                  showDemoToggle={false}
+                  settings={settings}
+                  onUpdateSettings={handleUpdateSettings}
+                  teamMember={teamMember}
+                  onSignOut={handleSignOutTeam}
+                  onBackToLanding={
+                    teamMember.role === 'researcher'
+                      ? () => navigateTo('researcher_landing', '#/researcher')
+                      : undefined
+                  }
+                  onOpenEnrollParticipant={
+                    teamMember.role === 'pi' || teamMember.role === 'researcher'
+                      ? () => navigateTo('enrollment_prep', '#/enrollment-prep')
+                      : undefined
+                  }
+                />
+              )}
           </Suspense>
         )}
       </div>

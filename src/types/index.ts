@@ -1,5 +1,7 @@
 export type Role = 'participant' | 'researcher';
 
+export type AppRoute = 'home' | 'pi' | 'researcher' | 'participant';
+
 export type TeamMemberRole = 'pi' | 'researcher' | 'assessor';
 
 export type RecruitmentSource = 'direct' | 'team';

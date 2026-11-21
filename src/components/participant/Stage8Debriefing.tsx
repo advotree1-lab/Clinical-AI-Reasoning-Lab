@@ -1,27 +1,23 @@
 import React from 'react';
-import {
-  Printer,
-  RotateCcw
-} from 'lucide-react';
+import { Printer, CheckCircle2, Lock } from 'lucide-react';
 import { Participant } from '../../types';
 
 interface Stage8DebriefingProps {
   participant: Participant;
-  onRestart: () => void;
+  onCompleteReturnToLogin: () => void;
   protocolNumber: string;
 }
 
 export const Stage8Debriefing: React.FC<Stage8DebriefingProps> = ({
   participant,
-  onRestart,
+  onCompleteReturnToLogin,
   protocolNumber
 }) => {
   return (
     <div className="max-w-4xl mx-auto py-8 sm:py-10 px-4 sm:px-6">
       <div className="bg-white rounded-lg border border-slate-200/90 p-6 sm:p-10 shadow-2xs">
-        
         {/* Header Metadata */}
-        <div className="flex items-center gap-2 text-xs font-mono text-teal-700 mb-2">
+        <div className="flex flex-wrap items-center gap-2 text-xs font-mono text-teal-700 mb-2">
           <span>STAGE 08 / 08</span>
           <span aria-hidden="true">·</span>
           <span>SESSION COMPLETION &amp; DEBRIEFING</span>
@@ -30,26 +26,57 @@ export const Stage8Debriefing: React.FC<Stage8DebriefingProps> = ({
         </div>
 
         <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
-          Post-Participation Ethical Debriefing & Disclosures
+          Post-Participation Ethical Debriefing &amp; Study Completion
         </h2>
+
+        {/* Completion & Session Closure Confirmation */}
+        <div className="mt-4 p-4 rounded-lg bg-teal-50/80 border border-teal-200 flex items-start gap-3 text-xs text-teal-950">
+          <CheckCircle2 className="w-4 h-4 text-teal-700 shrink-0 mt-0.5" />
+          <div>
+            <strong className="font-semibold text-teal-900 block">
+              Study Completed — Participant Session Securely Ended
+            </strong>
+            Thank you for completing all stages of the Clinical AI Reasoning Lab study. Your responses have been recorded under your anonymous identifier and your temporary participant session has been terminated. Please return this device to the supervising researcher.
+          </div>
+        </div>
 
         {/* Participant Session Details Ribbon (Unboxed) */}
         <div className="mt-5 p-4 rounded bg-slate-50 border border-slate-200 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
           <div>
-            <span className="text-slate-500 block text-[10px] uppercase font-mono">Anonymous Token</span>
-            <span className="font-mono font-bold text-slate-900 text-sm">{participant.code}</span>
+            <span className="text-slate-500 block text-[10px] uppercase font-mono">
+              Anonymous Token
+            </span>
+            <span className="font-mono font-bold text-slate-900 text-sm">
+              {participant.code}
+            </span>
           </div>
           <div>
-            <span className="text-slate-500 block text-[10px] uppercase font-mono">Designation</span>
-            <span className="font-medium text-slate-900">{participant.designation === 'Other' && participant.designationOther ? participant.designationOther : participant.designation}</span>
+            <span className="text-slate-500 block text-[10px] uppercase font-mono">
+              Designation
+            </span>
+            <span className="font-medium text-slate-900">
+              {participant.designation === 'Other' && participant.designationOther
+                ? participant.designationOther
+                : participant.designation}
+            </span>
           </div>
           <div>
-            <span className="text-slate-500 block text-[10px] uppercase font-mono">Specialty</span>
-            <span className="font-medium text-slate-900">{participant.specialty === 'Other' && participant.specialtyOther ? participant.specialtyOther : participant.specialty}</span>
+            <span className="text-slate-500 block text-[10px] uppercase font-mono">
+              Specialty
+            </span>
+            <span className="font-medium text-slate-900">
+              {participant.specialty === 'Other' && participant.specialtyOther
+                ? participant.specialtyOther
+                : participant.specialty}
+            </span>
           </div>
           <div>
-            <span className="text-slate-500 block text-[10px] uppercase font-mono">Dataset Status</span>
-            <span className="font-mono text-slate-900 font-semibold">SECURED & RECORDED</span>
+            <span className="text-slate-500 block text-[10px] uppercase font-mono">
+              Dataset Status
+            </span>
+            <span className="font-mono text-slate-900 font-semibold">
+              SECURED &amp; CLOSED
+            </span>
           </div>
         </div>
 
@@ -60,19 +87,25 @@ export const Stage8Debriefing: React.FC<Stage8DebriefingProps> = ({
           </h3>
 
           <p className="text-xs text-slate-700 leading-relaxed">
-            During Stage 6 (CDSS Simulation), you evaluated five standardized clinical cases alongside CDSS suggestions. To rigorously assess <strong>automation bias, cognitive offloading, and verification vigilance</strong>, the CDSS outputs were <strong>pre-calibrated research stimuli</strong>:
+            During Stage 6 (CDSS Simulation), you evaluated five standardized clinical cases alongside CDSS suggestions. To rigorously assess{' '}
+            <strong>automation bias, cognitive offloading, and verification vigilance</strong>, the CDSS outputs were{' '}
+            <strong>pre-calibrated research stimuli</strong>:
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
             <div className="p-3 rounded bg-white border border-slate-200 text-xs">
-              <span className="font-bold text-slate-900 block mb-0.5">2 Clinically Appropriate Recommendations</span>
+              <span className="font-bold text-slate-900 block mb-0.5">
+                2 Clinically Appropriate Recommendations
+              </span>
               <p className="text-slate-600 text-[11px] leading-relaxed">
                 Hyperosmolar Hyperglycaemic State with Urosepsis/Hypokalaemia (Case 4) and Post-Diarrhoeal Haemolytic Uraemic Syndrome / TMA (Case 5) evaluated appropriate adoption of evidence-based guidance.
               </p>
             </div>
 
             <div className="p-3 rounded bg-white border border-slate-200 text-xs">
-              <span className="font-bold text-slate-900 block mb-0.5">3 Deliberately Misleading Recommendations</span>
+              <span className="font-bold text-slate-900 block mb-0.5">
+                3 Deliberately Misleading Recommendations
+              </span>
               <p className="text-slate-600 text-[11px] leading-relaxed">
                 Posterior Wall STEMI Equivalent (diagnostic anchoring), Acute MCA Stroke on Apixaban (harmful thrombolysis advice), and Near-Fatal Asthma with Silent Chest (investigation inversion) tested whether clinicians detected safety violations or blindly deferred.
               </p>
@@ -87,16 +120,17 @@ export const Stage8Debriefing: React.FC<Stage8DebriefingProps> = ({
         {/* Methodological Context Note */}
         <div className="mt-5 p-4 rounded bg-slate-50 border border-slate-200 space-y-2">
           <span className="font-mono text-[10px] uppercase tracking-wider text-slate-500 block">
-            Methodological Scope & Limitations
+            Methodological Scope &amp; Limitations
           </span>
           <p className="text-xs text-slate-700 leading-relaxed">
             This study is a controlled academic simulation. Scores across the Vignette Cases reflect simulated independent task performance rather than permanent clinical cognitive deskilling. Self-reported survey responses capture work-related GenAI exposure over the past 3 months.
           </p>
         </div>
 
-        {/* Actions */}
+        {/* Controlled Completion Actions (No direct researcher portal access) */}
         <div className="mt-8 pt-5 border-t border-slate-200/70 flex flex-col sm:flex-row items-center justify-between gap-3">
           <button
+            type="button"
             onClick={() => window.print()}
             className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 rounded-lg border border-slate-300 transition-colors shadow-2xs cursor-pointer"
           >
@@ -105,14 +139,14 @@ export const Stage8Debriefing: React.FC<Stage8DebriefingProps> = ({
           </button>
 
           <button
-            onClick={onRestart}
+            type="button"
+            onClick={onCompleteReturnToLogin}
             className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-semibold text-white bg-teal-600 hover:bg-teal-700 rounded-lg transition-colors shadow-2xs cursor-pointer"
           >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span>Return to Study Welcome</span>
+            <Lock className="w-3.5 h-3.5" />
+            <span>Finish &amp; Return to Researcher Login</span>
           </button>
         </div>
-
       </div>
     </div>
   );
