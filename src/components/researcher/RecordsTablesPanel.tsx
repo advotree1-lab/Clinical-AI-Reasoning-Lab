@@ -88,7 +88,7 @@ export const OperationalParticipantsTable: React.FC<OperationalParticipantsTable
           <p className="text-xs text-slate-500">
             {isPiOrDemo
               ? 'Participant progression, demographics, and milestone timestamps.'
-              : 'Operational status roster scoped to participants recruited via your team referral links (demographics and clinical answers masked per protocol RLS).'}
+              : 'Operational status roster scoped to participants recruited via your team referral links (demographics and clinical responses remain masked).'}
           </p>
         </div>
 
@@ -160,7 +160,13 @@ export const OperationalParticipantsTable: React.FC<OperationalParticipantsTable
                           : 'text-teal-700 font-semibold'
                       }
                     >
-                      {r.completionStatus}
+                      {r.completionStatus === 'completed'
+                        ? 'Completed'
+                        : r.completionStatus === 'in_progress'
+                        ? 'In Progress'
+                        : r.completionStatus === 'registered'
+                        ? 'Registered'
+                        : 'Abandoned'}
                     </span>
                   </td>
                   {isPiOrDemo && (

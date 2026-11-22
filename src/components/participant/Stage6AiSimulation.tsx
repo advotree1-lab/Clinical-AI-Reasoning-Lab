@@ -815,7 +815,7 @@ export const Stage6AiSimulation: React.FC<Stage6AiSimulationProps> = ({
               <div className="flex items-center gap-2 font-medium">
                 <Lock className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
                 <span>
-                  Case evaluation submitted and locked in the study database.
+                  Case evaluation submitted and securely recorded.
                 </span>
               </div>
               {typeof currentSubmittedRecord.activeSeconds === 'number' && (

@@ -1,6 +1,7 @@
 import React from 'react';
 import { BarChart3, UserPlus, ArrowRight, LogOut } from 'lucide-react';
 import { ResearchTeamMember } from '../../types';
+import { BrandMark } from '../common/BrandLogo';
 
 interface ResearcherLandingViewProps {
   member: ResearchTeamMember;
@@ -18,22 +19,25 @@ export const ResearcherLandingView: React.FC<ResearcherLandingViewProps> = ({
   return (
     <div className="min-h-[calc(100vh-8.5rem)] bg-slate-50/70 py-10 sm:py-14 px-4 sm:px-6 lg:px-8">
       <div className="max-w-5xl mx-auto space-y-8">
-        {/* Authenticated Researcher Header */}
+        {/* Authenticated Research Team Header */}
         <div className="p-6 sm:p-7 rounded-xl bg-white border border-slate-200 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <div className="flex flex-wrap items-center gap-2 text-xs font-mono text-teal-700 font-semibold mb-1">
-              <span>AUTHENTICATED RESEARCHER</span>
-              <span aria-hidden="true">·</span>
-              <span>{member.researcherCode}</span>
-              <span aria-hidden="true">·</span>
-              <span>Target: {member.recruitmentTarget} participants</span>
+          <div className="flex items-start gap-3.5">
+            <BrandMark size={40} className="mt-0.5" />
+            <div>
+              <div className="flex flex-wrap items-center gap-2 text-xs font-mono text-teal-700 font-semibold mb-1">
+                <span>Research Team Member</span>
+                <span aria-hidden="true">·</span>
+                <span>{member.researcherCode}</span>
+                <span aria-hidden="true">·</span>
+                <span className="tabular-nums">Target: {member.recruitmentTarget} participants</span>
+              </div>
+              <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+                Welcome, {member.fullName}
+              </h1>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Signed in as {member.email}
+              </p>
             </div>
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
-              Welcome, {member.fullName}
-            </h1>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Signed in as {member.email}
-            </p>
           </div>
 
           <button
@@ -65,7 +69,7 @@ export const ResearcherLandingView: React.FC<ResearcherLandingViewProps> = ({
                   Research Dashboard
                 </h2>
                 <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-                  Inspect your operational recruitment roster, completion status by participant code, assigned recruitment links, target attainment, and published study stimuli.
+                  Review your operational recruitment roster, completion status by participant code, assigned recruitment links, target attainment, and published study cases.
                 </p>
               </div>
             </div>
@@ -99,7 +103,7 @@ export const ResearcherLandingView: React.FC<ResearcherLandingViewProps> = ({
                   Enroll Participant
                 </h2>
                 <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-                  Prepare and validate a recruitment link, end your researcher browser session safely, and start a fresh anonymous participant session for a clinician to complete the 8-stage study.
+                  Prepare and validate a recruitment link, securely conclude your research team session, and initiate a dedicated anonymous participant session for the eight-stage study.
                 </p>
               </div>
             </div>

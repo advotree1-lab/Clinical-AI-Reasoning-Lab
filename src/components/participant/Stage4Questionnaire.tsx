@@ -925,7 +925,7 @@ export const Stage4Questionnaire: React.FC<Stage4QuestionnaireProps> = ({
               </button>
             ) : (
               <span className="text-[11px] font-mono text-slate-500">
-                Token: {participant.code}
+                Study ID: {participant.code}
               </span>
             )}
 

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Lock, ShieldAlert, ArrowLeft, LogOut } from 'lucide-react';
+import { ShieldAlert, ArrowLeft, LogOut } from 'lucide-react';
 import { ResearchTeamMember } from '../../types';
 import { researchStore } from '../../services/researchStore';
+import { BrandMark } from '../common/BrandLogo';
 
 interface ResearcherAuthViewProps {
   portalType: 'pi' | 'researcher';
@@ -80,28 +81,25 @@ export const ResearcherAuthView: React.FC<ResearcherAuthViewProps> = ({
         </div>
 
         <div className="bg-white rounded-xl border border-slate-200 shadow-2xs p-6 sm:p-8 space-y-5">
-          <div className="flex items-start gap-3 pb-4 border-b border-slate-200/80">
-            <div className="w-10 h-10 rounded-lg bg-teal-50 border border-teal-200 flex items-center justify-center shrink-0">
-              <Lock className="w-5 h-5 text-teal-700" />
-            </div>
+          <div className="flex items-start gap-3.5 pb-4 border-b border-slate-200/80">
+            <BrandMark size={40} />
             <div>
               <div className="text-[11px] font-mono uppercase tracking-wider text-teal-700 font-semibold">
-                {isPiPortal ? 'Principal Investigator Portal' : 'Researcher Portal'}
+                {isPiPortal ? 'Principal Investigator Portal' : 'Research Team Portal'}
               </div>
               <h1 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
-                {isPiPortal ? 'Principal Investigator Sign In' : 'Researcher Sign In'}
+                {isPiPortal ? 'Principal Investigator Sign In' : 'Research Team Sign In'}
               </h1>
+              <div className="text-[11px] text-slate-500 mt-0.5">
+                Clinical AI Reasoning Lab
+              </div>
             </div>
           </div>
 
           <p className="text-xs text-slate-600 leading-relaxed">
             {isPiPortal
-              ? 'Sign in with your authorised Supabase Auth email and password. Access requires an active record in '
-              : 'Sign in with your authorised Supabase Auth email and password. Access requires an active authorised team record in '}
-            <code className="font-mono text-[11px] bg-slate-100 px-1 py-0.5 rounded">
-              research_team_members
-            </code>
-            {isPiPortal ? ' with role = pi.' : ' with researcher permissions.'}
+              ? 'Sign in with your authorised email address and password. Access is restricted to verified Principal Investigator accounts.'
+              : 'Sign in with your authorised email address and password. Access requires an active Research Team Member or Independent Assessor account.'}
           </p>
 
           {sessionType === 'anonymous_participant' && (
@@ -110,9 +108,9 @@ export const ResearcherAuthView: React.FC<ResearcherAuthViewProps> = ({
                 <ShieldAlert className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
                 <div>
                   <strong className="block font-semibold text-amber-900">
-                    Active Anonymous Participant Session Detected
+                    Active Participant Session Detected
                   </strong>
-                  Anonymous participant sessions cannot access researcher or PI portals. Sign out of the participant session first or authenticate with your credentials below.
+                  Participant study sessions cannot access investigator or team portals. End the active participant session first or sign in with your authorised staff credentials below.
                 </div>
               </div>
               <button
@@ -130,11 +128,11 @@ export const ResearcherAuthView: React.FC<ResearcherAuthViewProps> = ({
           {!isSupabaseAvailable ? (
             <div className="p-4 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-950 space-y-2">
               <div className="font-semibold text-amber-900">
-                Supabase Authentication Not Configured
+                Platform Sign-In Unavailable
               </div>
               <p className="leading-relaxed">
                 {configError ||
-                  'VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY are required for Portal authentication.'}
+                  'Research portal sign-in is not yet configured in this environment. Please contact the Principal Investigator or platform administrator.'}
               </p>
             </div>
           ) : (
@@ -156,7 +154,7 @@ export const ResearcherAuthView: React.FC<ResearcherAuthViewProps> = ({
                     setEmail(e.target.value);
                     if (errorMessage) setErrorMessage(null);
                   }}
-                  placeholder={isPiPortal ? 'pi@hospital.edu' : 'researcher@hospital.edu'}
+                  placeholder={isPiPortal ? 'pi@institution.edu' : 'team@institution.edu'}
                   className="w-full px-3.5 py-2.5 rounded-lg border border-slate-300 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-teal-600/20 focus:border-teal-600"
                 />
               </div>
@@ -196,10 +194,10 @@ export const ResearcherAuthView: React.FC<ResearcherAuthViewProps> = ({
                 className="w-full py-2.5 px-4 text-xs sm:text-sm font-semibold text-white bg-teal-600 hover:bg-teal-700 disabled:bg-slate-400 rounded-lg transition-colors shadow-2xs cursor-pointer"
               >
                 {isSubmitting
-                  ? 'Verifying Credentials & Role...'
+                  ? 'Verifying Authorisation...'
                   : isPiPortal
                   ? 'Sign In to Principal Investigator Portal'
-                  : 'Sign In to Researcher Portal'}
+                  : 'Sign In to Research Team Portal'}
               </button>
             </form>
           )}

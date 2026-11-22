@@ -7,12 +7,7 @@ export const isSupabaseConfigured: boolean = Boolean(supabaseUrl && supabasePubl
 
 export const supabaseConfigError: string | null = isSupabaseConfigured
   ? null
-  : `Missing Supabase environment variable(s): ${[
-      !supabaseUrl && 'VITE_SUPABASE_URL',
-      !supabasePublishableKey && 'VITE_SUPABASE_PUBLISHABLE_KEY',
-    ]
-      .filter(Boolean)
-      .join(', ')}. Configure them in .env.local for local development or in your hosting environment settings.`;
+  : 'The research platform backend is not yet configured in this environment. Please contact the Principal Investigator or platform administrator.';
 
 export const supabase: SupabaseClient | null = isSupabaseConfigured
   ? createClient(supabaseUrl, supabasePublishableKey)
@@ -20,7 +15,7 @@ export const supabase: SupabaseClient | null = isSupabaseConfigured
 
 export function requireSupabaseClient(): SupabaseClient {
   if (!supabase) {
-    throw new Error(supabaseConfigError || 'Supabase client is not configured.');
+    throw new Error(supabaseConfigError || 'Research platform service is currently unavailable.');
   }
   return supabase;
 }

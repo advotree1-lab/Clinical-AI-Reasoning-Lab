@@ -45,11 +45,7 @@ export const RecruitmentAndTeamPanel: React.FC<RecruitmentAndTeamPanelProps> = (
           Recruitment Links &amp; Research Team Roster
         </h3>
         <p className="text-xs text-slate-600 leading-relaxed">
-          Recruitment link tracking and role-verified team targets operate on the live Supabase{' '}
-          <code className="font-mono text-[11px] bg-slate-100 px-1 py-0.5 rounded">recruitment_links</code>{' '}
-          and{' '}
-          <code className="font-mono text-[11px] bg-slate-100 px-1 py-0.5 rounded">research_team_members</code>{' '}
-          tables. Switch to Live Research Mode with an authorised team login to inspect active recruitment links and team counts.
+          Recruitment link tracking and team target metrics operate in live study mode. Sign in with an authorised team account to inspect active recruitment links and team counts.
         </p>
       </div>
     );
@@ -74,16 +70,14 @@ export const RecruitmentAndTeamPanel: React.FC<RecruitmentAndTeamPanelProps> = (
 
   return (
     <div className="space-y-6">
-      {/* Database Permission Governance Notice */}
+      {/* Role-Scoped Governance Notice */}
       <div className="p-4 rounded-xl bg-teal-50/70 border border-teal-200 text-xs text-teal-950 flex items-start gap-3 leading-relaxed">
         <ShieldCheck className="w-4 h-4 text-teal-700 shrink-0 mt-0.5" />
         <div>
           <strong className="font-semibold text-teal-900 block">
-            Database-Enforced Recruitment &amp; Team Governance
+            Role-Scoped Recruitment &amp; Team Governance
           </strong>
-          Under the executed RLS and table grants, authenticated clients have read-only{' '}
-          <code className="font-mono text-[11px] bg-white px-1 py-0.5 rounded border border-teal-200">SELECT</code>{' '}
-          visibility scoped to their role (Principal Investigators see all links and team members; Researchers see their own links and target progress). Creating new team user accounts or minting additional referral tokens is restricted to the database administrator in Supabase SQL Editor.
+          Access to recruitment links and team rosters is scoped to your assigned study role. Principal Investigators have visibility across all links and team members, while Research Team Members see their own assigned links and target progress. Provisioning new team accounts or issuing additional referral tokens is managed by the Principal Investigator and study administration.
         </div>
       </div>
 
@@ -105,8 +99,7 @@ export const RecruitmentAndTeamPanel: React.FC<RecruitmentAndTeamPanelProps> = (
 
         {recruitmentLinks.length === 0 ? (
           <div className="p-6 text-center text-xs text-slate-500 border border-dashed border-slate-200 rounded-lg">
-            No recruitment links found for your account in{' '}
-            <code className="font-mono">recruitment_links</code>.
+            No recruitment links are currently assigned to your account.
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -193,7 +186,7 @@ export const RecruitmentAndTeamPanel: React.FC<RecruitmentAndTeamPanelProps> = (
                 : 'My Research Team Profile & Recruitment Target'}
             </h3>
             <p className="text-xs text-slate-500">
-              Active roles verified in <code className="font-mono text-[11px]">research_team_members</code>.
+              Active research staff accounts and recruitment targets.
             </p>
           </div>
         </div>
@@ -226,12 +219,12 @@ export const RecruitmentAndTeamPanel: React.FC<RecruitmentAndTeamPanelProps> = (
                         <div className="font-semibold text-slate-900">{tm.fullName}</div>
                         <div className="text-[11px] text-slate-500">{tm.email}</div>
                       </td>
-                      <td className="p-3 font-mono uppercase text-slate-700">
+                      <td className="p-3 font-medium text-slate-700">
                         {tm.role === 'pi'
                           ? 'Principal Investigator'
                           : tm.role === 'assessor'
-                          ? `Assessor (Slot ${tm.assessorSlot ?? '?'})`
-                          : 'Researcher'}
+                          ? `Independent Assessor (Slot ${tm.assessorSlot ?? '?'})`
+                          : 'Research Team Member'}
                       </td>
                       <td className="p-3 text-right font-mono tabular-nums text-slate-900 font-semibold">
                         {recruited} / {tm.recruitmentTarget}

@@ -1,5 +1,6 @@
 import React from 'react';
 import { ResearchTeamMember } from '../../types';
+import { BrandMark } from '../common/BrandLogo';
 
 export type PortalNavbarView =
   | 'home'
@@ -40,20 +41,18 @@ export const Navbar: React.FC<NavbarProps> = ({
     : appView === 'pi_dashboard'
     ? 'Principal Investigator Portal'
     : isAuthenticatedTeamView && teamMember?.role === 'assessor'
-    ? `Clinical Assessor Portal · Slot ${teamMember.assessorSlot ?? '?'}`
+    ? `Independent Assessor Console · Slot ${teamMember.assessorSlot ?? '?'}`
     : isAuthenticatedTeamView
-    ? 'Researcher Portal'
+    ? 'Research Team Portal'
     : 'Clinical Reasoning & AI Simulation Study';
 
   return (
-    <header className="border-b border-slate-200 bg-white sticky top-0 z-40">
+    <header className="border-b border-slate-200 bg-white/95 backdrop-blur-xs sticky top-0 z-40">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between gap-4 h-16">
           {/* Zone 1: Brand Identity */}
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-8 h-8 rounded-lg bg-teal-600 text-white flex items-center justify-center font-bold text-xs tracking-wider font-mono shrink-0">
-              CRL
-            </div>
+            <BrandMark size={34} />
             <div className="min-w-0">
               {isParticipantSession ? (
                 <span className="text-sm sm:text-base font-bold tracking-tight text-slate-900 truncate block leading-tight">
@@ -122,7 +121,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
                 }`}
               >
-                Researcher
+                Research Team
               </button>
               <button
                 type="button"

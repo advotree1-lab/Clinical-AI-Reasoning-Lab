@@ -1,5 +1,6 @@
 import React from 'react';
 import { ArrowRight } from 'lucide-react';
+import { BrandMark } from '../common/BrandLogo';
 
 interface Stage1WelcomeProps {
   onBegin: () => void;
@@ -19,17 +20,20 @@ export const Stage1Welcome: React.FC<Stage1WelcomeProps> = ({
         {/* Header Metadata Ribbon + Powered by MediKyne */}
         <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-2">
           <div>
-          <div className="flex flex-wrap items-center gap-2 text-xs font-mono text-teal-700 mb-3">
-            <span>STAGE 01 / 08</span>
-            <span aria-hidden="true">·</span>
-            <span>MEDICAL RESEARCH SIMULATION</span>
-            <span aria-hidden="true">·</span>
-            <span>PROTOCOL {protocolNumber}</span>
-          </div>
+            <div className="flex flex-wrap items-center gap-2 text-xs font-mono text-teal-700 mb-3">
+              <span>STAGE 01 / 08</span>
+              <span aria-hidden="true">·</span>
+              <span>MEDICAL RESEARCH SIMULATION</span>
+              <span aria-hidden="true">·</span>
+              <span>PROTOCOL {protocolNumber}</span>
+            </div>
 
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 leading-tight">
-              Clinical AI Reasoning Lab
-            </h1>
+            <div className="flex items-center gap-3.5">
+              <BrandMark size={40} />
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900 leading-tight">
+                Clinical AI Reasoning Lab
+              </h1>
+            </div>
           </div>
 
           <div className="inline-flex items-center gap-2.5 px-3 py-2 rounded-md border border-slate-800 bg-black shrink-0 self-start shadow-2xs">

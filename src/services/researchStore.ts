@@ -170,7 +170,7 @@ class ResearchStore {
 
   public saveParticipant(participant: Participant) {
     if (!participant.isDemo) {
-      throw new Error('Live research participants must be persisted via Supabase RPCs, not localStorage.');
+      throw new Error('Live research participant records are saved directly to the research platform.');
     }
     const list = this.getParticipants(true);
     const existingIndex = list.findIndex(p => p.id === participant.id);
@@ -190,7 +190,7 @@ class ResearchStore {
 
   public saveQuestionnaire(resp: QuestionnaireResponse) {
     if (!resp.isDemo) {
-      throw new Error('Live research questionnaires must be persisted via Supabase RPCs, not localStorage.');
+      throw new Error('Live questionnaire responses are saved directly to the research platform.');
     }
     const list = this.getQuestionnaires(true);
     const existingIndex = list.findIndex(
@@ -212,7 +212,7 @@ class ResearchStore {
 
   public saveAiInteraction(record: AiInteractionRecord) {
     if (!record.isDemo) {
-      throw new Error('Live CDSS interactions must be persisted via Supabase RPCs, not localStorage.');
+      throw new Error('Live clinical case records are saved directly to the research platform.');
     }
     const list = this.getAiInteractions(true);
     const existingIndex = list.findIndex(
@@ -238,7 +238,7 @@ class ResearchStore {
 
   public saveVignetteAnswer(record: VignetteAnswerRecord) {
     if (!record.isDemo) {
-      throw new Error('Live vignette answers must be persisted via Supabase RPCs, not localStorage.');
+      throw new Error('Live vignette answers are saved directly to the research platform.');
     }
     const list = this.getVignetteAnswers(true);
     const existingIndex = list.findIndex(

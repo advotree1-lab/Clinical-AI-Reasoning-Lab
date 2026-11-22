@@ -81,7 +81,7 @@ export const Stage3Registration: React.FC<Stage3RegistrationProps> = ({
         <p className="mt-2 text-xs text-slate-600 leading-relaxed">
           {isDemoMode
             ? 'Your anonymous research identifier has been generated. Complete your baseline professional profile before proceeding to the GenAI Exposure and Cognitive Offloading Study Questionnaire.'
-            : 'Complete your baseline professional profile below. Your unique anonymous research code (DOC-XXXXXX) will be assigned securely by the study database upon enrollment.'}
+            : 'Complete your baseline professional profile below. Your unique anonymous research code (DOC-XXXXXX) will be assigned securely upon enrollment.'}
         </p>
 
         {/* Anonymous ID Strip */}
@@ -91,7 +91,7 @@ export const Stage3Registration: React.FC<Stage3RegistrationProps> = ({
               Anonymous Research Token
             </span>
             <span className="text-lg sm:text-xl font-mono font-bold text-slate-900">
-              {isDemoMode ? demoCode : 'Server-assigned (DOC-XXXXXX)'}
+              {isDemoMode ? demoCode : 'Assigned on enrollment (DOC-XXXXXX)'}
             </span>
           </div>
           <div className="text-right">

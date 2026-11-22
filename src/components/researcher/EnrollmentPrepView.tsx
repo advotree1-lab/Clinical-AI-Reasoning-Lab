@@ -79,7 +79,7 @@ export const EnrollmentPrepView: React.FC<EnrollmentPrepViewProps> = ({
       .catch(err => {
         if (!active) return;
         setLinksError(
-          err instanceof Error ? err.message : 'Unable to load recruitment links from Supabase.'
+          err instanceof Error ? err.message : 'Unable to load recruitment links. Please try again.'
         );
       })
       .finally(() => {
@@ -202,7 +202,7 @@ export const EnrollmentPrepView: React.FC<EnrollmentPrepViewProps> = ({
               </h1>
               <p className="text-xs text-slate-500 mt-0.5">
                 Initiated by {member.fullName} ({member.researcherCode} ·{' '}
-                {member.role === 'pi' ? 'Principal Investigator' : 'Researcher'})
+                {member.role === 'pi' ? 'Principal Investigator' : 'Research Team Member'})
               </p>
             </div>
           </div>
@@ -296,7 +296,7 @@ export const EnrollmentPrepView: React.FC<EnrollmentPrepViewProps> = ({
               </div>
             ) : (
               <div className="p-3.5 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-900">
-                No pre-assigned recruitment links were found in <code className="font-mono">recruitment_links</code> for your account. You can validate a token manually below or proceed with direct enrollment if permitted.
+                No pre-assigned recruitment links were found for your account. You can validate a referral token manually below or proceed with direct supervised enrollment.
               </div>
             )}
 
@@ -375,13 +375,13 @@ export const EnrollmentPrepView: React.FC<EnrollmentPrepViewProps> = ({
                 Clicking <strong>START PARTICIPANT SESSION</strong> will:
                 <ul className="list-disc pl-4 mt-1 space-y-0.5">
                   <li>
-                    Immediately sign out your authenticated researcher session (no researcher credentials or permissions remain in the browser).
+                    Immediately sign out your research team account so no investigator permissions remain active in this browser.
                   </li>
                   <li>
-                    Create a brand-new anonymous Supabase Auth identity exclusively for this participant via <code className="font-mono text-[11px]">ensureAnonymousParticipantAuth()</code>.
+                    Create an isolated, anonymous participant session exclusively for the incoming clinician participant.
                   </li>
                   <li>
-                    Launch the 8-stage participant study flow and require fresh researcher sign-in after the participant finishes debriefing.
+                    Launch the eight-stage study protocol and require fresh staff sign-in once the participant finishes debriefing.
                   </li>
                 </ul>
               </div>

@@ -655,14 +655,14 @@ export const supabaseResearchService = {
     const client = requireSupabaseClient();
     const { data: sessionData, error: sessionError } = await client.auth.getSession();
     if (sessionError) {
-      throw new Error(`Failed to read Supabase session: ${sessionError.message}`);
+      throw new Error('Unable to verify your active session. Please refresh the page and try again.');
     }
 
     const existingUser = sessionData.session?.user;
     if (existingUser) {
       if (existingUser.is_anonymous === false) {
         throw new Error(
-          'A Research Team account is currently signed in. Please sign out of the Research Team session before starting a live participant session.'
+          'A Research Team account is currently signed in. Please sign out before starting a participant session.'
         );
       }
       return existingUser.id;
@@ -671,8 +671,7 @@ export const supabaseResearchService = {
     const { data: anonData, error: anonError } = await client.auth.signInAnonymously();
     if (anonError || !anonData.user) {
       throw new Error(
-        anonError?.message ||
-          'Unable to establish an anonymous doctor session. Ensure Anonymous Sign-Ins is enabled in Supabase Auth.'
+        'Unable to initialize a temporary participant session. Please contact the Principal Investigator or supervising researcher.'
       );
     }
 
@@ -703,7 +702,7 @@ export const supabaseResearchService = {
       p_token: token,
     });
     if (error) {
-      throw new Error(`Failed to validate recruitment link: ${error.message}`);
+      throw new Error('Unable to verify this recruitment token. Please check the code and try again.');
     }
     const row = Array.isArray(data) ? data[0] : data;
     return {
@@ -728,7 +727,7 @@ export const supabaseResearchService = {
       .order('case_number', { ascending: true });
 
     if (error) {
-      throw new Error(`Failed to load clinical cases from Supabase: ${error.message}`);
+      throw new Error('Unable to load clinical study cases right now. Please refresh or contact your supervising researcher.');
     }
 
     return ((data || []) as ClinicalCaseRow[]).map(mapClinicalCaseRow);
@@ -751,7 +750,7 @@ export const supabaseResearchService = {
       .maybeSingle();
 
     if (pError) {
-      throw new Error(`Failed to restore participant session: ${pError.message}`);
+      throw new Error('Unable to restore your study session. Please refresh or notify your supervising researcher.');
     }
     if (!pRow) {
       return null;
@@ -788,11 +787,11 @@ export const supabaseResearchService = {
         .eq('participant_id', participant.id),
     ]);
 
-    if (qRes.error) throw new Error(`Failed to restore questionnaire: ${qRes.error.message}`);
-    if (aiRes.error) throw new Error(`Failed to restore CDSS records: ${aiRes.error.message}`);
-    if (followRes.error) throw new Error(`Failed to restore follow-up events: ${followRes.error.message}`);
-    if (vigRes.error) throw new Error(`Failed to restore vignette answers: ${vigRes.error.message}`);
-    if (timerRes.error) throw new Error(`Failed to restore case timers: ${timerRes.error.message}`);
+    if (qRes.error) throw new Error('Unable to restore saved questionnaire responses. Please refresh the page.');
+    if (aiRes.error) throw new Error('Unable to restore clinical simulation records. Please refresh the page.');
+    if (followRes.error) throw new Error('Unable to restore simulation prompt history. Please refresh the page.');
+    if (vigRes.error) throw new Error('Unable to restore clinical vignette answers. Please refresh the page.');
+    if (timerRes.error) throw new Error('Unable to restore case timing state. Please refresh the page.');
 
     // Log advisory session_resumed telemetry non-blockingly
     void this.logResearchEvent({
@@ -830,12 +829,12 @@ export const supabaseResearchService = {
     });
 
     if (error) {
-      throw new Error(`Participant enrollment failed: ${error.message}`);
+      throw new Error('Unable to complete participant registration. Please confirm your profile details and try again.');
     }
 
     const row = Array.isArray(data) ? data[0] : data;
     if (!row?.participant_id) {
-      throw new Error('Participant enrollment did not return a participant_id.');
+      throw new Error('Participant registration did not return an active participant code. Please try again.');
     }
 
     const { data: fullRow, error: fetchError } = await client
@@ -845,7 +844,7 @@ export const supabaseResearchService = {
       .single();
 
     if (fetchError || !fullRow) {
-      throw new Error(`Enrolled participant could not be loaded: ${fetchError?.message || 'Unknown error'}`);
+      throw new Error('Your registration profile could not be loaded. Please refresh and try again.');
     }
 
     return mapParticipantRow(fullRow as ParticipantRow);
@@ -885,7 +884,7 @@ export const supabaseResearchService = {
     });
 
     if (error) {
-      throw new Error(`Questionnaire submission failed: ${error.message}`);
+      throw new Error('Unable to submit your questionnaire responses. Please review your selections and try again.');
     }
 
     const { data: qRow, error: qError } = await client
@@ -895,7 +894,7 @@ export const supabaseResearchService = {
       .single();
 
     if (qError || !qRow) {
-      throw new Error(`Saved questionnaire could not be loaded: ${qError?.message || 'Unknown error'}`);
+      throw new Error('Your questionnaire response was saved, but the summary could not be reloaded. Please refresh.');
     }
 
     return mapQuestionnaireRow(qRow as QuestionnaireRow);
@@ -908,7 +907,7 @@ export const supabaseResearchService = {
       p_case_id: caseId,
     });
     if (error) {
-      throw new Error(`Failed to open study case ${caseId}: ${error.message}`);
+      throw new Error('Unable to open this clinical case. Please refresh and try again.');
     }
     const row = Array.isArray(data) ? data[0] : data;
     return {
@@ -928,7 +927,7 @@ export const supabaseResearchService = {
       p_delta_seconds: Math.round(deltaSeconds),
     });
     if (error) {
-      throw new Error(`Timer heartbeat failed for ${caseId}: ${error.message}`);
+      throw new Error('Unable to update case elapsed time.');
     }
     return Number(data ?? 0);
   },
@@ -945,7 +944,7 @@ export const supabaseResearchService = {
       p_suggestion_id: suggestionId,
     });
     if (error) {
-      throw new Error(`Failed to log CDSS follow-up prompt: ${error.message}`);
+      throw new Error('Unable to record follow-up prompt selection. Please try again.');
     }
     return String(data);
   },
@@ -965,7 +964,7 @@ export const supabaseResearchService = {
     });
 
     if (error) {
-      throw new Error(`Failed to submit CDSS evaluation for ${input.caseId}: ${error.message}`);
+      throw new Error('Unable to save this case evaluation. Please ensure all required fields are completed.');
     }
 
     const { data: row, error: fetchError } = await client
@@ -977,7 +976,7 @@ export const supabaseResearchService = {
       .single();
 
     if (fetchError || !row) {
-      throw new Error(`Submitted CDSS record could not be loaded: ${fetchError?.message || 'Unknown error'}`);
+      throw new Error('Your case evaluation was recorded, but could not be refreshed. Please reload the page.');
     }
 
     return mapAiInteractionRow(row as AiInteractionRow);
@@ -989,7 +988,7 @@ export const supabaseResearchService = {
       p_participant_id: participantId,
     });
     if (error) {
-      throw new Error(`Cannot complete CDSS stage yet: ${error.message}`);
+      throw new Error('Please complete and submit all five clinical simulation cases before advancing.');
     }
     return String(data);
   },
@@ -1008,7 +1007,7 @@ export const supabaseResearchService = {
     });
 
     if (error) {
-      throw new Error(`Failed to submit vignette ${input.caseId}: ${error.message}`);
+      throw new Error('Unable to save this clinical vignette response. Please verify all fields are complete.');
     }
 
     const { data: row, error: fetchError } = await client
@@ -1020,7 +1019,7 @@ export const supabaseResearchService = {
       .single();
 
     if (fetchError || !row) {
-      throw new Error(`Submitted vignette answer could not be loaded: ${fetchError?.message || 'Unknown error'}`);
+      throw new Error('Your vignette response was saved, but could not be refreshed. Please reload the page.');
     }
 
     return mapVignetteAnswerRow(row as VignetteAnswerRow);
@@ -1032,7 +1031,7 @@ export const supabaseResearchService = {
       p_participant_id: participantId,
     });
     if (error) {
-      throw new Error(`Cannot complete study yet: ${error.message}`);
+      throw new Error('Please complete and submit all six clinical vignettes before finishing the study.');
     }
     return String(data);
   },
@@ -1046,7 +1045,7 @@ export const supabaseResearchService = {
       .maybeSingle();
 
     if (error) {
-      throw new Error(`Failed to refresh participant record: ${error.message}`);
+      throw new Error('Unable to refresh your study profile. Please reload the page.');
     }
     return data ? mapParticipantRow(data as ParticipantRow) : null;
   },
@@ -1070,7 +1069,7 @@ export const supabaseResearchService = {
       p_client_timestamp: input.clientTimestamp ?? new Date().toISOString(),
     });
     if (error) {
-      throw new Error(`Failed to log research event: ${error.message}`);
+      throw new Error('Unable to record study activity timing.');
     }
     return data ? String(data) : null;
   },
@@ -1110,7 +1109,7 @@ export const supabaseResearchService = {
       .maybeSingle();
 
     if (error) {
-      throw new Error(`Failed to verify research team membership: ${error.message}`);
+      throw new Error('Unable to verify research team authorisation. Please try again or contact the Principal Investigator.');
     }
 
     return data ? mapTeamMemberRow(data as ResearchTeamMemberRow) : null;
@@ -1135,12 +1134,12 @@ export const supabaseResearchService = {
     });
 
     if (authError || !authData.user) {
-      throw new Error(authError?.message || 'Invalid email or password.');
+      throw new Error('Invalid email address or password. Please check your credentials and try again.');
     }
 
     if (authData.user.is_anonymous) {
       await client.auth.signOut();
-      throw new Error('Anonymous participant sessions cannot access the Researcher Portal.');
+      throw new Error('Participant study sessions cannot access the Research Team portal.');
     }
 
     const { data: memberRow, error: memberError } = await client
@@ -1152,13 +1151,13 @@ export const supabaseResearchService = {
 
     if (memberError) {
       await client.auth.signOut();
-      throw new Error(`Failed to verify team role in research_team_members: ${memberError.message}`);
+      throw new Error('Unable to verify your research team authorisation. Please try again or contact the Principal Investigator.');
     }
 
     if (!memberRow) {
       await client.auth.signOut();
       throw new Error(
-        'Access denied: Your Supabase account is not linked to an active record in research_team_members. Contact the Principal Investigator.'
+        'Your account is not yet authorised for this research platform. Please contact the Principal Investigator.'
       );
     }
 
@@ -1176,7 +1175,7 @@ export const supabaseResearchService = {
     if (portal === 'pi' && member.role !== 'pi') {
       await client.auth.signOut();
       throw new Error(
-        'Access denied: This login portal is strictly restricted to Principal Investigator accounts (role = pi).'
+        'This portal is restricted to Principal Investigator accounts. Please sign in through the Research Team portal.'
       );
     }
 
@@ -1198,7 +1197,7 @@ export const supabaseResearchService = {
       .order('created_at', { ascending: false });
 
     if (error) {
-      throw new Error(`Failed to load recruitment links: ${error.message}`);
+      throw new Error('Unable to load recruitment links. Please refresh and try again.');
     }
 
     return ((data || []) as RecruitmentLinkRow[]).map(mapRecruitmentLinkRow);
@@ -1209,7 +1208,7 @@ export const supabaseResearchService = {
     const client = requireSupabaseClient();
     const { error } = await client.auth.signOut();
     if (error) {
-      throw new Error(`Sign out failed: ${error.message}`);
+      throw new Error('Unable to sign out cleanly. Please refresh the browser.');
     }
   },
 
@@ -1219,7 +1218,7 @@ export const supabaseResearchService = {
     // Verify caller still holds an active non-anonymous session
     const { data: sessionData } = await client.auth.getSession();
     if (!sessionData.session?.user || sessionData.session.user.is_anonymous) {
-      throw new Error('Authenticated researcher session expired. Please sign in again.');
+      throw new Error('Your research team session has expired. Please sign in again.');
     }
 
     const [casesRes, linksRes, opRes] = await Promise.all([
@@ -1238,13 +1237,13 @@ export const supabaseResearchService = {
     ]);
 
     if (casesRes.error) {
-      throw new Error(`Failed to load clinical cases: ${casesRes.error.message}`);
+      throw new Error('Unable to load clinical cases. Please refresh and try again.');
     }
     if (linksRes.error) {
-      throw new Error(`Failed to load recruitment links: ${linksRes.error.message}`);
+      throw new Error('Unable to load recruitment links. Please refresh and try again.');
     }
     if (opRes.error) {
-      throw new Error(`Failed to load operational participant roster: ${opRes.error.message}`);
+      throw new Error('Unable to load the participant progress roster. Please refresh and try again.');
     }
 
     const participantCases = ((casesRes.data || []) as ClinicalCaseRow[]).map(mapClinicalCaseRow);
@@ -1289,13 +1288,13 @@ export const supabaseResearchService = {
     ]);
 
     if (keysRes.error) {
-      throw new Error(`Failed to load clinical answer keys: ${keysRes.error.message}`);
+      throw new Error('Unable to load evaluation answer keys. Please refresh and try again.');
     }
     if (vigRes.error) {
-      throw new Error(`Failed to load vignette answers: ${vigRes.error.message}`);
+      throw new Error('Unable to load vignette responses. Please refresh and try again.');
     }
     if (scoresRes.error) {
-      throw new Error(`Failed to load assessor scores: ${scoresRes.error.message}`);
+      throw new Error('Unable to load assessment scores. Please refresh and try again.');
     }
 
     const keyMap = new Map<string, ClinicalCaseAnswerKeyRow>();
@@ -1383,14 +1382,14 @@ export const supabaseResearchService = {
       client.from('case_session_timers').select('*').order('last_opened_at', { ascending: false }),
     ]);
 
-    if (pRes.error) throw new Error(`Failed to load participants: ${pRes.error.message}`);
-    if (qRes.error) throw new Error(`Failed to load questionnaires: ${qRes.error.message}`);
-    if (aiRes.error) throw new Error(`Failed to load AI interactions: ${aiRes.error.message}`);
-    if (evalRes.error) throw new Error(`Failed to load AI evaluations: ${evalRes.error.message}`);
-    if (followRes.error) throw new Error(`Failed to load follow-up events: ${followRes.error.message}`);
-    if (teamRes.error) throw new Error(`Failed to load research team roster: ${teamRes.error.message}`);
-    if (eventsRes.error) throw new Error(`Failed to load research events: ${eventsRes.error.message}`);
-    if (timersRes.error) throw new Error(`Failed to load case timers: ${timersRes.error.message}`);
+    if (pRes.error) throw new Error('Unable to load enrolled participant records. Please refresh and try again.');
+    if (qRes.error) throw new Error('Unable to load questionnaire responses. Please refresh and try again.');
+    if (aiRes.error) throw new Error('Unable to load AI simulation records. Please refresh and try again.');
+    if (evalRes.error) throw new Error('Unable to load simulation evaluation flags. Please refresh and try again.');
+    if (followRes.error) throw new Error('Unable to load follow-up prompt records. Please refresh and try again.');
+    if (teamRes.error) throw new Error('Unable to load the research team roster. Please refresh and try again.');
+    if (eventsRes.error) throw new Error('Unable to load study audit events. Please refresh and try again.');
+    if (timersRes.error) throw new Error('Unable to load case timing records. Please refresh and try again.');
 
     const teamMembers = ((teamRes.data || []) as ResearchTeamMemberRow[]).map(mapTeamMemberRow);
     const teamById = new Map<string, ResearchTeamMember>();
@@ -1454,7 +1453,7 @@ export const supabaseResearchService = {
       p_notes: input.notes?.trim() || null,
     });
     if (error) {
-      throw new Error(`Assessor score submission failed: ${error.message}`);
+      throw new Error('Unable to save your evaluation score. Please verify Independent Assessor permissions and try again.');
     }
     return String(data);
   },
@@ -1466,7 +1465,7 @@ export const supabaseResearchService = {
       p_adjudicated_score: adjudicatedScore,
     });
     if (error) {
-      throw new Error(`PI adjudication failed: ${error.message}`);
+      throw new Error('Unable to save Principal Investigator adjudication. Please try again.');
     }
   },
 };

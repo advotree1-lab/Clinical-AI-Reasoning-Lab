@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none" role="img" aria-label="Clinical AI Reasoning Lab emblem">
+  <!-- Subtle clinical shield / rounded medical precision frame -->
+  <rect x="2" y="2" width="44" height="44" rx="12" fill="#0F172A" />
+  <rect x="2.75" y="2.75" width="42.5" height="42.5" rx="11.25" stroke="#1E293B" stroke-width="1.5" />
+
+  <!-- Subtle clinical cross axes (supporting structure) -->
+  <path d="M24 10V38" stroke="#14B8A6" stroke-width="1.75" stroke-linecap="round" stroke-opacity="0.35" />
+  <path d="M10 24H38" stroke="#14B8A6" stroke-width="1.75" stroke-linecap="round" stroke-opacity="0.35" />
+
+  <!-- Bilateral human clinical reasoning arcs (left & right hemispheres) -->
+  <path
+    d="M21 13.5C15.8 13.5 12.5 17.3 12.5 22.2C12.5 24.4 13.4 26.3 14.8 27.7C14.3 29.4 14.8 31.6 16.4 33C17.9 34.3 19.7 34.5 21 34.5"
+    stroke="#F8FAFC"
+    stroke-width="2.2"
+    stroke-linecap="round"
+  />
+  <path
+    d="M27 13.5C32.2 13.5 35.5 17.3 35.5 22.2C35.5 24.4 34.6 26.3 33.2 27.7C33.7 29.4 33.2 31.6 31.6 33C30.1 34.3 28.3 34.5 27 34.5"
+    stroke="#F8FAFC"
+    stroke-width="2.2"
+    stroke-linecap="round"
+  />
+
+  <!-- Inner neural decision pathways connecting reasoning to evidence nodes -->
+  <path d="M16.5 20.5L24 17.5L31.5 20.5" stroke="#5EEAD4" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M17.5 27.5L24 30.5L30.5 27.5" stroke="#5EEAD4" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M24 17.5V30.5" stroke="#2DD4BF" stroke-width="1.9" stroke-linecap="round" />
+
+  <!-- Evidence synthesis nodes (clinical cross nexus) -->
+  <circle cx="24" cy="17.5" r="2.2" fill="#2DD4BF" />
+  <circle cx="24" cy="24" r="2.8" fill="#0F172A" stroke="#F8FAFC" stroke-width="2" />
+  <circle cx="24" cy="30.5" r="2.2" fill="#2DD4BF" />
+  <circle cx="16.5" cy="20.5" r="1.75" fill="#F8FAFC" />
+  <circle cx="31.5" cy="20.5" r="1.75" fill="#F8FAFC" />
+</svg>

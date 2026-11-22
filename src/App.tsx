@@ -119,7 +119,7 @@ export default function App() {
       const loaded = await researchStore.loadLiveParticipantCases();
       if (loaded.length === 0) {
         setLiveCasesError(
-          'No published clinical cases were found in Supabase clinical_cases. Verify the SQL migration and case seed ran successfully.'
+          'Published clinical cases are not currently available for this study session. Please contact the Principal Investigator or study coordinator.'
         );
         setParticipantCases([]);
       } else {
@@ -129,7 +129,7 @@ export default function App() {
       setLiveCasesError(
         err instanceof Error
           ? err.message
-          : 'Unable to load published clinical cases from Supabase.'
+          : 'Unable to load published clinical cases right now.'
       );
     } finally {
       setLiveCasesLoading(false);
@@ -171,7 +171,7 @@ export default function App() {
           setTeamMember(null);
           setAuthSessionType('none');
           setUnauthorizedNotice(
-            'Access denied: Your Supabase account is not linked to an active record in research_team_members.'
+            'Your account is not yet authorised for this research platform. Please contact the Principal Investigator.'
           );
           setAppView(
             requested === 'pi_login' || requested === 'pi_dashboard'
@@ -341,7 +341,7 @@ export default function App() {
       setAuthSessionType('none');
       setAppView('researcher_login');
       updateUrlHashSafely('#/researcher-login');
-      throw new Error('Your researcher session expired. Please sign in again before enrolling a participant.');
+      throw new Error('Your research team session has expired. Please sign in again before enrolling a participant.');
     }
 
     // Store non-secret supervised handoff token & flag before closing researcher session

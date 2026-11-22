@@ -668,17 +668,14 @@ export const ParticipantFlow: React.FC<ParticipantFlowProps> = ({
       <div className="min-h-[calc(100vh-4rem)] bg-slate-50 py-14 px-4">
         <div className="max-w-xl mx-auto bg-white rounded-lg border border-slate-200 p-8 shadow-2xs space-y-4">
           <div className="text-xs font-mono uppercase tracking-wider text-amber-700 font-bold">
-            Live Research Backend Not Configured
+            Study Session Unavailable
           </div>
           <h2 className="text-xl font-bold text-slate-900">
-            Supabase Environment Variables Missing
+            Platform Configuration Incomplete
           </h2>
           <p className="text-xs text-slate-600 leading-relaxed">
             {researchStore.getSupabaseConfigError() ||
-              'VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY are required for live Research Mode.'}
-          </p>
-          <p className="text-xs text-slate-600 leading-relaxed">
-            Use Demo Cohort Mode to explore the clinical research workflow locally, or configure your Supabase credentials in the deployment environment.
+              'This study session cannot connect right now because platform configuration is incomplete. Please notify your supervising researcher or study coordinator.'}
           </p>
           {onToggleDemoMode && (
             <div className="pt-2">

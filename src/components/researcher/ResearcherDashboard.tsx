@@ -33,6 +33,7 @@ import {
 import { researchStore } from '../../services/researchStore';
 import { computeAnalytics, exportToCsv } from '../../services/analytics';
 import { SPSS_SYNTAX_SPS } from '../../data/backendCode';
+import { BrandMark } from '../common/BrandLogo';
 import { ClinicalImageGallery } from '../common/ClinicalImageGallery';
 import { RecruitmentAndTeamPanel } from './RecruitmentAndTeamPanel';
 import {
@@ -195,7 +196,7 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
       setLiveDataset(ds);
     } catch (err) {
       setLiveError(
-        err instanceof Error ? err.message : 'Unable to fetch researcher dataset from Supabase.'
+        err instanceof Error ? err.message : 'Unable to load study records right now. Please try again.'
       );
     } finally {
       setLiveLoading(false);
@@ -378,7 +379,7 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
       setScoreFeedback({
         type: 'error',
         message:
-          'Database RLS restricts direct rubric submission to authorised Assessor accounts (role = assessor). As PI, inspect Assessor 1 & 2 marks and submit final adjudication below.'
+          'Direct rubric scoring is restricted to authorised Independent Assessor accounts. As Principal Investigator, review Assessor 1 and Assessor 2 marks below and submit your final adjudication.'
       });
       return;
     }
@@ -396,7 +397,7 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
       await loadLiveDataset();
       setScoreFeedback({
         type: 'success',
-        message: `Assessor ${effectiveAssessorSlot} score (${total} / 4.0) saved to Supabase.`
+        message: `Independent Assessor ${effectiveAssessorSlot} score (${total} / 4.0) saved.`
       });
     } catch (err) {
       setScoreFeedback({
@@ -425,7 +426,7 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
       await loadLiveDataset();
       setScoreFeedback({
         type: 'success',
-        message: `PI adjudicated score (${numeric} / 4.0) recorded in Supabase.`
+        message: `Principal Investigator adjudicated score (${numeric} / 4.0) saved.`
       });
     } catch (err) {
       setScoreFeedback({
@@ -588,8 +589,8 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
     : teamMember?.role === 'pi'
     ? 'Principal Investigator'
     : teamMember?.role === 'assessor'
-    ? `Clinical Assessor (Slot ${teamMember.assessorSlot ?? '?'})`
-    : 'Researcher';
+    ? `Independent Assessor (Slot ${teamMember.assessorSlot ?? '?'})`
+    : 'Research Team Member';
 
   // Counts for live summary cards across roles
   const totalOperational = isDemoMode ? participants.length : operationalParticipants.length;
@@ -606,28 +607,33 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
     <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8 space-y-6">
       {/* Top Console Header */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between p-6 rounded-xl bg-white border border-slate-200 shadow-2xs gap-4">
-        <div>
-          <div className="flex flex-wrap items-center gap-2 text-xs font-mono text-teal-700 font-semibold mb-1">
-            <span>{roleDisplayLabel.toUpperCase()}</span>
-            <span aria-hidden="true">·</span>
-            <span>PROTOCOL {settings.protocolNumber}</span>
-            {teamMember && !isDemoMode && (
-              <>
-                <span aria-hidden="true">·</span>
-                <span className="text-slate-600">{teamMember.researcherCode}</span>
-              </>
-            )}
+        <div className="flex items-start gap-3.5">
+          <BrandMark size={40} className="mt-0.5" />
+          <div>
+            <div className="flex flex-wrap items-center gap-2 text-xs font-mono text-teal-700 font-semibold mb-1">
+              <span>{roleDisplayLabel}</span>
+              <span aria-hidden="true">·</span>
+              <span>Protocol {settings.protocolNumber}</span>
+              {teamMember && !isDemoMode && (
+                <>
+                  <span aria-hidden="true">·</span>
+                  <span className="text-slate-600">{teamMember.researcherCode}</span>
+                </>
+              )}
+            </div>
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
+              {teamMember?.role === 'pi'
+                ? 'Clinical AI Reasoning Lab: Principal Investigator Dashboard'
+                : teamMember?.role === 'assessor'
+                ? 'Clinical AI Reasoning Lab: Independent Assessor Console'
+                : 'Clinical AI Reasoning Lab: Research Team Dashboard'}
+            </h1>
+            <p className="text-xs text-slate-500 mt-0.5">
+              {teamMember && !isDemoMode
+                ? `Signed in as ${teamMember.fullName} (${teamMember.email})`
+                : 'Synthetic N=40 simulation analytics, dual-assessor rubrics & SPSS exports.'}
+            </p>
           </div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
-            {teamMember?.role === 'pi'
-              ? 'Clinical AI Reasoning Lab: Principal Investigator Dashboard'
-              : 'Clinical AI Reasoning Lab: Researcher Dashboard'}
-          </h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            {teamMember && !isDemoMode
-              ? `Signed in as ${teamMember.fullName} (${teamMember.email})`
-              : 'Synthetic N=40 simulation analytics, dual-assessor rubrics & SPSS exports.'}
-          </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5">
@@ -715,20 +721,20 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
 
       {/* Mode Notice */}
       {isDemoMode ? (
-        <div className="p-3.5 rounded-lg bg-amber-50/80 border border-amber-200 flex items-center justify-between text-xs text-amber-950 font-mono">
+        <div className="p-3.5 rounded-lg bg-amber-50/80 border border-amber-200 flex items-center justify-between text-xs text-amber-950">
           <span>
-            SYNTHETIC DEMO MODE ACTIVE: Evaluating 40 simulated clinicians stored locally in your browser. Partitioned from Supabase live records.
+            Demonstration Cohort active: evaluating 40 simulated clinician profiles stored locally in this browser.
           </span>
-          <span className="text-[11px] bg-white px-2.5 py-0.5 rounded border border-amber-300 font-bold shrink-0 ml-3">
+          <span className="text-[11px] font-mono bg-white px-2.5 py-0.5 rounded border border-amber-300 font-bold shrink-0 ml-3">
             DEMO N = 40
           </span>
         </div>
       ) : (
-        <div className="p-3.5 rounded-lg bg-teal-50/80 border border-teal-200 flex items-center justify-between text-xs text-teal-950 font-mono">
+        <div className="p-3.5 rounded-lg bg-teal-50/80 border border-teal-200 flex items-center justify-between text-xs text-teal-950">
           <span>
-            LIVE SUPABASE RESEARCH MODE: Role-scoped access ({roleDisplayLabel}) enforced by PostgreSQL Row-Level Security.
+            Active Research Study · Signed in as <strong>{roleDisplayLabel}</strong> with role-scoped access.
           </span>
-          <span className="text-[11px] bg-white px-2.5 py-0.5 rounded border border-teal-300 font-bold text-teal-800 shrink-0 ml-3">
+          <span className="text-[11px] font-mono bg-white px-2.5 py-0.5 rounded border border-teal-300 font-bold text-teal-800 shrink-0 ml-3">
             LIVE STUDY
           </span>
         </div>
@@ -740,7 +746,7 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
           <div className="flex items-start gap-2.5">
             <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
             <div>
-              <strong className="font-semibold block">Unable to load live dataset</strong>
+              <strong className="font-semibold block">Unable to load study records</strong>
               <span>{liveError}</span>
             </div>
           </div>
@@ -749,14 +755,14 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
             onClick={() => void loadLiveDataset()}
             className="px-3 py-1.5 font-semibold text-rose-800 bg-white border border-rose-300 rounded-lg hover:bg-rose-100/60 shrink-0 cursor-pointer"
           >
-            Retry Query
+            Retry
           </button>
         </div>
       )}
 
       {!isDemoMode && liveLoading && !liveDataset && (
         <div className="p-10 rounded-xl bg-white border border-slate-200 text-center text-xs font-mono text-slate-600">
-          Loading live Supabase study records for {roleDisplayLabel}...
+          Loading study records for {roleDisplayLabel}...
         </div>
       )}
 
@@ -1309,7 +1315,7 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
                   {isDemoMode
                     ? 'Demo simulation: toggle between Assessor 1 & Assessor 2 slots.'
                     : teamMember?.role === 'assessor'
-                    ? `Blinded Assessor Slot ${effectiveAssessorSlot}: RLS restricts scoring exclusively to your assigned slot.`
+                    ? `Blinded Independent Assessor (Slot ${effectiveAssessorSlot}): Scoring is isolated exclusively to your assigned evaluation slot.`
                     : 'Principal Investigator view: review Assessor 1 & Assessor 2 scores side-by-side and resolve discrepancies.'}
                 </p>
               </div>
@@ -1343,8 +1349,8 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
                   <ShieldCheck className="w-3.5 h-3.5" />
                   <span>
                     {teamMember?.role === 'assessor'
-                      ? `Locked: Assessor Slot ${effectiveAssessorSlot}`
-                      : 'PI Adjudication Access'}
+                      ? `Assigned: Independent Assessor Slot ${effectiveAssessorSlot}`
+                      : 'Principal Investigator Adjudication'}
                   </span>
                 </div>
               )}
@@ -1707,8 +1713,8 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
                 {isDemoMode
                   ? 'Inspect or edit local Demo Mode stimuli and rubrics.'
                   : teamMember?.role === 'researcher'
-                  ? 'Read-only view of the 11 published participant clinical cases (answer keys restricted to PI & Assessors).'
-                  : 'Read-only view of the 11 Supabase clinical cases and locked answer keys.'}
+                  ? 'Read-only view of the 11 published participant clinical cases (answer keys restricted to Principal Investigator & Independent Assessors).'
+                  : 'Read-only view of the 11 clinical study cases and locked evaluation rubrics.'}
               </p>
             </div>
 
@@ -1851,10 +1857,10 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
         <div className="p-6 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-4">
           <div>
             <h3 className="text-base font-bold text-slate-900">
-              Multi-Table Relational Data Export (CSV &amp; SPSS)
+              Research Dataset Export (CSV &amp; SPSS)
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              Download formula-sanitized CSV tables ready for R, Stata, Python, or IBM SPSS Statistics.
+              Download formula-sanitized CSV datasets ready for R, Stata, Python, or IBM SPSS Statistics.
             </p>
           </div>
 
@@ -1908,7 +1914,7 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
                   <span>CDSS Interactions ({aiInteractions.length})</span>
                 </div>
                 <p className="text-[11px] text-slate-600">
-                  Agreement, final diagnosis, rationale, verification intent, active timing, and server misleading evaluation flags.
+                  Agreement, final diagnosis, rationale, verification intent, active timing, and stimulus evaluation flags.
                 </p>
               </div>
               <button
@@ -2032,8 +2038,7 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
               Study Protocol Metadata &amp; Authentication Governance
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
-              Institutional details displayed on consent and debriefing screens. Researcher authentication is enforced strictly by Supabase Auth and{' '}
-              <code className="font-mono text-[11px]">research_team_members</code>.
+              Institutional details displayed on consent and debriefing screens. Staff access is governed by verified account credentials and Principal Investigator authorisation.
             </p>
           </div>
 
