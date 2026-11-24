@@ -1,22 +1,34 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowLeft, ArrowRight, CheckCircle2, AlertCircle } from 'lucide-react';
 
 interface Stage2EligibilityProps {
   onConfirmEligible: () => void;
   onBack: () => void;
   isDemoMode: boolean;
+  initialConfirmed?: boolean;
 }
 
 export const Stage2Eligibility: React.FC<Stage2EligibilityProps> = ({
   onConfirmEligible,
   onBack,
   isDemoMode,
+  initialConfirmed = false
 }) => {
-  const [isMedicalDoctor, setIsMedicalDoctor] = useState(false);
-  const [isClinicallyActive, setIsClinicallyActive] = useState(false);
-  const [willAvoidExternalAi, setWillAvoidExternalAi] = useState(false);
-  const [firstTimeParticipant, setFirstTimeParticipant] = useState(false);
+  const [isMedicalDoctor, setIsMedicalDoctor] = useState(initialConfirmed);
+  const [isClinicallyActive, setIsClinicallyActive] = useState(initialConfirmed);
+  const [willAvoidExternalAi, setWillAvoidExternalAi] = useState(initialConfirmed);
+  const [firstTimeParticipant, setFirstTimeParticipant] = useState(initialConfirmed);
   const [declinedEligibility, setDeclinedEligibility] = useState(false);
+
+  useEffect(() => {
+    if (initialConfirmed) {
+      setIsMedicalDoctor(true);
+      setIsClinicallyActive(true);
+      setWillAvoidExternalAi(true);
+      setFirstTimeParticipant(true);
+      setDeclinedEligibility(false);
+    }
+  }, [initialConfirmed]);
 
   const allConfirmed =
     isMedicalDoctor && isClinicallyActive && willAvoidExternalAi && firstTimeParticipant;

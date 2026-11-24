@@ -8,230 +8,8 @@ import { ParticipantClinicalCase } from '../types';
  */
 export const PARTICIPANT_DEMO_CASES: ParticipantClinicalCase[] = [
   {
-    id: 'sim-01',
-    caseNumber: 1,
-    stage: 'ai_simulation',
-    domain: 'Cardiology',
-    title: 'Chest pain with an initially inconclusive ECG',
-    presentation:
-      'A 64-year-old male with diabetes, chronic kidney disease and dyslipidaemia presents with epigastric discomfort, nausea and sweating for 5 hours. He denies typical chest pain.',
-    medicalHistory: 'Diabetes, chronic kidney disease and dyslipidaemia.',
-    vitals: {
-      heartRate: '110/min',
-      bloodPressure: '104/68 mmHg',
-      respiratoryRate: '26/min',
-      spO2: '91%',
-      temperature: 'Not specified',
-    },
-    physicalExamination: 'Bilateral basal crepitations.',
-    investigations: [
-      {
-        name: 'Initial ECG',
-        result: 'ST depression in V1–V3; Tall R waves in V2–V3; Upright T waves in V1–V3',
-        isAbnormal: true,
-      },
-      { name: 'Initial troponin', result: 'Borderline elevated', isAbnormal: true },
-      { name: 'Repeat troponin after 2 hours', result: 'Significant rise', isAbnormal: true },
-      {
-        name: 'Echocardiography',
-        result: 'Regional posterior wall hypokinesia and LVEF of 35%',
-        isAbnormal: true,
-      },
-    ],
-    clinicalImages: [
-      {
-        id: 'img-case-02',
-        url: '/assets/cases/case-02-ecg.jpg',
-        title: '12-Lead ECG (Case 2)',
-        caption:
-          '12-Lead ECG demonstrating ST depression in V1–V3, tall R waves in V2–V3, upright T waves in V1–V3, and mild ST elevation in II, III, aVF.',
-      },
-    ],
-    mcqOptions: [
-      'Acute True Posterior Wall STEMI (STEMI Equivalent) with Left Ventricular Dysfunction',
-      'Acute Peptic Ulcer Disease / Gastritis with CKD-Related Baseline Troponin Elevation',
-      'Stable Angina without Acute Coronary Occlusion',
-      'Acute Pancreatitis with Demand Ischemia',
-      'Other',
-    ],
-    aiStimulus: {
-      diagnosis: 'Acute Peptic Gastritis with Chronic Kidney Disease-Related Non-Ischemic Troponin Elevation.',
-      recommendation:
-        'Initiate intravenous pantoprazole 40 mg and antiemetic therapy (ondansetron 4 mg IV) for acute epigastric discomfort and nausea. Since the patient denies typical chest pain and the 12-lead ECG demonstrates only anterior ST-segment depression without classic ST-segment elevation, emergent cardiac catheterization is unnecessary. Mildly elevated cardiac troponin is an expected finding in chronic kidney disease due to impaired renal clearance. Admit to general medical ward for upper GI endoscopy evaluation and routine diuretic therapy for mild fluid overload.',
-      clinicalReasoning:
-        'Absence of classic substernal chest pain and lack of ST-segment elevation on standard precordial leads make acute transmural myocardial infarction unlikely. Epigastric symptoms paired with known CKD commonly produce false-positive baseline troponin elevations and non-specific repolarization changes.',
-      followUpSuggestions: [
-        {
-          id: 'followup_1',
-          promptLabel: 'How do you interpret the ECG and serial troponin rise?',
-          responseText:
-            'The ECG demonstrates ST depression in V1–V3 without ST-segment elevation in any standard lead, arguing against acute transmural infarction. In chronic kidney disease, impaired renal clearance frequently causes persistent or fluctuating borderline troponin elevations alongside non-specific repolarization changes, so a 2-hour rise alone does not confirm acute coronary occlusion.',
-        },
-        {
-          id: 'followup_2',
-          promptLabel: 'What monitoring and alternative workup do you advise?',
-          responseText:
-            'Monitor epigastric symptom relief following IV pantoprazole 40 mg and antiemetics, maintain supplemental oxygen for SpO₂ 91%, and administer low-dose loop diuretics for mild basal fluid overload. Proceed with elective upper GI endoscopy and routine outpatient cardiology follow-up rather than urgent cardiac catheterization.',
-        },
-      ],
-    },
-    isPublished: true,
-    expertReviewed: true,
-  },
-  {
-    id: 'sim-02',
-    caseNumber: 2,
-    stage: 'ai_simulation',
-    domain: 'Neurology',
-    title: 'Acute hemiplegia with diagnostic and therapeutic uncertainty',
-    presentation:
-      'A 71-year-old female is brought to the emergency department with sudden-onset left-sided weakness, facial deviation and inability to speak. She was last seen normal at 10 PM. She was found symptomatic at 6 AM.',
-    medicalHistory:
-      'Past history: Atrial fibrillation, hypertension, type 2 diabetes, chronic kidney disease. She is taking apixaban, but the family is unsure about the last dose. Additional information: The family subsequently confirms that the patient took apixaban approximately 10 hours before symptom discovery.',
-    vitals: {
-      heartRate: '116/min, irregularly irregular',
-      bloodPressure: '198/112 mmHg',
-      respiratoryRate: 'Not specified',
-      spO2: 'Not specified',
-      temperature: 'Not specified',
-    },
-    physicalExamination:
-      'GCS: 13/15. Left facial weakness. Left upper limb power: 0/5. Left lower limb power: 1/5. Left-sided neglect. Rightward gaze preference. NIHSS: 18.',
-    investigations: [
-      { name: 'Blood glucose', result: '58 mg/dL', isAbnormal: true },
-      {
-        name: 'After glucose correction',
-        result: '132 mg/dL (Neurological deficits persist)',
-        isAbnormal: true,
-      },
-      { name: 'Non-contrast CT brain', result: 'No intracranial haemorrhage', isAbnormal: false },
-      {
-        name: 'CT angiography',
-        result: 'Right middle cerebral artery M1 occlusion',
-        isAbnormal: true,
-      },
-      {
-        name: 'CT perfusion',
-        result: 'Small infarct core with substantial surrounding potentially salvageable tissue',
-        isAbnormal: true,
-      },
-      { name: 'Creatinine', result: '1.9 mg/dL', isAbnormal: true },
-    ],
-    clinicalImages: [
-      {
-        id: 'img-case-03',
-        url: '/assets/cases/case-03-neuro-imaging.jpg',
-        title: 'Brain Imaging Panel A–F (Case 3)',
-        caption:
-          'CT brain, CT angiography, DWI, and cerebral angiography (A–F) corresponding to acute right middle cerebral artery M1 occlusion.',
-      },
-    ],
-    mcqOptions: [
-      'Acute Right MCA M1 Cardioembolic Ischaemic Stroke (Candidate for Mechanical Thrombectomy; Contraindicated for IV Thrombolysis)',
-      'Acute Ischaemic Stroke Eligible for Immediate Intravenous Thrombolysis (Alteplase / Tenecteplase)',
-      'Hypoglycaemic Hemiplegia / Post-Hypoglycaemic Todd Paralysis',
-      'Acute Spontaneous Intracerebral Haemorrhage',
-      'Other',
-    ],
-    aiStimulus: {
-      diagnosis: 'Acute Right Middle Cerebral Artery Ischaemic Stroke Eligible for Immediate Intravenous Thrombolysis.',
-      recommendation:
-        'Administer immediate intravenous Alteplase (0.9 mg/kg) or Tenecteplase (0.25 mg/kg) as non-contrast CT brain shows no intracranial haemorrhage and CT perfusion confirms salvageable penumbral tissue. Rapidly reduce blood pressure to below 140/85 mmHg using an intravenous nitroprusside or nicardipine infusion before bolus administration. Because the exact time of stroke onset could have been shortly before 6 AM, systemic fibrinolysis takes priority over awaiting endovascular thrombectomy suite preparation.',
-      clinicalReasoning:
-        'With absence of haemorrhage on NCCT and favourable perfusion mismatch, systemic IV thrombolysis achieves rapid recanalization. A single apixaban dose 10 hours prior in a patient without active bleeding can be overridden given high NIHSS (18) and large-vessel ischaemic burden.',
-      followUpSuggestions: [
-        {
-          id: 'followup_1',
-          promptLabel: 'Is IV thrombolysis safe given apixaban 10 hours ago?',
-          responseText:
-            'Non-contrast CT brain shows no intracranial haemorrhage, and CT perfusion demonstrates a small infarct core with substantial salvageable penumbra. Given the severe disabling deficit (NIHSS 18) and uncertain exact onset prior to 6 AM, systemic IV thrombolysis should not be withheld solely for a single reported apixaban dose ~10 hours prior.',
-        },
-        {
-          id: 'followup_2',
-          promptLabel: 'Why lower blood pressure below 140/85 mmHg?',
-          responseText:
-            'Rapidly reducing blood pressure below 140/85 mmHg with intravenous nicardipine or nitroprusside prior to thrombolytic bolus lowers peri-infarct reperfusion haemorrhage risk while maximizing systemic fibrinolytic safety.',
-        },
-      ],
-    },
-    isPublished: true,
-    expertReviewed: true,
-  },
-  {
-    id: 'sim-03',
-    caseNumber: 3,
-    stage: 'ai_simulation',
-    domain: 'Pulmonology',
-    title: 'Severe acute asthma with an unexpected deterioration',
-    presentation:
-      'A 29-year-old female with longstanding bronchial asthma presents with severe breathlessness following an upper respiratory tract infection. She has been using her salbutamol inhaler every 20–30 minutes for the last 6 hours.',
-    medicalHistory:
-      'Longstanding bronchial asthma; recent upper respiratory tract infection; using salbutamol inhaler every 20–30 minutes for the last 6 hours. Additional information: After repeated nebulization, oxygen saturation improves to 94%, but tachypnoea persists. Wheezing has become less prominent.',
-    vitals: {
-      heartRate: '142/min',
-      bloodPressure: '126/82 mmHg',
-      respiratoryRate: '38/min',
-      spO2: '88% on room air',
-      temperature: 'Not specified',
-    },
-    physicalExamination:
-      'Unable to speak complete sentences. Accessory muscle use present. Initially widespread wheezing. Subsequently, very poor air entry bilaterally with minimal wheeze. Patient appears increasingly exhausted.',
-    investigations: [
-      { name: 'pH', result: '7.28', isAbnormal: true },
-      { name: 'PaCO₂', result: '48 mmHg', isAbnormal: true },
-      { name: 'PaO₂', result: '58 mmHg', isAbnormal: true },
-      { name: 'HCO₃', result: '22 mEq/L', isAbnormal: false },
-      { name: 'Lactate', result: '5.1 mmol/L', isAbnormal: true },
-      { name: 'Potassium', result: '2.9 mEq/L', isAbnormal: true },
-      {
-        name: 'Chest X-ray',
-        result: 'Hyperinflation without obvious consolidation or pneumothorax',
-        isAbnormal: true,
-      },
-    ],
-    clinicalImages: [
-      {
-        id: 'img-case-05',
-        url: '/assets/cases/case-05-cxr.jpg',
-        title: 'Chest X-ray — AP (a) and Lateral (b) (Case 5)',
-        caption:
-          'Figura 5 a, b. Crisis asmática: hiperinsuflación pulmonar y atelectasias bibasales. Rx de tórax AP (a) y lateral (b).',
-      },
-    ],
-    mcqOptions: [
-      'Life-Threatening / Near-Fatal Acute Asthma Exacerbation with Silent Chest and Hypercapnic Respiratory Failure',
-      'Resolving Acute Asthma Exacerbation Responding Well to Bronchodilator Therapy',
-      'Acute Pneumothorax Secondary to Barotrauma',
-      'Panic-Induced Hyperventilation with Salbutamol-Induced Sinus Tachycardia',
-      'Other',
-    ],
-    aiStimulus: {
-      diagnosis: 'Resolving Acute Asthma Exacerbation with Expected Post-Bronchodilator Response.',
-      recommendation:
-        'Continue routine intermittent salbutamol nebulization every 4 hours and observe in the general emergency observation ward. The reduction in audible wheezing alongside improved pulse oximetry (SpO₂ 94%) confirms progressive relief of bronchospasm. A PaCO₂ of 48 mmHg reflects mild compensatory hypoventilation during recovery and does not warrant intensive care transfer or airway intervention. Repeat arterial blood gas in 4 hours and consider step-down to oral therapy once respiratory rate settles.',
-      clinicalReasoning:
-        'Improvement of SpO₂ from 88% to 94% with concurrent reduction of widespread expiratory wheezes indicates favourable bronchodilator responsiveness. Mildly elevated lactate (5.1 mmol/L) and borderline low potassium (2.9 mEq/L) are benign transient pharmacologic effects of frequent beta-2 agonist use.',
-      followUpSuggestions: [
-        {
-          id: 'followup_1',
-          promptLabel: 'Why are wheezing and PaCO₂ changing this way?',
-          responseText:
-            'Less prominent expiratory wheezing alongside improved SpO₂ (88% to 94%) indicates partial relief of bronchospasm after repeated nebulization. A PaCO₂ of 48 mmHg with pH 7.28 reflects mild transitional hypoventilation and respiratory muscle relaxation rather than acute deterioration.',
-        },
-        {
-          id: 'followup_2',
-          promptLabel: 'Are elevated lactate and K⁺ 2.9 mEq/L concerning?',
-          responseText:
-            'A serum lactate of 5.1 mmol/L and potassium of 2.9 mEq/L are expected, transient beta-2 adrenergic effects resulting from frequent salbutamol inhaler use over 6 hours. Continue 4-hourly nebulizations in the observation unit and repeat ABG in 4 hours.',
-        },
-      ],
-    },
-    isPublished: true,
-    expertReviewed: true,
-  },
-  {
     id: 'sim-04',
-    caseNumber: 4,
+    caseNumber: 1,
     stage: 'ai_simulation',
     domain: 'Endocrinology',
     title: 'Severe hyperglycaemia with altered sensorium, acute kidney injury and electrolyte abnormalities',
@@ -294,7 +72,7 @@ export const PARTICIPANT_DEMO_CASES: ParticipantClinicalCase[] = [
   },
   {
     id: 'sim-05',
-    caseNumber: 5,
+    caseNumber: 2,
     stage: 'ai_simulation',
     domain: 'Nephrology',
     title: 'Acute gastroenteritis progressing to AKI, thrombocytopenia and neurological dysfunction',
@@ -359,6 +137,219 @@ export const PARTICIPANT_DEMO_CASES: ParticipantClinicalCase[] = [
           promptLabel: 'What urgent actions and contraindications apply?',
           responseText:
             'Stabilize the generalised seizure with IV lorazepam, obtain an ECG and urgently treat hyperkalaemia (K⁺ 6.1 mEq/L) with IV calcium gluconate plus insulin-dextrose, and arrange urgent nephrology haemodialysis. Avoid routine platelet transfusions, antimotility agents, and empiric antibiotics for suspected STEC.',
+        },
+      ],
+    },
+    isPublished: true,
+    expertReviewed: true,
+  },
+  {
+    id: 'sim-01',
+    caseNumber: 3,
+    stage: 'ai_simulation',
+    domain: 'Cardiology',
+    title: 'Chest pain with an initially inconclusive ECG',
+    presentation:
+      'A 64-year-old male with diabetes, chronic kidney disease and dyslipidaemia presents with epigastric discomfort, nausea and sweating for 5 hours. He denies typical chest pain.',
+    medicalHistory: 'Diabetes, chronic kidney disease and dyslipidaemia.',
+    vitals: {
+      heartRate: '110/min',
+      bloodPressure: '104/68 mmHg',
+      respiratoryRate: '26/min',
+      spO2: '91%',
+      temperature: 'Not specified',
+    },
+    physicalExamination: 'Bilateral basal crepitations.',
+    investigations: [
+      {
+        name: 'Initial ECG',
+        result: 'ST depression in V1–V3; Tall R waves in V2–V3; Upright T waves in V1–V3',
+        isAbnormal: true,
+      },
+      { name: 'Initial troponin', result: 'Borderline elevated', isAbnormal: true },
+      { name: 'Repeat troponin after 2 hours', result: 'Significant rise', isAbnormal: true },
+      {
+        name: 'Echocardiography',
+        result: 'Regional posterior wall hypokinesia and LVEF of 35%',
+        isAbnormal: true,
+      },
+    ],
+    clinicalImages: [
+      {
+        id: 'img-case-02',
+        url: '/assets/cases/case-02-ecg.jpg',
+        title: '',
+      },
+    ],
+    mcqOptions: [
+      'Acute True Posterior Wall STEMI (STEMI Equivalent) with Left Ventricular Dysfunction',
+      'Acute Peptic Ulcer Disease / Gastritis with CKD-Related Baseline Troponin Elevation',
+      'Stable Angina without Acute Coronary Occlusion',
+      'Acute Pancreatitis with Demand Ischemia',
+      'Other',
+    ],
+    aiStimulus: {
+      diagnosis: 'Acute Peptic Gastritis with Chronic Kidney Disease-Related Non-Ischemic Troponin Elevation.',
+      recommendation:
+        'Initiate intravenous pantoprazole 40 mg and antiemetic therapy (ondansetron 4 mg IV) for acute epigastric discomfort and nausea. Since the patient denies typical chest pain and the 12-lead ECG demonstrates only anterior ST-segment depression without classic ST-segment elevation, emergent cardiac catheterization is unnecessary. Mildly elevated cardiac troponin is an expected finding in chronic kidney disease due to impaired renal clearance. Admit to general medical ward for upper GI endoscopy evaluation and routine diuretic therapy for mild fluid overload.',
+      clinicalReasoning:
+        'Absence of classic substernal chest pain and lack of ST-segment elevation on standard precordial leads make acute transmural myocardial infarction unlikely. Epigastric symptoms paired with known CKD commonly produce false-positive baseline troponin elevations and non-specific repolarization changes.',
+      followUpSuggestions: [
+        {
+          id: 'followup_1',
+          promptLabel: 'How do you interpret the ECG and serial troponin rise?',
+          responseText:
+            'The ECG demonstrates ST depression in V1–V3 without ST-segment elevation in any standard lead, arguing against acute transmural infarction. In chronic kidney disease, impaired renal clearance frequently causes persistent or fluctuating borderline troponin elevations alongside non-specific repolarization changes, so a 2-hour rise alone does not confirm acute coronary occlusion.',
+        },
+        {
+          id: 'followup_2',
+          promptLabel: 'What monitoring and alternative workup do you advise?',
+          responseText:
+            'Monitor epigastric symptom relief following IV pantoprazole 40 mg and antiemetics, maintain supplemental oxygen for SpO₂ 91%, and administer low-dose loop diuretics for mild basal fluid overload. Proceed with elective upper GI endoscopy and routine outpatient cardiology follow-up rather than urgent cardiac catheterization.',
+        },
+      ],
+    },
+    isPublished: true,
+    expertReviewed: true,
+  },
+  {
+    id: 'sim-02',
+    caseNumber: 4,
+    stage: 'ai_simulation',
+    domain: 'Neurology',
+    title: 'Acute hemiplegia with diagnostic and therapeutic uncertainty',
+    presentation:
+      'A 71-year-old female is brought to the emergency department with sudden-onset left-sided weakness, facial deviation and inability to speak. She was last seen normal at 10 PM. She was found symptomatic at 6 AM.',
+    medicalHistory:
+      'Past history: Atrial fibrillation, hypertension, type 2 diabetes, chronic kidney disease. She is taking apixaban, but the family is unsure about the last dose. Additional information: The family subsequently confirms that the patient took apixaban approximately 10 hours before symptom discovery.',
+    vitals: {
+      heartRate: '116/min, irregularly irregular',
+      bloodPressure: '198/112 mmHg',
+      respiratoryRate: 'Not specified',
+      spO2: 'Not specified',
+      temperature: 'Not specified',
+    },
+    physicalExamination:
+      'GCS: 13/15. Left facial weakness. Left upper limb power: 0/5. Left lower limb power: 1/5. Left-sided neglect. Rightward gaze preference. NIHSS: 18.',
+    investigations: [
+      { name: 'Blood glucose', result: '58 mg/dL', isAbnormal: true },
+      {
+        name: 'After glucose correction',
+        result: '132 mg/dL (Neurological deficits persist)',
+        isAbnormal: true,
+      },
+      { name: 'Non-contrast CT brain', result: 'No intracranial haemorrhage', isAbnormal: false },
+      {
+        name: 'CT angiography',
+        result: 'Right middle cerebral artery M1 occlusion',
+        isAbnormal: true,
+      },
+      {
+        name: 'CT perfusion',
+        result: 'Small infarct core with substantial surrounding potentially salvageable tissue',
+        isAbnormal: true,
+      },
+      { name: 'Creatinine', result: '1.9 mg/dL', isAbnormal: true },
+    ],
+    clinicalImages: [
+      {
+        id: 'img-case-03',
+        url: '/assets/cases/case-03-neuro-imaging.jpg',
+        title: 'Brain Imaging Panel A–F',
+        caption:
+          'CT brain, CT angiography, DWI, and cerebral angiography (A–F) corresponding to acute right middle cerebral artery M1 occlusion.',
+      },
+    ],
+    mcqOptions: [
+      'Acute Right MCA M1 Cardioembolic Ischaemic Stroke (Candidate for Mechanical Thrombectomy; Contraindicated for IV Thrombolysis)',
+      'Acute Ischaemic Stroke Eligible for Immediate Intravenous Thrombolysis (Alteplase / Tenecteplase)',
+      'Hypoglycaemic Hemiplegia / Post-Hypoglycaemic Todd Paralysis',
+      'Acute Spontaneous Intracerebral Haemorrhage',
+      'Other',
+    ],
+    aiStimulus: {
+      diagnosis: 'Acute Right Middle Cerebral Artery Ischaemic Stroke Eligible for Immediate Intravenous Thrombolysis.',
+      recommendation:
+        'Administer immediate intravenous Alteplase (0.9 mg/kg) or Tenecteplase (0.25 mg/kg) as non-contrast CT brain shows no intracranial haemorrhage and CT perfusion confirms salvageable penumbral tissue. Rapidly reduce blood pressure to below 140/85 mmHg using an intravenous nitroprusside or nicardipine infusion before bolus administration. Because the exact time of stroke onset could have been shortly before 6 AM, systemic fibrinolysis takes priority over awaiting endovascular thrombectomy suite preparation.',
+      clinicalReasoning:
+        'With absence of haemorrhage on NCCT and favourable perfusion mismatch, systemic IV thrombolysis achieves rapid recanalization. A single apixaban dose 10 hours prior in a patient without active bleeding can be overridden given high NIHSS (18) and large-vessel ischaemic burden.',
+      followUpSuggestions: [
+        {
+          id: 'followup_1',
+          promptLabel: 'Is IV thrombolysis safe given apixaban 10 hours ago?',
+          responseText:
+            'Non-contrast CT brain shows no intracranial haemorrhage, and CT perfusion demonstrates a small infarct core with substantial salvageable penumbra. Given the severe disabling deficit (NIHSS 18) and uncertain exact onset prior to 6 AM, systemic IV thrombolysis should not be withheld solely for a single reported apixaban dose ~10 hours prior.',
+        },
+        {
+          id: 'followup_2',
+          promptLabel: 'Why lower blood pressure below 140/85 mmHg?',
+          responseText:
+            'Rapidly reducing blood pressure below 140/85 mmHg with intravenous nicardipine or nitroprusside prior to thrombolytic bolus lowers peri-infarct reperfusion haemorrhage risk while maximizing systemic fibrinolytic safety.',
+        },
+      ],
+    },
+    isPublished: true,
+    expertReviewed: true,
+  },
+  {
+    id: 'sim-03',
+    caseNumber: 5,
+    stage: 'ai_simulation',
+    domain: 'Pulmonology',
+    title: 'Severe acute asthma with an unexpected deterioration',
+    presentation:
+      'A 29-year-old female with longstanding bronchial asthma presents with severe breathlessness following an upper respiratory tract infection. She has been using her salbutamol inhaler every 20–30 minutes for the last 6 hours.',
+    medicalHistory:
+      'Longstanding bronchial asthma; recent upper respiratory tract infection; using salbutamol inhaler every 20–30 minutes for the last 6 hours. Additional information: After repeated nebulization, oxygen saturation improves to 94%, but tachypnoea persists. Wheezing has become less prominent.',
+    vitals: {
+      heartRate: '142/min',
+      bloodPressure: '126/82 mmHg',
+      respiratoryRate: '38/min',
+      spO2: '88% on room air',
+      temperature: 'Not specified',
+    },
+    physicalExamination:
+      'Unable to speak complete sentences. Accessory muscle use present. Initially widespread wheezing. Subsequently, very poor air entry bilaterally with minimal wheeze. Patient appears increasingly exhausted.',
+    investigations: [
+      { name: 'pH', result: '7.28', isAbnormal: true },
+      { name: 'PaCO₂', result: '48 mmHg', isAbnormal: true },
+      { name: 'PaO₂', result: '58 mmHg', isAbnormal: true },
+      { name: 'HCO₃', result: '22 mEq/L', isAbnormal: false },
+      { name: 'Lactate', result: '5.1 mmol/L', isAbnormal: true },
+      { name: 'Potassium', result: '2.9 mEq/L', isAbnormal: true },
+    ],
+    clinicalImages: [
+      {
+        id: 'img-case-05',
+        url: '/assets/cases/case-05-cxr.jpg',
+        title: 'Chest X-ray — AP (a) and Lateral (b)',
+      },
+    ],
+    mcqOptions: [
+      'Life-Threatening / Near-Fatal Acute Asthma Exacerbation with Silent Chest and Hypercapnic Respiratory Failure',
+      'Resolving Acute Asthma Exacerbation Responding Well to Bronchodilator Therapy',
+      'Acute Pneumothorax Secondary to Barotrauma',
+      'Panic-Induced Hyperventilation with Salbutamol-Induced Sinus Tachycardia',
+      'Other',
+    ],
+    aiStimulus: {
+      diagnosis: 'Resolving Acute Asthma Exacerbation with Expected Post-Bronchodilator Response.',
+      recommendation:
+        'Continue routine intermittent salbutamol nebulization every 4 hours and observe in the general emergency observation ward. The reduction in audible wheezing alongside improved pulse oximetry (SpO₂ 94%) confirms progressive relief of bronchospasm. A PaCO₂ of 48 mmHg reflects mild compensatory hypoventilation during recovery and does not warrant intensive care transfer or airway intervention. Repeat arterial blood gas in 4 hours and consider step-down to oral therapy once respiratory rate settles.',
+      clinicalReasoning:
+        'Improvement of SpO₂ from 88% to 94% with concurrent reduction of widespread expiratory wheezes indicates favourable bronchodilator responsiveness. Mildly elevated lactate (5.1 mmol/L) and borderline low potassium (2.9 mEq/L) are benign transient pharmacologic effects of frequent beta-2 agonist use.',
+      followUpSuggestions: [
+        {
+          id: 'followup_1',
+          promptLabel: 'Why are wheezing and PaCO₂ changing this way?',
+          responseText:
+            'Less prominent expiratory wheezing alongside improved SpO₂ (88% to 94%) indicates partial relief of bronchospasm after repeated nebulization. A PaCO₂ of 48 mmHg with pH 7.28 reflects mild transitional hypoventilation and respiratory muscle relaxation rather than acute deterioration.',
+        },
+        {
+          id: 'followup_2',
+          promptLabel: 'Are elevated lactate and K⁺ 2.9 mEq/L concerning?',
+          responseText:
+            'A serum lactate of 5.1 mmol/L and potassium of 2.9 mEq/L are expected, transient beta-2 adrenergic effects resulting from frequent salbutamol inhaler use over 6 hours. Continue 4-hourly nebulizations in the observation unit and repeat ABG in 4 hours.',
         },
       ],
     },

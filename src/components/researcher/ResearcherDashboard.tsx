@@ -904,7 +904,7 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
 
                 <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
                   <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-emerald-700 block">
-                    Completed (8/8)
+                    Completed (7/7)
                   </span>
                   <div className="text-2xl font-mono font-bold text-emerald-700 tabular-nums mt-1">
                     {analytics.completedCount}

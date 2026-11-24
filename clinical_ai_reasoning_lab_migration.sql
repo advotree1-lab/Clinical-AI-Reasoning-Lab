@@ -271,9 +271,13 @@ CREATE TABLE IF NOT EXISTS public.case_session_timers (
     last_heartbeat_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     active_seconds INT NOT NULL DEFAULT 0 CHECK (active_seconds >= 0),
     open_count INT NOT NULL DEFAULT 1 CHECK (open_count >= 1),
+    displayed_option_order JSONB,
     submitted_at TIMESTAMPTZ,
     UNIQUE (participant_id, case_id)
 );
+
+ALTER TABLE public.case_session_timers
+    ADD COLUMN IF NOT EXISTS displayed_option_order JSONB;
 
 CREATE TABLE IF NOT EXISTS public.ai_interactions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -293,6 +297,8 @@ CREATE TABLE IF NOT EXISTS public.ai_interactions (
         )
     ),
     final_diagnosis TEXT NOT NULL,
+    selected_option_id TEXT,
+    displayed_option_order JSONB,
     switched_diagnosis BOOLEAN NOT NULL DEFAULT false,
     reason_for_decision TEXT NOT NULL,
     final_confidence INT NOT NULL CHECK (final_confidence BETWEEN 1 AND 5),
@@ -306,6 +312,10 @@ CREATE TABLE IF NOT EXISTS public.ai_interactions (
     completed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     UNIQUE (participant_id, case_id)
 );
+
+ALTER TABLE public.ai_interactions
+    ADD COLUMN IF NOT EXISTS selected_option_id TEXT,
+    ADD COLUMN IF NOT EXISTS displayed_option_order JSONB;
 
 -- Server-evaluated CDSS outcomes (PI ONLY; isolated from participants)
 CREATE TABLE IF NOT EXISTS public.ai_interaction_evaluations (
@@ -1103,9 +1113,11 @@ GRANT EXECUTE ON FUNCTION public.submit_questionnaire(
 ) TO authenticated;
 
 -- 6.4 open_study_case
+DROP FUNCTION IF EXISTS public.open_study_case(UUID, VARCHAR);
 CREATE OR REPLACE FUNCTION public.open_study_case(
     p_participant_id UUID,
-    p_case_id VARCHAR(64)
+    p_case_id VARCHAR(64),
+    p_displayed_option_order JSONB DEFAULT NULL
 )
 RETURNS TABLE (
     first_displayed_at TIMESTAMPTZ,
@@ -1119,18 +1131,25 @@ SET search_path = public, pg_temp
 AS $$
 DECLARE
     v_uid UUID := auth.uid();
+    v_participant public.participants;
     v_case public.clinical_cases;
     v_timer public.case_session_timers;
+    v_target_rank INT;
 BEGIN
     IF v_uid IS NULL THEN
         RAISE EXCEPTION 'Authentication required.';
     END IF;
 
-    IF NOT EXISTS (
-        SELECT 1 FROM public.participants
-        WHERE id = p_participant_id AND auth_user_id = v_uid
-    ) THEN
+    SELECT * INTO v_participant
+    FROM public.participants
+    WHERE id = p_participant_id AND auth_user_id = v_uid;
+
+    IF NOT FOUND THEN
         RAISE EXCEPTION 'Participant not found or unauthorized.';
+    END IF;
+
+    IF v_participant.questionnaire_completed_at IS NULL THEN
+        RAISE EXCEPTION 'Study questionnaire must be completed before opening clinical cases.';
     END IF;
 
     SELECT * INTO v_case
@@ -1141,6 +1160,62 @@ BEGIN
         RAISE EXCEPTION 'Published study case % not found.', p_case_id;
     END IF;
 
+    IF v_case.stage = 'ai_simulation' THEN
+        v_target_rank := CASE v_case.id
+            WHEN 'sim-04' THEN 1
+            WHEN 'sim-05' THEN 2
+            WHEN 'sim-01' THEN 3
+            WHEN 'sim-02' THEN 4
+            WHEN 'sim-03' THEN 5
+            ELSE 100 + v_case.case_number
+        END;
+
+        IF EXISTS (
+            SELECT 1
+            FROM public.clinical_cases cc
+            WHERE cc.stage = 'ai_simulation'
+              AND cc.is_published = true
+              AND (
+                  CASE cc.id
+                      WHEN 'sim-04' THEN 1
+                      WHEN 'sim-05' THEN 2
+                      WHEN 'sim-01' THEN 3
+                      WHEN 'sim-02' THEN 4
+                      WHEN 'sim-03' THEN 5
+                      ELSE 100 + cc.case_number
+                  END
+              ) < v_target_rank
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM public.ai_interactions ai
+                  WHERE ai.participant_id = p_participant_id
+                    AND ai.case_id = cc.id
+              )
+        ) THEN
+            RAISE EXCEPTION 'CDSS cases must be completed sequentially in order before opening %.', p_case_id;
+        END IF;
+    ELSIF v_case.stage = 'post_ai' THEN
+        IF v_participant.cdss_completed_at IS NULL THEN
+            RAISE EXCEPTION 'All CDSS cases must be completed before opening unaided vignettes.';
+        END IF;
+
+        IF EXISTS (
+            SELECT 1
+            FROM public.clinical_cases cc
+            WHERE cc.stage = 'post_ai'
+              AND cc.is_published = true
+              AND cc.case_number < v_case.case_number
+              AND NOT EXISTS (
+                  SELECT 1
+                  FROM public.vignette_answers va
+                  WHERE va.participant_id = p_participant_id
+                    AND va.case_id = cc.id
+              )
+        ) THEN
+            RAISE EXCEPTION 'Unaided vignettes must be completed sequentially in order before opening %.', p_case_id;
+        END IF;
+    END IF;
+
     INSERT INTO public.case_session_timers (
         participant_id,
         case_id,
@@ -1149,7 +1224,8 @@ BEGIN
         last_opened_at,
         last_heartbeat_at,
         active_seconds,
-        open_count
+        open_count,
+        displayed_option_order
     )
     VALUES (
         p_participant_id,
@@ -1159,12 +1235,17 @@ BEGIN
         NOW(),
         NOW(),
         0,
-        1
+        1,
+        p_displayed_option_order
     )
     ON CONFLICT (participant_id, case_id) DO UPDATE
     SET last_opened_at = NOW(),
         last_heartbeat_at = NOW(),
-        open_count = public.case_session_timers.open_count + 1
+        open_count = public.case_session_timers.open_count + 1,
+        displayed_option_order = COALESCE(
+            public.case_session_timers.displayed_option_order,
+            p_displayed_option_order
+        )
     RETURNING * INTO v_timer;
 
     UPDATE public.participants
@@ -1194,8 +1275,8 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.open_study_case(UUID, VARCHAR) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.open_study_case(UUID, VARCHAR) TO authenticated;
+REVOKE ALL ON FUNCTION public.open_study_case(UUID, VARCHAR, JSONB) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.open_study_case(UUID, VARCHAR, JSONB) TO authenticated;
 
 -- 6.5 heartbeat_case_timer
 CREATE OR REPLACE FUNCTION public.heartbeat_case_timer(
@@ -1373,6 +1454,7 @@ REVOKE ALL ON FUNCTION public.log_cdss_followup(UUID, VARCHAR, TEXT) FROM PUBLIC
 GRANT EXECUTE ON FUNCTION public.log_cdss_followup(UUID, VARCHAR, TEXT) TO authenticated;
 
 -- 6.7 submit_ai_interaction
+DROP FUNCTION IF EXISTS public.submit_ai_interaction(UUID, VARCHAR, TEXT, TEXT, BOOLEAN, TEXT, INT, BOOLEAN, TEXT);
 CREATE OR REPLACE FUNCTION public.submit_ai_interaction(
     p_participant_id UUID,
     p_case_id VARCHAR(64),
@@ -1382,7 +1464,9 @@ CREATE OR REPLACE FUNCTION public.submit_ai_interaction(
     p_reason_for_decision TEXT,
     p_final_confidence INT,
     p_will_verify BOOLEAN,
-    p_verification_targets TEXT
+    p_verification_targets TEXT,
+    p_selected_option_id TEXT DEFAULT NULL,
+    p_displayed_option_order JSONB DEFAULT NULL
 )
 RETURNS UUID
 LANGUAGE plpgsql
@@ -1401,6 +1485,7 @@ DECLARE
     v_last TIMESTAMPTZ;
     v_active INT;
     v_wall INT;
+    v_target_rank INT;
     v_matched_gold BOOLEAN;
     v_accepted_misleading BOOLEAN;
     v_switched_towards_correct BOOLEAN;
@@ -1440,6 +1525,40 @@ BEGIN
         RAISE EXCEPTION 'CDSS case % has already been submitted and locked.', p_case_id;
     END IF;
 
+    v_target_rank := CASE v_case.id
+        WHEN 'sim-04' THEN 1
+        WHEN 'sim-05' THEN 2
+        WHEN 'sim-01' THEN 3
+        WHEN 'sim-02' THEN 4
+        WHEN 'sim-03' THEN 5
+        ELSE 100 + v_case.case_number
+    END;
+
+    IF EXISTS (
+        SELECT 1
+        FROM public.clinical_cases cc
+        WHERE cc.stage = 'ai_simulation'
+          AND cc.is_published = true
+          AND (
+              CASE cc.id
+                  WHEN 'sim-04' THEN 1
+                  WHEN 'sim-05' THEN 2
+                  WHEN 'sim-01' THEN 3
+                  WHEN 'sim-02' THEN 4
+                  WHEN 'sim-03' THEN 5
+                  ELSE 100 + cc.case_number
+              END
+          ) < v_target_rank
+          AND NOT EXISTS (
+              SELECT 1
+              FROM public.ai_interactions ai
+              WHERE ai.participant_id = p_participant_id
+                AND ai.case_id = cc.id
+          )
+    ) THEN
+        RAISE EXCEPTION 'CDSS cases must be submitted sequentially in order.';
+    END IF;
+
     SELECT * INTO v_timer
     FROM public.case_session_timers
     WHERE participant_id = p_participant_id AND case_id = p_case_id
@@ -1447,15 +1566,16 @@ BEGIN
 
     IF NOT FOUND THEN
         INSERT INTO public.case_session_timers (
-            participant_id, case_id, stage, first_displayed_at, last_opened_at, last_heartbeat_at, active_seconds, open_count, submitted_at
+            participant_id, case_id, stage, first_displayed_at, last_opened_at, last_heartbeat_at, active_seconds, open_count, displayed_option_order, submitted_at
         )
         VALUES (
-            p_participant_id, p_case_id, 'ai_simulation', v_now, v_now, v_now, 0, 1, v_now
+            p_participant_id, p_case_id, 'ai_simulation', v_now, v_now, v_now, 0, 1, p_displayed_option_order, v_now
         )
         RETURNING * INTO v_timer;
     ELSE
         UPDATE public.case_session_timers
-        SET submitted_at = COALESCE(submitted_at, v_now)
+        SET submitted_at = COALESCE(submitted_at, v_now),
+            displayed_option_order = COALESCE(displayed_option_order, p_displayed_option_order)
         WHERE id = v_timer.id
         RETURNING * INTO v_timer;
     END IF;
@@ -1471,6 +1591,8 @@ BEGIN
         is_demo,
         ai_agreement,
         final_diagnosis,
+        selected_option_id,
+        displayed_option_order,
         switched_diagnosis,
         reason_for_decision,
         final_confidence,
@@ -1489,6 +1611,8 @@ BEGIN
         false,
         p_ai_agreement,
         BTRIM(p_final_diagnosis),
+        NULLIF(BTRIM(COALESCE(p_selected_option_id, '')), ''),
+        COALESCE(p_displayed_option_order, v_timer.displayed_option_order),
         COALESCE(p_switched_diagnosis, false),
         BTRIM(p_reason_for_decision),
         p_final_confidence,
@@ -1562,8 +1686,8 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.submit_ai_interaction(UUID, VARCHAR, TEXT, TEXT, BOOLEAN, TEXT, INT, BOOLEAN, TEXT) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.submit_ai_interaction(UUID, VARCHAR, TEXT, TEXT, BOOLEAN, TEXT, INT, BOOLEAN, TEXT) TO authenticated;
+REVOKE ALL ON FUNCTION public.submit_ai_interaction(UUID, VARCHAR, TEXT, TEXT, BOOLEAN, TEXT, INT, BOOLEAN, TEXT, TEXT, JSONB) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.submit_ai_interaction(UUID, VARCHAR, TEXT, TEXT, BOOLEAN, TEXT, INT, BOOLEAN, TEXT, TEXT, JSONB) TO authenticated;
 
 -- 6.8 complete_cdss_stage
 CREATE OR REPLACE FUNCTION public.complete_cdss_stage(p_participant_id UUID)
@@ -1638,6 +1762,7 @@ AS $$
 DECLARE
     v_uid UUID := auth.uid();
     v_participant public.participants;
+    v_case public.clinical_cases;
     v_timer public.case_session_timers;
     v_answer_id UUID;
     v_now TIMESTAMPTZ := NOW();
@@ -1664,10 +1789,11 @@ BEGIN
         RAISE EXCEPTION 'CDSS cases must be completed before submitting unaided vignette answers.';
     END IF;
 
-    IF NOT EXISTS (
-        SELECT 1 FROM public.clinical_cases
-        WHERE id = p_case_id AND stage = 'post_ai' AND is_published = true
-    ) THEN
+    SELECT * INTO v_case
+    FROM public.clinical_cases
+    WHERE id = p_case_id AND stage = 'post_ai' AND is_published = true;
+
+    IF NOT FOUND THEN
         RAISE EXCEPTION 'Published vignette case % not found.', p_case_id;
     END IF;
 
@@ -1676,6 +1802,22 @@ BEGIN
         WHERE participant_id = p_participant_id AND case_id = p_case_id
     ) THEN
         RAISE EXCEPTION 'Vignette case % has already been submitted and locked.', p_case_id;
+    END IF;
+
+    IF EXISTS (
+        SELECT 1
+        FROM public.clinical_cases cc
+        WHERE cc.stage = 'post_ai'
+          AND cc.is_published = true
+          AND cc.case_number < v_case.case_number
+          AND NOT EXISTS (
+              SELECT 1
+              FROM public.vignette_answers va
+              WHERE va.participant_id = p_participant_id
+                AND va.case_id = cc.id
+          )
+    ) THEN
+        RAISE EXCEPTION 'Unaided vignettes must be submitted sequentially in order.';
     END IF;
 
     SELECT * INTO v_timer

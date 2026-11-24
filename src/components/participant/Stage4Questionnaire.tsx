@@ -15,18 +15,35 @@ import {
   GenAiTaskFrequency,
   GenAiTaskMatrix,
   ClinicalReasoningConsultationStage,
-  InstitutionalPolicyStatus
+  InstitutionalPolicyStatus,
+  RecruitmentTokenValidation
 } from '../../types';
 
+export interface RegistrationProfileDraft {
+  designation: ParticipantDesignation;
+  designationOther: string;
+  specialty: ClinicalSpecialty;
+  specialtyOther: string;
+  yearsSinceMbbsBracket: YearsSinceMbbsBracket;
+  hospitalType: InstitutionType;
+  hospitalTypeOther: string;
+  formalGenAiTraining: boolean;
+}
+
 interface Stage4QuestionnaireProps {
-  participant: Participant;
+  participant?: Participant | null;
   existingResponse?: QuestionnaireResponse | null;
-  onSubmit: (response: QuestionnaireResponse, updatedParticipant: Participant) => void | Promise<void>;
+  activeSection?: 'registration' | 'questionnaire';
+  registrationDraft?: RegistrationProfileDraft | null;
+  onConfirmRegistration?: (draft: RegistrationProfileDraft) => void;
+  onSubmit: (response: QuestionnaireResponse, updatedParticipant?: Participant) => void | Promise<void>;
   onContinueNext?: () => void;
   onBack: () => void;
   isDemoMode: boolean;
   isSubmitting?: boolean;
   errorMessage?: string | null;
+  referralToken?: string | null;
+  referralValidation?: RecruitmentTokenValidation | null;
 }
 
 const DESIGNATION_OPTIONS: ParticipantDesignation[] = [
@@ -84,39 +101,45 @@ const TASK_ROWS: { key: keyof GenAiTaskMatrix; code: string; label: string }[] =
 export const Stage4Questionnaire: React.FC<Stage4QuestionnaireProps> = ({
   participant,
   existingResponse = null,
+  activeSection = 'questionnaire',
+  registrationDraft = null,
+  onConfirmRegistration,
   onSubmit,
   onContinueNext,
   onBack,
   isDemoMode,
   isSubmitting = false,
-  errorMessage = null
+  errorMessage = null,
+  referralToken = null,
+  referralValidation = null
 }) => {
   const isLockedInLive = !isDemoMode && Boolean(existingResponse);
+  const [localError, setLocalError] = useState<string | null>(null);
 
-  // SECTION I: RESPONDENT PROFILE (Initialized from Stage 3 participant or existingResponse)
+  // SECTION I: RESPONDENT PROFILE
   const [designation, setDesignation] = useState<ParticipantDesignation>(
-    existingResponse?.designation ?? participant.designation
+    registrationDraft?.designation ?? existingResponse?.designation ?? participant?.designation ?? 'Junior Resident'
   );
   const [designationOther, setDesignationOther] = useState(
-    existingResponse?.designationOther ?? participant.designationOther ?? ''
+    registrationDraft?.designationOther ?? existingResponse?.designationOther ?? participant?.designationOther ?? ''
   );
   const [specialty, setSpecialty] = useState<ClinicalSpecialty>(
-    existingResponse?.specialty ?? participant.specialty
+    registrationDraft?.specialty ?? existingResponse?.specialty ?? participant?.specialty ?? 'General Medicine'
   );
   const [specialtyOther, setSpecialtyOther] = useState(
-    existingResponse?.specialtyOther ?? participant.specialtyOther ?? ''
+    registrationDraft?.specialtyOther ?? existingResponse?.specialtyOther ?? participant?.specialtyOther ?? ''
   );
   const [yearsSinceMbbsBracket, setYearsSinceMbbsBracket] = useState<YearsSinceMbbsBracket>(
-    existingResponse?.yearsSinceMbbsBracket ?? participant.yearsSinceMbbsBracket
+    registrationDraft?.yearsSinceMbbsBracket ?? existingResponse?.yearsSinceMbbsBracket ?? participant?.yearsSinceMbbsBracket ?? '1–5 years'
   );
   const [hospitalType, setHospitalType] = useState<InstitutionType>(
-    existingResponse?.hospitalType ?? participant.institutionType
+    registrationDraft?.hospitalType ?? existingResponse?.hospitalType ?? participant?.institutionType ?? 'Teaching hospital'
   );
   const [hospitalTypeOther, setHospitalTypeOther] = useState(
-    existingResponse?.hospitalTypeOther ?? participant.institutionOther ?? ''
+    registrationDraft?.hospitalTypeOther ?? existingResponse?.hospitalTypeOther ?? participant?.institutionOther ?? ''
   );
   const [formalGenAiTraining, setFormalGenAiTraining] = useState<boolean>(
-    existingResponse?.formalGenAiTraining ?? participant.formalGenAiTraining
+    registrationDraft?.formalGenAiTraining ?? existingResponse?.formalGenAiTraining ?? participant?.formalGenAiTraining ?? false
   );
 
   // SECTION II: GENAI EXPOSURE (Q1 - Q12)
@@ -206,38 +229,86 @@ export const Stage4Questionnaire: React.FC<Stage4QuestionnaireProps> = ({
     setInstitutionalPolicy('No');
   };
 
+  const effectiveDesignation = registrationDraft?.designation ?? designation;
+  const effectiveDesignationOther = registrationDraft?.designationOther ?? designationOther;
+  const effectiveSpecialty = registrationDraft?.specialty ?? specialty;
+  const effectiveSpecialtyOther = registrationDraft?.specialtyOther ?? specialtyOther;
+  const effectiveYears = registrationDraft?.yearsSinceMbbsBracket ?? yearsSinceMbbsBracket;
+  const effectiveHospital = registrationDraft?.hospitalType ?? hospitalType;
+  const effectiveHospitalOther = registrationDraft?.hospitalTypeOther ?? hospitalTypeOther;
+  const effectiveTraining = registrationDraft?.formalGenAiTraining ?? formalGenAiTraining;
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
+    setLocalError(null);
+
+    if (activeSection === 'registration') {
+      if (isLockedInLive) {
+        onContinueNext?.();
+        return;
+      }
+      if (!isDemoMode) {
+        if (designation === 'Other' && !designationOther.trim()) {
+          setLocalError('Please specify your designation before continuing.');
+          return;
+        }
+        if (specialty === 'Other' && !specialtyOther.trim()) {
+          setLocalError('Please specify your clinical specialty before continuing.');
+          return;
+        }
+        if (hospitalType === 'Other' && !hospitalTypeOther.trim()) {
+          setLocalError('Please specify your hospital or institution type before continuing.');
+          return;
+        }
+      }
+      onConfirmRegistration?.({
+        designation,
+        designationOther: designationOther.trim(),
+        specialty,
+        specialtyOther: specialtyOther.trim(),
+        yearsSinceMbbsBracket,
+        hospitalType,
+        hospitalTypeOther: hospitalTypeOther.trim(),
+        formalGenAiTraining
+      });
+      return;
+    }
+
     if (isLockedInLive) {
       onContinueNext?.();
       return;
     }
 
-    const updatedParticipant: Participant = {
-      ...participant,
-      designation,
-      designationOther: designation === 'Other' ? (designationOther.trim() || 'Other (Not specified)') : undefined,
-      specialty,
-      specialtyOther: specialty === 'Other' ? (specialtyOther.trim() || 'Other (Not specified)') : undefined,
-      yearsSinceMbbsBracket,
-      institutionType: hospitalType,
-      institutionOther: hospitalType === 'Other' ? (hospitalTypeOther.trim() || 'Other (Not specified)') : undefined,
-      formalGenAiTraining
-    };
+    const updatedParticipant: Participant | undefined = participant
+      ? {
+          ...participant,
+          designation: effectiveDesignation,
+          designationOther:
+            effectiveDesignation === 'Other' ? effectiveDesignationOther.trim() || 'Other (Not specified)' : undefined,
+          specialty: effectiveSpecialty,
+          specialtyOther:
+            effectiveSpecialty === 'Other' ? effectiveSpecialtyOther.trim() || 'Other (Not specified)' : undefined,
+          yearsSinceMbbsBracket: effectiveYears,
+          institutionType: effectiveHospital,
+          institutionOther:
+            effectiveHospital === 'Other' ? effectiveHospitalOther.trim() || 'Other (Not specified)' : undefined,
+          formalGenAiTraining: effectiveTraining
+        }
+      : undefined;
 
     const response: QuestionnaireResponse = {
       id: `q-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-      participantId: participant.id,
+      participantId: participant?.id ?? '',
       isDemo: isDemoMode,
-      designation,
-      designationOther: designation === 'Other' ? (designationOther.trim() || 'Other (Not specified)') : undefined,
-      specialty,
-      specialtyOther: specialty === 'Other' ? (specialtyOther.trim() || 'Other (Not specified)') : undefined,
-      yearsSinceMbbsBracket,
-      hospitalType,
-      hospitalTypeOther: hospitalType === 'Other' ? (hospitalTypeOther.trim() || 'Other (Not specified)') : undefined,
-      formalGenAiTraining,
+      designation: effectiveDesignation,
+      designationOther: effectiveDesignation === 'Other' ? (effectiveDesignationOther.trim() || 'Other (Not specified)') : undefined,
+      specialty: effectiveSpecialty,
+      specialtyOther: effectiveSpecialty === 'Other' ? (effectiveSpecialtyOther.trim() || 'Other (Not specified)') : undefined,
+      yearsSinceMbbsBracket: effectiveYears,
+      hospitalType: effectiveHospital,
+      hospitalTypeOther: effectiveHospital === 'Other' ? (effectiveHospitalOther.trim() || 'Other (Not specified)') : undefined,
+      formalGenAiTraining: effectiveTraining,
       usedGenAiLast3Months,
       ...(usedGenAiLast3Months
         ? {
@@ -272,66 +343,91 @@ export const Stage4Questionnaire: React.FC<Stage4QuestionnaireProps> = ({
         <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-200/80 gap-2 mb-6">
           <div>
             <div className="flex items-center gap-2 text-xs font-mono text-teal-700 mb-1">
-              <span>STAGE 05 / 08</span>
+              <span>{activeSection === 'registration' ? 'STAGE 04 / 08' : 'STAGE 05 / 08'}</span>
               <span aria-hidden="true">·</span>
-              <span>STUDY QUESTIONNAIRE</span>
+              <span>{activeSection === 'registration' ? 'PARTICIPANT REGISTRATION' : 'STUDY QUESTIONNAIRE'}</span>
             </div>
             <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
-              GenAI Exposure and Cognitive Offloading Among Medical Doctors
+              {activeSection === 'registration'
+                ? 'Respondent Profile & Clinical Registration'
+                : 'GenAI Exposure and Cognitive Offloading Among Medical Doctors'}
             </h2>
-            <div className="text-xs text-slate-500 mt-1">
-              Subject: <span className="font-mono font-semibold text-slate-800">{participant.code}</span> · {designation === 'Other' && designationOther ? designationOther : designation} ({specialty === 'Other' && specialtyOther ? specialtyOther : specialty})
+            <div className="text-xs text-slate-500 mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+              <span>
+                Subject:{' '}
+                <span className="font-mono font-semibold text-slate-800">
+                  {participant?.code ?? 'Assigned on questionnaire submission'}
+                </span>{' '}
+                · {effectiveDesignation === 'Other' && effectiveDesignationOther ? effectiveDesignationOther : effectiveDesignation} (
+                {effectiveSpecialty === 'Other' && effectiveSpecialtyOther ? effectiveSpecialtyOther : effectiveSpecialty})
+              </span>
+              {!isDemoMode && !participant && referralValidation?.isValid && referralValidation.researcherCode && (
+                <span className="font-mono text-[11px] font-semibold text-emerald-700">
+                  · Recruited via {referralValidation.researcherCode}
+                </span>
+              )}
             </div>
           </div>
 
-          {isDemoMode && (
+          {isDemoMode && activeSection === 'questionnaire' && !isLockedInLive && (
             <button
               type="button"
               onClick={handleAutoFillSurvey}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded border border-slate-200 transition-colors shrink-0 self-start sm:self-auto"
               title="Auto-fill representative questionnaire responses"
             >
-              <span>⚡ Auto-Fill Survey</span>
+              <span>Auto-Fill Survey</span>
             </button>
           )}
         </div>
 
         {isLockedInLive && (
           <div className="mb-6 p-3.5 rounded bg-emerald-50 border border-emerald-200 text-xs text-emerald-900 font-medium">
-            Your Study Questionnaire response has already been submitted and saved. Proceed below to continue to the CDSS stage.
+            {activeSection === 'registration'
+              ? 'Your Registration profile has already been recorded and locked. You may review your details below and continue to the Study Questionnaire.'
+              : 'Your Study Questionnaire response has already been submitted and saved. Proceed below to continue to the CDSS simulation stage.'}
           </div>
         )}
 
-        {errorMessage && (
+        {!isDemoMode && !participant && referralToken && referralValidation && !referralValidation.isValid && (
+          <div className="mb-6 p-3 rounded bg-amber-50 border border-amber-200 text-xs text-amber-900">
+            The referral link parameter could not be verified or has expired. Your enrollment will be recorded as <strong>Direct participation</strong>.
+          </div>
+        )}
+
+        {(localError || errorMessage) && (
           <div className="mb-6 p-3.5 rounded bg-rose-50 border border-rose-200 text-xs text-rose-800 font-medium">
-            {errorMessage}
+            {localError || errorMessage}
           </div>
         )}
 
-        {/* Participant Information and Instructions */}
-        <div className="mb-8 p-4 rounded bg-slate-50 border border-slate-200 text-xs text-slate-700 space-y-2 leading-relaxed">
-          <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-900">
-            Participant Information and Instructions
+        {activeSection === 'questionnaire' && (
+          <div className="mb-8 p-4 rounded bg-slate-50 border border-slate-200 text-xs text-slate-700 space-y-2 leading-relaxed">
+            <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-900">
+              Participant Information and Instructions
+            </div>
+            <p>
+              This questionnaire aims to assess the use of Generative Artificial Intelligence (GenAI) tools and their association with cognitive offloading among medical doctors.
+            </p>
+            <p>
+              For this questionnaire, GenAI refers to tools that generate text in response to prompts, such as <strong>ChatGPT, Google Gemini, Microsoft Copilot and Claude</strong>.
+            </p>
+            <p>
+              Please answer all questions based on your <strong>work-related use during the past 3 months only</strong>. Do not include personal or entertainment use.
+            </p>
+            <p className="text-slate-600">
+              Do not enter or disclose patient names or identifiable information. Your responses will be kept confidential and used exclusively for research purposes.
+            </p>
           </div>
-          <p>
-            This questionnaire aims to assess the use of Generative Artificial Intelligence (GenAI) tools and their association with cognitive offloading among medical doctors.
-          </p>
-          <p>
-            For this questionnaire, GenAI refers to tools that generate text in response to prompts, such as <strong>ChatGPT, Google Gemini, Microsoft Copilot and Claude</strong>.
-          </p>
-          <p>
-            Please answer all questions based on your <strong>work-related use during the past 3 months only</strong>. Do not include personal or entertainment use.
-          </p>
-          <p className="text-slate-600">
-            Do not enter or disclose patient names or identifiable information. Your responses will be kept confidential and used exclusively for research purposes.
-          </p>
-        </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-8">
+          <fieldset disabled={isLockedInLive} className="space-y-8 disabled:opacity-90">
           
-          {/* ==================================================== */}
-          {/* SECTION I: RESPONDENT PROFILE */}
-          {/* ==================================================== */}
+          {activeSection === 'registration' && (
+          /* ==================================================== */
+          /* SECTION I: RESPONDENT PROFILE */
+          /* ==================================================== */
           <div className="p-5 sm:p-6 rounded bg-slate-50/70 border border-slate-200 space-y-5">
             <div className="pb-2 border-b border-slate-200 flex items-center justify-between">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 font-mono">
@@ -508,10 +604,12 @@ export const Stage4Questionnaire: React.FC<Stage4QuestionnaireProps> = ({
               </div>
             </div>
           </div>
+          )}
 
-          {/* ==================================================== */}
-          {/* SECTION II: GENAI EXPOSURE */}
-          {/* ==================================================== */}
+          {activeSection === 'questionnaire' && (
+          /* ==================================================== */
+          /* SECTION II: GENAI EXPOSURE */
+          /* ==================================================== */
           <div className="p-5 sm:p-6 rounded bg-slate-50/70 border border-slate-200 space-y-6">
             <div className="pb-2 border-b border-slate-200 flex items-center justify-between">
               <div>
@@ -910,24 +1008,27 @@ export const Stage4Questionnaire: React.FC<Stage4QuestionnaireProps> = ({
               </div>
             )}
           </div>
+          )}
+          </fieldset>
 
           {/* Navigation */}
-          <div className="pt-4 border-t border-slate-200/70 flex items-center justify-between">
-            {isDemoMode ? (
+          <div className="pt-4 border-t border-slate-200/70 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
               <button
                 type="button"
                 onClick={onBack}
                 disabled={isSubmitting}
-                className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 transition-colors disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 transition-colors disabled:opacity-50 cursor-pointer"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
                 <span>Back</span>
               </button>
-            ) : (
-              <span className="text-[11px] font-mono text-slate-500">
-                Study ID: {participant.code}
-              </span>
-            )}
+              {participant?.code && (
+                <span className="text-[11px] font-mono text-slate-500 hidden sm:inline">
+                  · Study ID: {participant.code}
+                </span>
+              )}
+            </div>
 
             <button
               type="submit"
@@ -935,10 +1036,14 @@ export const Stage4Questionnaire: React.FC<Stage4QuestionnaireProps> = ({
               className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-semibold text-white bg-teal-600 hover:bg-teal-700 disabled:bg-slate-400 rounded-lg transition-colors shadow-2xs cursor-pointer"
             >
               <span>
-                {isSubmitting
+                {activeSection === 'registration'
+                  ? isLockedInLive
+                    ? 'View Submitted Questionnaire'
+                    : 'Confirm Registration & Continue to Questionnaire'
+                  : isSubmitting
                   ? 'Saving Questionnaire...'
                   : isLockedInLive
-                  ? 'Proceed to CDSS'
+                  ? 'Proceed to CDSS Simulation'
                   : usedGenAiLast3Months
                   ? 'Submit Questionnaire & Proceed to CDSS'
                   : 'Skip to CDSS & Vignette Cases'}

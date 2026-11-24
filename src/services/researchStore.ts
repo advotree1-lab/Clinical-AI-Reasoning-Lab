@@ -12,7 +12,8 @@ import {
   RecruitmentTokenValidation,
   ResearchEventType,
   ResearchTeamMember,
-  ResearcherPortalDataset
+  ResearcherPortalDataset,
+  CdssOptionOrderItem
 } from '../types';
 import { PARTICIPANT_DEMO_CASES } from '../data/participantCases';
 import {
@@ -31,11 +32,11 @@ const DEMO_AI_INTERACTIONS_KEY = 'carl_demo_ai_interactions_v6';
 const DEMO_VIGNETTES_KEY = 'carl_demo_vignettes_v6';
 
 const PROTOCOL_SETTINGS_KEY = 'carl_protocol_settings_v6';
-const CASES_KEY = 'carl_clinical_cases_v6';
+const CASES_KEY = 'carl_clinical_cases_v7';
 
 const DEFAULT_SETTINGS: ResearchProtocolSettings = {
   requireParticipantConsent: true,
-  institutionName: 'Department of Medicine, Academic Medical College',
+  institutionName: 'Department of Medicine, Ayaan Medical College',
   protocolNumber: 'IEC/2026/RES-AI-884',
   primaryInvestigator: 'Dr. Research Fellow & Guide',
   dataRetentionMonths: 24,
@@ -56,7 +57,16 @@ class ResearchStore {
     try {
       const storedSettings = localStorage.getItem(PROTOCOL_SETTINGS_KEY);
       if (storedSettings) {
-        this.settings = { ...DEFAULT_SETTINGS, ...JSON.parse(storedSettings) };
+        const parsed = JSON.parse(storedSettings);
+        const merged: ResearchProtocolSettings = { ...DEFAULT_SETTINGS, ...parsed };
+        if (merged.institutionName.includes('Academic Medical College')) {
+          merged.institutionName = merged.institutionName.replace(
+            'Academic Medical College',
+            'Ayaan Medical College'
+          );
+          localStorage.setItem(PROTOCOL_SETTINGS_KEY, JSON.stringify(merged));
+        }
+        this.settings = merged;
       } else {
         localStorage.setItem(PROTOCOL_SETTINGS_KEY, JSON.stringify(this.settings));
       }
@@ -88,7 +98,8 @@ class ResearchStore {
             return baseline
               ? {
                   ...stored,
-                  clinicalImages: stored.clinicalImages ?? baseline.clinicalImages
+                  investigations: baseline.investigations,
+                  clinicalImages: baseline.clinicalImages
                 }
               : stored;
           });
@@ -309,8 +320,12 @@ class ResearchStore {
     return supabaseResearchService.submitQuestionnaire(input);
   }
 
-  public openLiveCaseSession(participantId: string, caseId: string): Promise<CaseTimerOpenResult> {
-    return supabaseResearchService.openStudyCase(participantId, caseId);
+  public openLiveCaseSession(
+    participantId: string,
+    caseId: string,
+    displayedOptionOrder?: CdssOptionOrderItem[]
+  ): Promise<CaseTimerOpenResult> {
+    return supabaseResearchService.openStudyCase(participantId, caseId, displayedOptionOrder);
   }
 
   public heartbeatLiveCaseTimer(

@@ -1,16 +1,18 @@
 import React from 'react';
-import { Printer, CheckCircle2, Lock } from 'lucide-react';
+import { Printer, CheckCircle2, Lock, RotateCcw } from 'lucide-react';
 import { Participant } from '../../types';
 import { BrandMark } from '../common/BrandLogo';
 
 interface Stage8DebriefingProps {
   participant: Participant;
+  onRepeatStudyFlow?: () => void;
   onCompleteReturnToLogin: () => void;
   protocolNumber: string;
 }
 
 export const Stage8Debriefing: React.FC<Stage8DebriefingProps> = ({
   participant,
+  onRepeatStudyFlow,
   onCompleteReturnToLogin,
   protocolNumber
 }) => {
@@ -19,7 +21,7 @@ export const Stage8Debriefing: React.FC<Stage8DebriefingProps> = ({
       <div className="bg-white rounded-lg border border-slate-200/90 p-6 sm:p-10 shadow-2xs">
         {/* Header Metadata */}
         <div className="flex flex-wrap items-center gap-2 text-xs font-mono text-teal-700 mb-2">
-          <span>STAGE 08 / 08</span>
+          <span>STAGE 07 / 07</span>
           <span aria-hidden="true">·</span>
           <span>SESSION COMPLETION &amp; DEBRIEFING</span>
           <span aria-hidden="true">·</span>
@@ -27,7 +29,7 @@ export const Stage8Debriefing: React.FC<Stage8DebriefingProps> = ({
         </div>
 
         <div className="flex items-center gap-3.5">
-          <BrandMark size="md" surface="light" />
+          <BrandMark size={40} />
           <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
             Post-Participation Ethical Debriefing &amp; Study Completion
           </h2>
@@ -91,7 +93,7 @@ export const Stage8Debriefing: React.FC<Stage8DebriefingProps> = ({
           </h3>
 
           <p className="text-xs text-slate-700 leading-relaxed">
-            During Stage 6 (CDSS Simulation), you evaluated five standardized clinical cases alongside CDSS suggestions. To rigorously assess{' '}
+            During Stage 5 (CDSS Simulation), you evaluated five standardized clinical cases alongside CDSS suggestions. To rigorously assess{' '}
             <strong>automation bias, cognitive offloading, and verification vigilance</strong>, the CDSS outputs were{' '}
             <strong>pre-calibrated research stimuli</strong>:
           </p>
@@ -102,7 +104,7 @@ export const Stage8Debriefing: React.FC<Stage8DebriefingProps> = ({
                 2 Clinically Appropriate Recommendations
               </span>
               <p className="text-slate-600 text-[11px] leading-relaxed">
-                Hyperosmolar Hyperglycaemic State with Urosepsis/Hypokalaemia (Case 4) and Post-Diarrhoeal Haemolytic Uraemic Syndrome / TMA (Case 5) evaluated appropriate adoption of evidence-based guidance.
+                Hyperosmolar Hyperglycaemic State with Urosepsis/Hypokalaemia (Case 1) and Post-Diarrhoeal Haemolytic Uraemic Syndrome / TMA (Case 2) evaluated appropriate adoption of evidence-based guidance.
               </p>
             </div>
 
@@ -142,14 +144,28 @@ export const Stage8Debriefing: React.FC<Stage8DebriefingProps> = ({
             <span>Print Certificate of Participation</span>
           </button>
 
-          <button
-            type="button"
-            onClick={onCompleteReturnToLogin}
-            className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-semibold text-white bg-teal-600 hover:bg-teal-700 rounded-lg transition-colors shadow-2xs cursor-pointer"
-          >
-            <Lock className="w-3.5 h-3.5" />
-            <span>Finish &amp; Return to Team Sign In</span>
-          </button>
+          <div className="flex flex-wrap items-center justify-center sm:justify-end gap-2.5">
+            {onRepeatStudyFlow && (
+              <button
+                type="button"
+                onClick={onRepeatStudyFlow}
+                title="Revisit Stages 1–7 while keeping submitted CDSS and Vignette cases locked"
+                className="inline-flex items-center gap-1.5 px-4 py-2.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 rounded-lg border border-slate-300 transition-colors shadow-2xs cursor-pointer"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Repeat 7-Stage Flow</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={onCompleteReturnToLogin}
+              className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-semibold text-white bg-teal-600 hover:bg-teal-700 rounded-lg transition-colors shadow-2xs cursor-pointer"
+            >
+              <Lock className="w-3.5 h-3.5" />
+              <span>Finish &amp; Return to Team Sign In</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>

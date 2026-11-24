@@ -276,6 +276,13 @@ export interface ClinicalCase extends ParticipantClinicalCase {
 
 export type AiAgreementLevel = 'Completely agree' | 'Partially agree' | 'Disagree' | 'Uncertain; requires verification';
 
+export interface CdssOptionOrderItem {
+  optionId: string;
+  label: string;
+  text: string;
+  isOther?: boolean;
+}
+
 export interface CaseSessionTimer {
   id: string;
   participantId: string;
@@ -286,6 +293,7 @@ export interface CaseSessionTimer {
   lastHeartbeatAt: string;
   activeSeconds: number;
   openCount: number;
+  displayedOptionOrder?: CdssOptionOrderItem[];
   submittedAt?: string | null;
 }
 
@@ -312,12 +320,15 @@ export interface AiInteractionRecord {
   // Post-CDSS participant evaluation
   aiAgreement: AiAgreementLevel;
   finalDiagnosis: string;
+  selectedOptionId?: string;
+  displayedOptionOrder?: CdssOptionOrderItem[];
   reasonForDecision: string;
   finalConfidence: number; // 1 to 5
   willVerify: boolean;
   verificationTargets: string;
   switchedDiagnosis: boolean;
   // Server-computed analytical flags (populated in PI evaluations table & Demo Mode only)
+  matchedGoldStandard?: boolean;
   switchedTowardsCorrect?: boolean;
   acceptedMisleading?: boolean;
   // Server-authoritative timing fields

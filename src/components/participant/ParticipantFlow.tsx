@@ -11,11 +11,9 @@ import {
   ResearchEventType
 } from '../../types';
 import { researchStore } from '../../services/researchStore';
-import { EnrollParticipantInput } from '../../services/supabaseResearchService';
 import { Stage1Welcome } from './Stage1Welcome';
 import { Stage2Eligibility } from './Stage2Eligibility';
 import { Stage2Consent } from './Stage2Consent';
-import { Stage3Registration } from './Stage3Registration';
 import { Stage4Questionnaire } from './Stage4Questionnaire';
 import { Stage6AiSimulation } from './Stage6AiSimulation';
 import { Stage7PostAiAssessment } from './Stage7PostAiAssessment';
@@ -38,16 +36,15 @@ const REFERRAL_SESSION_STORAGE_KEY = 'carl_referral_token_v1';
 const SUPERVISED_SESSION_STORAGE_KEY = 'carl_supervised_session_v1';
 
 /**
- * Maps database participants.current_stage (4..7) into the 8-step Participant UI flow:
- * DB 4 (enrolled) -> UI 5 (Questionnaire)
- * DB 5 (survey done) -> UI 6 (5 CDSS cases)
- * DB 6 (cdss done) -> UI 7 (6 Post-AI vignettes)
- * DB 7 / completed -> UI 8 (Debriefing)
+ * Maps database participants.current_stage (4..7) into the 7-step Participant UI flow:
+ * DB 4 (enrolled / survey pending) -> UI 4 (Questionnaire)
+ * DB 5 (survey done) -> UI 5 (5 CDSS cases)
+ * DB 6 (cdss done) -> UI 6 (6 Post-AI vignettes)
+ * DB 7 / completed -> UI 7 (Debriefing)
  */
 function dbStageToUiStep(dbStage: number | undefined, completed: boolean): number {
-  if (completed) return 8;
-  const clamped = Math.max(4, Math.min(7, dbStage || 4));
-  return clamped + 1;
+  if (completed) return 7;
+  return Math.max(4, Math.min(7, dbStage || 4));
 }
 
 export const ParticipantFlow: React.FC<ParticipantFlowProps> = ({
@@ -62,6 +59,8 @@ export const ParticipantFlow: React.FC<ParticipantFlowProps> = ({
   onCompleteReturnToLogin
 }) => {
   const [stage, setStage] = useState<number>(1);
+  const [eligibilityConfirmed, setEligibilityConfirmed] = useState<boolean>(false);
+  const [consentConfirmed, setConsentConfirmed] = useState<boolean>(false);
   const [currentParticipant, setCurrentParticipant] = useState<Participant | null>(null);
   const [restoredQuestionnaire, setRestoredQuestionnaire] = useState<QuestionnaireResponse | null>(null);
   const [restoredAiInteractions, setRestoredAiInteractions] = useState<AiInteractionRecord[]>([]);
@@ -93,6 +92,8 @@ export const ParticipantFlow: React.FC<ParticipantFlowProps> = ({
 
     if (isDemoMode) {
       setIsRestoringSession(false);
+      setEligibilityConfirmed(false);
+      setConsentConfirmed(false);
       setCurrentParticipant(null);
       setRestoredQuestionnaire(null);
       setRestoredAiInteractions([]);
@@ -130,6 +131,8 @@ export const ParticipantFlow: React.FC<ParticipantFlowProps> = ({
         if (!active) return;
 
         if (snapshot) {
+          setEligibilityConfirmed(true);
+          setConsentConfirmed(true);
           setCurrentParticipant(snapshot.participant);
           setRestoredQuestionnaire(snapshot.questionnaire);
           setRestoredAiInteractions(snapshot.aiInteractions);
@@ -137,6 +140,8 @@ export const ParticipantFlow: React.FC<ParticipantFlowProps> = ({
           setRestoredVignetteAnswers(snapshot.vignetteAnswers);
           setStage(dbStageToUiStep(snapshot.participant.currentStage, snapshot.participant.completed));
         } else {
+          setEligibilityConfirmed(false);
+          setConsentConfirmed(false);
           setCurrentParticipant(null);
           setRestoredQuestionnaire(null);
           setRestoredAiInteractions([]);
@@ -166,7 +171,7 @@ export const ParticipantFlow: React.FC<ParticipantFlowProps> = ({
     payload?: Record<string, unknown>
   ) => {
     if (isDemoMode || !currentParticipant || !researchStore.isLiveSupabaseAvailable()) return;
-    const dbStage = Math.max(1, Math.min(7, stage - 1));
+    const dbStage = Math.max(1, Math.min(7, stage));
     void researchStore
       .logLiveEvent({
         participantId: currentParticipant.id,
@@ -197,7 +202,7 @@ export const ParticipantFlow: React.FC<ParticipantFlowProps> = ({
       researcherCode: null,
       createdAt: nowIso,
       completed: false,
-      currentStage: Math.max(4, Math.min(7, stage - 1))
+      currentStage: Math.max(4, Math.min(7, stage))
     };
     setCurrentParticipant(p);
     researchStore.saveParticipant(p);
@@ -249,92 +254,80 @@ export const ParticipantFlow: React.FC<ParticipantFlowProps> = ({
     } else if (stage === 3) {
       handleConsent();
     } else if (stage === 4) {
-      void handleRegister({
-        designation: 'Junior Resident',
-        specialty: 'General Medicine',
-        yearsSinceMbbsBracket: '1–5 years',
-        institutionType: 'Teaching hospital',
-        formalGenAiTraining: false,
-        consentGiven: true
-      });
-    } else if (stage === 5) {
       const p = ensureDemoParticipant();
       void handleQuestionnaireSubmit(buildSampleQuestionnaire(p), p);
-    } else if (stage === 6) {
+    } else if (stage === 5) {
+      if (restoredAiInteractions.length >= simCases.length && simCases.length > 0) {
+        void handleAiSimulationComplete(restoredAiInteractions);
+        return;
+      }
       const p = ensureDemoParticipant();
       const nowIso = new Date().toISOString();
-      const simRecords: AiInteractionRecord[] = simCases.map(c => ({
-        id: `ai-sim-${p.id}-${c.id}`,
-        participantId: p.id,
-        caseId: c.id,
-        isDemo: true,
-        aiAgreement: 'Uncertain; requires verification',
-        finalDiagnosis: c.mcqOptions[0] || 'Other',
-        reasonForDecision:
-          'Reviewed clinical history, vitals, and investigations against standardized CDSS recommendation.',
-        finalConfidence: 4,
-        willVerify: true,
-        verificationTargets: 'Check clinical practice guidelines and obtain confirmatory testing.',
-        switchedDiagnosis: false,
-        firstDisplayedAt: nowIso,
-        lastOpenedAt: nowIso,
-        submittedAt: nowIso,
-        activeSeconds: 0,
-        wallClockSeconds: 0,
-        completedAt: nowIso
-      }));
+      const simRecords: AiInteractionRecord[] = simCases.map(c => {
+        const existing = restoredAiInteractions.find(r => r.caseId === c.id);
+        if (existing) return existing;
+        return {
+          id: `ai-sim-${p.id}-${c.id}`,
+          participantId: p.id,
+          caseId: c.id,
+          isDemo: true,
+          aiAgreement: 'Uncertain; requires verification',
+          finalDiagnosis: c.mcqOptions[0] || 'Other',
+          reasonForDecision:
+            'Reviewed clinical history, vitals, and investigations against standardized CDSS recommendation.',
+          finalConfidence: 4,
+          willVerify: true,
+          verificationTargets: 'Check clinical practice guidelines and obtain confirmatory testing.',
+          switchedDiagnosis: false,
+          firstDisplayedAt: nowIso,
+          lastOpenedAt: nowIso,
+          submittedAt: nowIso,
+          activeSeconds: 0,
+          wallClockSeconds: 0,
+          completedAt: nowIso
+        };
+      });
       void handleAiSimulationComplete(simRecords);
-    } else if (stage === 7) {
+    } else if (stage === 6) {
+      if (restoredVignetteAnswers.length >= postAiCases.length && postAiCases.length > 0) {
+        void handlePostAiComplete(restoredVignetteAnswers);
+        return;
+      }
       const p = ensureDemoParticipant();
       const nowIso = new Date().toISOString();
-      const postRecords: VignetteAnswerRecord[] = postAiCases.map(c => ({
-        id: `post-${p.id}-${c.id}`,
-        participantId: p.id,
-        caseId: c.id,
-        stage: 'post_ai',
-        isDemo: true,
-        mostLikelyDiagnosis: c.mcqOptions[0] || 'Other',
-        differential1: 'Alternative acute etiology',
-        differential2: 'Secondary systemic condition',
-        redFlags: 'Hemodynamic instability and urgent clinical danger indicators',
-        nextStep: 'Immediate targeted stabilization and confirmatory investigation',
-        confidence: 4,
-        firstDisplayedAt: nowIso,
-        lastOpenedAt: nowIso,
-        activeSeconds: 0,
-        wallClockSeconds: 0,
-        submittedAt: nowIso
-      }));
+      const postRecords: VignetteAnswerRecord[] = postAiCases.map(c => {
+        const existing = restoredVignetteAnswers.find(a => a.caseId === c.id);
+        if (existing) return existing;
+        return {
+          id: `post-${p.id}-${c.id}`,
+          participantId: p.id,
+          caseId: c.id,
+          stage: 'post_ai',
+          isDemo: true,
+          mostLikelyDiagnosis: c.mcqOptions[0] || 'Other',
+          differential1: 'Alternative acute etiology',
+          differential2: 'Secondary systemic condition',
+          redFlags: 'Hemodynamic instability and urgent clinical danger indicators',
+          nextStep: 'Immediate targeted stabilization and confirmatory investigation',
+          confidence: 4,
+          firstDisplayedAt: nowIso,
+          lastOpenedAt: nowIso,
+          activeSeconds: 0,
+          wallClockSeconds: 0,
+          submittedAt: nowIso
+        };
+      });
       void handlePostAiComplete(postRecords);
     }
   };
 
   const handleJumpToStage = (targetStage: number) => {
-    if (isDemoMode) {
-      if (targetStage >= 5) {
-        ensureDemoParticipant();
-      }
-      setStage(targetStage);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      return;
+    if (isDemoMode && targetStage >= 5) {
+      ensureDemoParticipant();
     }
-
-    if (!currentParticipant) {
-      if (targetStage <= stage) {
-        setStage(targetStage);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      }
-      return;
-    }
-
-    const maxUnlocked = dbStageToUiStep(
-      currentParticipant.currentStage,
-      currentParticipant.completed
-    );
-    if (targetStage >= 5 && targetStage <= maxUnlocked) {
-      setStage(targetStage);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
+    setStageError(null);
+    setStage(targetStage);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleLoadCompleteSession = () => {
@@ -357,54 +350,58 @@ export const ParticipantFlow: React.FC<ParticipantFlowProps> = ({
       completed: true,
       currentStage: 7
     };
+    const sampleQ = buildSampleQuestionnaire(p);
+    const simRecords: AiInteractionRecord[] = simCases.map(c => ({
+      id: `ai-sim-${p.id}-${c.id}`,
+      participantId: p.id,
+      caseId: c.id,
+      isDemo: true,
+      aiAgreement: 'Uncertain; requires verification',
+      finalDiagnosis: c.mcqOptions[0] || 'Other',
+      reasonForDecision: 'Evaluated CDSS recommendation against clinical findings.',
+      finalConfidence: 4,
+      willVerify: true,
+      verificationTargets: 'Review clinical practice guidelines.',
+      switchedDiagnosis: false,
+      firstDisplayedAt: nowIso,
+      lastOpenedAt: nowIso,
+      submittedAt: nowIso,
+      activeSeconds: 0,
+      wallClockSeconds: 0,
+      completedAt: nowIso
+    }));
+    const postRecords: VignetteAnswerRecord[] = postAiCases.map(c => ({
+      id: `post-${p.id}-${c.id}`,
+      participantId: p.id,
+      caseId: c.id,
+      stage: 'post_ai',
+      isDemo: true,
+      mostLikelyDiagnosis: c.mcqOptions[0] || 'Other',
+      differential1: 'Alternative acute etiology',
+      differential2: 'Secondary systemic condition',
+      redFlags: 'Critical clinical danger indicators',
+      nextStep: 'Immediate targeted management and diagnostic confirmation',
+      confidence: 4,
+      firstDisplayedAt: nowIso,
+      lastOpenedAt: nowIso,
+      activeSeconds: 0,
+      wallClockSeconds: 0,
+      submittedAt: nowIso
+    }));
+
+    setEligibilityConfirmed(true);
+    setConsentConfirmed(true);
     setCurrentParticipant(p);
+    setRestoredQuestionnaire(sampleQ);
+    setRestoredAiInteractions(simRecords);
+    setRestoredVignetteAnswers(postRecords);
+
     researchStore.saveParticipant(p);
-    researchStore.saveQuestionnaire(buildSampleQuestionnaire(p));
+    researchStore.saveQuestionnaire(sampleQ);
+    simRecords.forEach(r => researchStore.saveAiInteraction(r));
+    postRecords.forEach(a => researchStore.saveVignetteAnswer(a));
 
-    simCases.forEach(c => {
-      researchStore.saveAiInteraction({
-        id: `ai-sim-${p.id}-${c.id}`,
-        participantId: p.id,
-        caseId: c.id,
-        isDemo: true,
-        aiAgreement: 'Uncertain; requires verification',
-        finalDiagnosis: c.mcqOptions[0] || 'Other',
-        reasonForDecision: 'Evaluated CDSS recommendation against clinical findings.',
-        finalConfidence: 4,
-        willVerify: true,
-        verificationTargets: 'Review clinical practice guidelines.',
-        switchedDiagnosis: false,
-        firstDisplayedAt: nowIso,
-        lastOpenedAt: nowIso,
-        submittedAt: nowIso,
-        activeSeconds: 0,
-        wallClockSeconds: 0,
-        completedAt: nowIso
-      });
-    });
-
-    postAiCases.forEach(c => {
-      researchStore.saveVignetteAnswer({
-        id: `post-${p.id}-${c.id}`,
-        participantId: p.id,
-        caseId: c.id,
-        stage: 'post_ai',
-        isDemo: true,
-        mostLikelyDiagnosis: c.mcqOptions[0] || 'Other',
-        differential1: 'Alternative acute etiology',
-        differential2: 'Secondary systemic condition',
-        redFlags: 'Critical clinical danger indicators',
-        nextStep: 'Immediate targeted management and diagnostic confirmation',
-        confidence: 4,
-        firstDisplayedAt: nowIso,
-        lastOpenedAt: nowIso,
-        activeSeconds: 0,
-        wallClockSeconds: 0,
-        submittedAt: nowIso
-      });
-    });
-
-    setStage(8);
+    setStage(7);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -418,74 +415,20 @@ export const ParticipantFlow: React.FC<ParticipantFlowProps> = ({
   // UI Step 2 -> 3 (Eligibility -> Consent)
   const handleConfirmEligible = () => {
     setStageError(null);
+    setEligibilityConfirmed(true);
     setStage(3);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // UI Step 3 -> 4 (Consent -> Registration)
+  // UI Step 3 -> 4 (Consent -> Survey)
   const handleConsent = () => {
     setStageError(null);
+    setConsentConfirmed(true);
     setStage(4);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // UI Step 4 -> 5 (Registration -> Questionnaire)
-  const handleRegister = async (input: EnrollParticipantInput) => {
-    setStageError(null);
-
-    if (isDemoMode) {
-      const nowIso = new Date().toISOString();
-      const participant: Participant = {
-        id: `part-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-        code: `DOC-${Math.floor(1000 + Math.random() * 9000)}`,
-        designation: input.designation,
-        designationOther: input.designationOther,
-        specialty: input.specialty,
-        specialtyOther: input.specialtyOther,
-        yearsSinceMbbsBracket: input.yearsSinceMbbsBracket,
-        institutionType: input.institutionType,
-        institutionOther: input.institutionOther,
-        formalGenAiTraining: input.formalGenAiTraining,
-        consentGiven: true,
-        isDemo: true,
-        recruitmentSource: 'direct',
-        recruitedBy: null,
-        researcherCode: null,
-        createdAt: nowIso,
-        completed: false,
-        currentStage: 4
-      };
-      setCurrentParticipant(participant);
-      researchStore.saveParticipant(participant);
-      setStage(5);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      return;
-    }
-
-    setIsSubmittingStage(true);
-    try {
-      const enrolled = await researchStore.enrollLiveParticipant(input);
-      setCurrentParticipant(enrolled);
-      setStage(5);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      void researchStore
-        .logLiveEvent({
-          participantId: enrolled.id,
-          eventType: 'stage_entered',
-          stage: 4,
-          clientTimestamp: new Date().toISOString()
-        })
-        .catch(() => undefined);
-    } catch (err) {
-      setStageError(
-        err instanceof Error ? err.message : 'Unable to enroll participant in live study.'
-      );
-    } finally {
-      setIsSubmittingStage(false);
-    }
-  };
-
-  // UI Step 5 -> 6 (Questionnaire -> CDSS)
+  // UI Step 4 -> 5 (Survey -> CDSS)
   const handleQuestionnaireSubmit = async (
     response: QuestionnaireResponse,
     updatedParticipant?: Participant
@@ -493,27 +436,87 @@ export const ParticipantFlow: React.FC<ParticipantFlowProps> = ({
     setStageError(null);
 
     if (isDemoMode) {
-      researchStore.saveQuestionnaire(response);
-      const baseParticipant = updatedParticipant || currentParticipant;
-      if (baseParticipant) {
-        const updated = {
-          ...baseParticipant,
+      const nowIso = new Date().toISOString();
+      const baseParticipant: Participant =
+        updatedParticipant ||
+        currentParticipant || {
+          id: `part-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+          code: `DOC-${Math.floor(1000 + Math.random() * 9000)}`,
+          designation: response.designation,
+          designationOther: response.designationOther,
+          specialty: response.specialty,
+          specialtyOther: response.specialtyOther,
+          yearsSinceMbbsBracket: response.yearsSinceMbbsBracket,
+          institutionType: response.hospitalType,
+          institutionOther: response.hospitalTypeOther,
+          formalGenAiTraining: response.formalGenAiTraining,
+          consentGiven: true,
+          isDemo: true,
+          recruitmentSource: 'direct',
+          recruitedBy: null,
+          researcherCode: null,
+          createdAt: nowIso,
+          completed: false,
           currentStage: 5
         };
-        setCurrentParticipant(updated);
-        researchStore.saveParticipant(updated);
-      }
-      setStage(6);
+
+      const updated: Participant = {
+        ...baseParticipant,
+        designation: response.designation,
+        designationOther: response.designationOther,
+        specialty: response.specialty,
+        specialtyOther: response.specialtyOther,
+        yearsSinceMbbsBracket: response.yearsSinceMbbsBracket,
+        institutionType: response.hospitalType,
+        institutionOther: response.hospitalTypeOther,
+        formalGenAiTraining: response.formalGenAiTraining,
+        completed: baseParticipant.completed || false,
+        currentStage: Math.max(5, baseParticipant.currentStage || 5)
+      };
+      const savedDemoQ: QuestionnaireResponse = {
+        ...response,
+        participantId: updated.id
+      };
+      setCurrentParticipant(updated);
+      setRestoredQuestionnaire(savedDemoQ);
+      researchStore.saveParticipant(updated);
+      researchStore.saveQuestionnaire(savedDemoQ);
+      setStage(5);
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
 
-    if (!currentParticipant) return;
-
     setIsSubmittingStage(true);
     try {
+      let activeParticipant = currentParticipant;
+      if (!activeParticipant) {
+        const validReferralToken =
+          referralToken && referralValidation?.isValid ? referralToken : null;
+        activeParticipant = await researchStore.enrollLiveParticipant({
+          designation: response.designation,
+          designationOther: response.designationOther,
+          specialty: response.specialty,
+          specialtyOther: response.specialtyOther,
+          yearsSinceMbbsBracket: response.yearsSinceMbbsBracket,
+          institutionType: response.hospitalType,
+          institutionOther: response.hospitalTypeOther,
+          formalGenAiTraining: response.formalGenAiTraining,
+          consentGiven: true,
+          referralToken: validReferralToken
+        });
+        setCurrentParticipant(activeParticipant);
+        void researchStore
+          .logLiveEvent({
+            participantId: activeParticipant.id,
+            eventType: 'stage_entered',
+            stage: 4,
+            clientTimestamp: new Date().toISOString()
+          })
+          .catch(() => undefined);
+      }
+
       const savedQ = await researchStore.submitLiveQuestionnaire({
-        participantId: currentParticipant.id,
+        participantId: activeParticipant.id,
         designation: response.designation,
         designationOther: response.designationOther,
         specialty: response.specialty,
@@ -539,16 +542,24 @@ export const ParticipantFlow: React.FC<ParticipantFlowProps> = ({
       });
       setRestoredQuestionnaire(savedQ);
 
-      const refreshed = await researchStore.refreshLiveParticipant(currentParticipant.id);
+      const refreshed = await researchStore.refreshLiveParticipant(activeParticipant.id);
       if (refreshed) {
         setCurrentParticipant(refreshed);
       } else {
         setCurrentParticipant(prev => (prev ? { ...prev, currentStage: 5 } : prev));
       }
 
-      setStage(6);
+      setStage(5);
       window.scrollTo({ top: 0, behavior: 'smooth' });
-      logEventSafely('stage_entered', undefined, { targetStage: 5 });
+      void researchStore
+        .logLiveEvent({
+          participantId: activeParticipant.id,
+          eventType: 'stage_entered',
+          stage: 5,
+          payload: { targetStage: 5 },
+          clientTimestamp: new Date().toISOString()
+        })
+        .catch(() => undefined);
     } catch (err) {
       setStageError(
         err instanceof Error ? err.message : 'Unable to save questionnaire response.'
@@ -558,14 +569,60 @@ export const ParticipantFlow: React.FC<ParticipantFlowProps> = ({
     }
   };
 
-  // UI Step 6 -> 7 (CDSS -> Post-AI Vignettes)
+  // UI Step 5 -> 6 (CDSS -> Post-AI Vignettes)
   const handleAiSimulationComplete = async (records: AiInteractionRecord[]) => {
     setStageError(null);
 
     if (isDemoMode) {
+      setRestoredAiInteractions(records);
       records.forEach(r => researchStore.saveAiInteraction(r));
       if (currentParticipant) {
-        const updated = { ...currentParticipant, currentStage: 6 };
+        const updated = {
+          ...currentParticipant,
+          completed: currentParticipant.completed || false,
+          currentStage: Math.max(6, currentParticipant.currentStage || 6)
+        };
+        setCurrentParticipant(updated);
+        researchStore.saveParticipant(updated);
+      }
+      setStage(6);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    const hasSurvey = Boolean(
+      currentParticipant &&
+        (restoredQuestionnaire ||
+          currentParticipant.questionnaireCompletedAt ||
+          currentParticipant.currentStage >= 5 ||
+          currentParticipant.completed)
+    );
+    if (!currentParticipant || !hasSurvey) {
+      setStage(6);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
+    }
+
+    const alreadyPastCdss = currentParticipant.completed || currentParticipant.currentStage >= 6;
+    if (!alreadyPastCdss) {
+      await researchStore.completeLiveCdssStage(currentParticipant.id);
+      const refreshed = await researchStore.refreshLiveParticipant(currentParticipant.id);
+      if (refreshed) setCurrentParticipant(refreshed);
+      logEventSafely('stage_entered', undefined, { targetStage: 6 });
+    }
+    setStage(6);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // UI Step 6 -> 7 (Post-AI Vignettes -> Debriefing)
+  const handlePostAiComplete = async (answers: VignetteAnswerRecord[]) => {
+    setStageError(null);
+
+    if (isDemoMode) {
+      setRestoredVignetteAnswers(answers);
+      answers.forEach(a => researchStore.saveVignetteAnswer(a));
+      if (currentParticipant) {
+        const updated = { ...currentParticipant, currentStage: 7, completed: true };
         setCurrentParticipant(updated);
         researchStore.saveParticipant(updated);
       }
@@ -574,55 +631,43 @@ export const ParticipantFlow: React.FC<ParticipantFlowProps> = ({
       return;
     }
 
-    if (!currentParticipant) return;
-    await researchStore.completeLiveCdssStage(currentParticipant.id);
-    const refreshed = await researchStore.refreshLiveParticipant(currentParticipant.id);
-    if (refreshed) setCurrentParticipant(refreshed);
-    setStage(7);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    logEventSafely('stage_entered', undefined, { targetStage: 6 });
-  };
-
-  // UI Step 7 -> 8 (Post-AI Vignettes -> Debriefing)
-  const handlePostAiComplete = async (answers: VignetteAnswerRecord[]) => {
-    setStageError(null);
-
-    if (isDemoMode) {
-      answers.forEach(a => researchStore.saveVignetteAnswer(a));
-      if (currentParticipant) {
-        const updated = { ...currentParticipant, currentStage: 7, completed: true };
-        setCurrentParticipant(updated);
-        researchStore.saveParticipant(updated);
-      }
-      setStage(8);
+    const hasCdss = Boolean(
+      currentParticipant &&
+        (currentParticipant.cdssCompletedAt ||
+          currentParticipant.currentStage >= 6 ||
+          currentParticipant.completed)
+    );
+    if (!currentParticipant || !hasCdss) {
+      setStage(7);
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }
 
-    if (!currentParticipant) return;
-    await researchStore.completeLiveVignetteStage(currentParticipant.id);
-    const refreshed = await researchStore.refreshLiveParticipant(currentParticipant.id);
-    if (refreshed) {
-      setCurrentParticipant(refreshed);
-    } else {
-      setCurrentParticipant(prev => (prev ? { ...prev, completed: true, currentStage: 7 } : prev));
-    }
-    logEventSafely('stage_entered', undefined, { targetStage: 7 });
+    if (!currentParticipant.completed) {
+      await researchStore.completeLiveVignetteStage(currentParticipant.id);
+      const refreshed = await researchStore.refreshLiveParticipant(currentParticipant.id);
+      if (refreshed) {
+        setCurrentParticipant(refreshed);
+      } else {
+        setCurrentParticipant(prev => (prev ? { ...prev, completed: true, currentStage: 7 } : prev));
+      }
+      logEventSafely('stage_entered', undefined, { targetStage: 7 });
 
-    // End the anonymous Supabase participant session immediately upon study completion
-    try {
-      await researchStore.resetLiveParticipantSession();
-    } catch {
-      // Proceed cleanly to debriefing confirmation
-    }
-    try {
-      sessionStorage.removeItem(REFERRAL_SESSION_STORAGE_KEY);
-      sessionStorage.removeItem(SUPERVISED_SESSION_STORAGE_KEY);
-    } catch {
-      // Ignore storage errors
+      // End the anonymous participant session immediately upon study completion
+      try {
+        await researchStore.resetLiveParticipantSession();
+      } catch {
+        // Proceed cleanly to debriefing confirmation
+      }
+      try {
+        sessionStorage.removeItem(REFERRAL_SESSION_STORAGE_KEY);
+        sessionStorage.removeItem(SUPERVISED_SESSION_STORAGE_KEY);
+      } catch {
+        // Ignore storage errors
+      }
     }
 
-    setStage(8);
+    setStage(7);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -643,6 +688,8 @@ export const ParticipantFlow: React.FC<ParticipantFlowProps> = ({
       setReferralToken(null);
       setReferralValidation(null);
     }
+    setEligibilityConfirmed(false);
+    setConsentConfirmed(false);
     setCurrentParticipant(null);
     setRestoredQuestionnaire(null);
     setRestoredAiInteractions([]);
@@ -656,7 +703,6 @@ export const ParticipantFlow: React.FC<ParticipantFlowProps> = ({
     'Welcome',
     'Eligibility',
     'Consent',
-    'ID Profile',
     'Survey',
     'CDSS',
     'Vignettes',
@@ -741,25 +787,21 @@ export const ParticipantFlow: React.FC<ParticipantFlowProps> = ({
         />
       )}
 
-      {/* Top 8-Stage Progress Ribbon */}
+      {/* Top 7-Stage Progress Ribbon */}
       <div className="bg-white border-b border-slate-200 py-3 px-4 shadow-2xs">
         <div className="max-w-6xl mx-auto flex items-center justify-between gap-1.5 overflow-x-auto">
           {stepLabels.map((label, idx) => {
             const stepNum = idx + 1;
             const isCompleted = stage > stepNum;
             const isCurrent = stage === stepNum;
-            const maxLiveUnlocked = currentParticipant
-              ? dbStageToUiStep(currentParticipant.currentStage, currentParticipant.completed)
-              : stage;
-            const isClickable =
-              isDemoMode ||
-              (currentParticipant ? stepNum >= 5 && stepNum <= maxLiveUnlocked : stepNum <= stage);
+            const isClickable = true;
 
             return (
               <button
                 key={label}
                 type="button"
                 disabled={!isClickable}
+                title={`Jump to Stage ${stepNum}: ${label}`}
                 onClick={() => handleJumpToStage(stepNum)}
                 className={`flex items-center gap-1.5 text-xs whitespace-nowrap shrink-0 px-2 py-1 rounded transition-colors ${
                   isClickable ? 'cursor-pointer' : 'cursor-default opacity-65'
@@ -767,8 +809,8 @@ export const ParticipantFlow: React.FC<ParticipantFlowProps> = ({
                   isCurrent
                     ? 'text-teal-800 font-bold bg-teal-50 border border-teal-200'
                     : isCompleted
-                    ? 'text-emerald-700 font-medium hover:bg-slate-50'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                    ? 'text-emerald-700 font-medium hover:bg-slate-100'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
                 }`}
               >
                 <div
@@ -792,7 +834,7 @@ export const ParticipantFlow: React.FC<ParticipantFlowProps> = ({
         </div>
       </div>
 
-      {!isDemoMode && stageError && stage !== 4 && stage !== 5 && (
+      {!isDemoMode && stageError && stage !== 4 && (
         <div className="max-w-4xl mx-auto mt-4 px-4">
           <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-800 font-medium">
             {stageError}
@@ -814,6 +856,7 @@ export const ParticipantFlow: React.FC<ParticipantFlowProps> = ({
             onConfirmEligible={handleConfirmEligible}
             onBack={() => setStage(1)}
             isDemoMode={isDemoMode}
+            initialConfirmed={eligibilityConfirmed || Boolean(currentParticipant)}
           />
         )}
 
@@ -823,12 +866,19 @@ export const ParticipantFlow: React.FC<ParticipantFlowProps> = ({
             onBack={() => setStage(2)}
             protocolNumber={settings.protocolNumber}
             isDemoMode={isDemoMode}
+            initialConsented={consentConfirmed || Boolean(currentParticipant)}
           />
         )}
 
         {stage === 4 && (
-          <Stage3Registration
-            onRegister={handleRegister}
+          <Stage4Questionnaire
+            participant={currentParticipant}
+            existingResponse={restoredQuestionnaire}
+            onSubmit={handleQuestionnaireSubmit}
+            onContinueNext={() => {
+              setStage(5);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
             onBack={() => setStage(3)}
             isDemoMode={isDemoMode}
             isSubmitting={isSubmittingStage}
@@ -838,106 +888,241 @@ export const ParticipantFlow: React.FC<ParticipantFlowProps> = ({
           />
         )}
 
-        {stage === 5 && currentParticipant && (
-          <Stage4Questionnaire
-            participant={currentParticipant}
-            existingResponse={restoredQuestionnaire}
-            onSubmit={handleQuestionnaireSubmit}
-            onContinueNext={() => {
-              setStage(6);
+        {stage === 5 && (() => {
+          const canSubmitCdss =
+            isDemoMode ||
+            Boolean(currentParticipant && (restoredQuestionnaire || currentParticipant.questionnaireCompletedAt || currentParticipant.currentStage >= 5 || currentParticipant.completed));
+          const displayParticipant: Participant = currentParticipant || {
+            id: 'preview-pending',
+            code: 'PENDING',
+            designation: 'Junior Resident',
+            specialty: 'General Medicine',
+            yearsSinceMbbsBracket: '1–5 years',
+            institutionType: 'Teaching hospital',
+            formalGenAiTraining: false,
+            consentGiven: consentConfirmed,
+            isDemo: isDemoMode,
+            recruitmentSource: 'direct',
+            recruitedBy: null,
+            researcherCode: null,
+            createdAt: new Date().toISOString(),
+            completed: false,
+            currentStage: 5
+          };
+
+          return (
+            <>
+              {!canSubmitCdss && (
+                <div className="max-w-7xl mx-auto pt-6 px-4 sm:px-6">
+                  <div className="p-3.5 rounded-lg bg-amber-50 border border-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-amber-950">
+                    <span>
+                      <strong>Open-Jump Preview:</strong> Complete Stage 4 (Survey) first to generate your Study ID and submit CDSS case evaluations.
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleJumpToStage(4)}
+                      className="px-3 py-1.5 rounded bg-amber-900 text-white font-semibold hover:bg-amber-800 transition-colors shrink-0 self-start sm:self-auto cursor-pointer"
+                    >
+                      Go to Stage 4 (Survey)
+                    </button>
+                  </div>
+                </div>
+              )}
+              <Stage6AiSimulation
+                key={canSubmitCdss ? 'live-cdss' : 'preview-cdss'}
+                cases={simCases}
+                participant={displayParticipant}
+                isDemoMode={isDemoMode}
+                isPreviewOnly={!canSubmitCdss}
+                initialRecords={canSubmitCdss ? restoredAiInteractions : []}
+                initialFollowupEvents={canSubmitCdss ? restoredFollowupEvents : []}
+                onOpenCase={
+                  isDemoMode || !currentParticipant || !canSubmitCdss
+                    ? undefined
+                    : (caseId) => researchStore.openLiveCaseSession(currentParticipant.id, caseId).then(() => undefined)
+                }
+                onHeartbeatTimer={
+                  isDemoMode || !currentParticipant || !canSubmitCdss
+                    ? undefined
+                    : (caseId, deltaSeconds) =>
+                        researchStore
+                          .heartbeatLiveCaseTimer(currentParticipant.id, caseId, deltaSeconds)
+                          .then(() => undefined)
+                }
+                onLogFollowup={
+                  isDemoMode || !currentParticipant || !canSubmitCdss
+                    ? undefined
+                    : async (caseId, suggestionId) => {
+                        const eventId = await researchStore.logLiveCdssFollowup(
+                          currentParticipant.id,
+                          caseId,
+                          suggestionId
+                        );
+                        const matchedCase = simCases.find(c => c.id === caseId);
+                        const stimulus = matchedCase?.aiStimulus;
+                        const fallbackPrompt =
+                          suggestionId === 'followup_1'
+                            ? 'Explain key diagnostic reasoning'
+                            : 'Summarize immediate management plan';
+                        const fallbackResponse =
+                          suggestionId === 'followup_1'
+                            ? stimulus?.clinicalReasoning || ''
+                            : stimulus?.recommendation || '';
+                        const suggestion = stimulus?.followUpSuggestions?.find(
+                          s => s.id === suggestionId
+                        );
+                        const newEvent: CdssFollowupEvent = {
+                          id: eventId || `followup-${caseId}-${suggestionId}`,
+                          participantId: currentParticipant.id,
+                          caseId,
+                          suggestionId,
+                          promptLabel: suggestion?.promptLabel || fallbackPrompt,
+                          responseText: suggestion?.responseText || fallbackResponse,
+                          clickedAt: new Date().toISOString()
+                        };
+                        setRestoredFollowupEvents(prev =>
+                          prev.some(ev => ev.caseId === caseId && ev.suggestionId === suggestionId)
+                            ? prev
+                            : [...prev, newEvent]
+                        );
+                      }
+                }
+                onSubmitCase={
+                  isDemoMode
+                    ? undefined
+                    : async (input) => {
+                        if (!currentParticipant || !canSubmitCdss) {
+                          throw new Error('Please submit Stage 4 (Survey) first before recording CDSS case evaluations.');
+                        }
+                        const saved = await researchStore.submitLiveAiInteraction(input);
+                        setRestoredAiInteractions(prev => [
+                          ...prev.filter(r => r.caseId !== saved.caseId),
+                          saved
+                        ]);
+                        return saved;
+                      }
+                }
+                onComplete={handleAiSimulationComplete}
+                onLogEvent={logEventSafely}
+              />
+            </>
+          );
+        })()}
+
+        {stage === 6 && (() => {
+          const canSubmitVignettes =
+            isDemoMode ||
+            Boolean(currentParticipant && (currentParticipant.cdssCompletedAt || currentParticipant.currentStage >= 6 || currentParticipant.completed));
+          const displayParticipant: Participant = currentParticipant || {
+            id: 'preview-pending',
+            code: 'PENDING',
+            designation: 'Junior Resident',
+            specialty: 'General Medicine',
+            yearsSinceMbbsBracket: '1–5 years',
+            institutionType: 'Teaching hospital',
+            formalGenAiTraining: false,
+            consentGiven: consentConfirmed,
+            isDemo: isDemoMode,
+            recruitmentSource: 'direct',
+            recruitedBy: null,
+            researcherCode: null,
+            createdAt: new Date().toISOString(),
+            completed: false,
+            currentStage: 6
+          };
+
+          return (
+            <>
+              {!canSubmitVignettes && (
+                <div className="max-w-4xl mx-auto pt-6 px-4 sm:px-6">
+                  <div className="p-3.5 rounded-lg bg-amber-50 border border-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-amber-950">
+                    <span>
+                      <strong>Open-Jump Preview:</strong>{' '}
+                      {!currentParticipant
+                        ? 'Complete Stage 4 (Survey) and Stage 5 (CDSS) before submitting Vignette responses.'
+                        : 'Complete all 5 CDSS cases in Stage 5 before submitting Vignette responses.'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleJumpToStage(!currentParticipant ? 4 : 5)}
+                      className="px-3 py-1.5 rounded bg-amber-900 text-white font-semibold hover:bg-amber-800 transition-colors shrink-0 self-start sm:self-auto cursor-pointer"
+                    >
+                      {!currentParticipant ? 'Go to Stage 4 (Survey)' : 'Go to Stage 5 (CDSS)'}
+                    </button>
+                  </div>
+                </div>
+              )}
+              <Stage7PostAiAssessment
+                key={canSubmitVignettes ? 'live-vignettes' : 'preview-vignettes'}
+                cases={postAiCases}
+                participant={displayParticipant}
+                isDemoMode={isDemoMode}
+                isPreviewOnly={!canSubmitVignettes}
+                initialAnswers={canSubmitVignettes ? restoredVignetteAnswers : []}
+                onOpenCase={
+                  isDemoMode || !currentParticipant || !canSubmitVignettes
+                    ? undefined
+                    : (caseId) => researchStore.openLiveCaseSession(currentParticipant.id, caseId).then(() => undefined)
+                }
+                onHeartbeatTimer={
+                  isDemoMode || !currentParticipant || !canSubmitVignettes
+                    ? undefined
+                    : (caseId, deltaSeconds) =>
+                        researchStore
+                          .heartbeatLiveCaseTimer(currentParticipant.id, caseId, deltaSeconds)
+                          .then(() => undefined)
+                }
+                onSubmitCase={
+                  isDemoMode
+                    ? undefined
+                    : async (input) => {
+                        if (!currentParticipant || !canSubmitVignettes) {
+                          throw new Error(
+                            !currentParticipant
+                              ? 'Please submit Stage 4 (Survey) and Stage 5 (CDSS) first before recording Vignette answers.'
+                              : 'Please complete all 5 CDSS cases in Stage 5 before submitting Vignette answers.'
+                          );
+                        }
+                        const saved = await researchStore.submitLiveVignetteAnswer(input);
+                        setRestoredVignetteAnswers(prev => [
+                          ...prev.filter(r => r.caseId !== saved.caseId),
+                          saved
+                        ]);
+                        return saved;
+                      }
+                }
+                onComplete={handlePostAiComplete}
+                onLogEvent={logEventSafely}
+              />
+            </>
+          );
+        })()}
+
+        {stage === 7 && (
+          <Stage8Debriefing
+            participant={
+              currentParticipant || {
+                id: 'preview-pending',
+                code: 'PENDING',
+                designation: 'Junior Resident',
+                specialty: 'General Medicine',
+                yearsSinceMbbsBracket: '1–5 years',
+                institutionType: 'Teaching hospital',
+                formalGenAiTraining: false,
+                consentGiven: consentConfirmed,
+                isDemo: isDemoMode,
+                recruitmentSource: 'direct',
+                recruitedBy: null,
+                researcherCode: null,
+                createdAt: new Date().toISOString(),
+                completed: false,
+                currentStage: 7
+              }
+            }
+            onRepeatStudyFlow={() => {
+              setStage(1);
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
-            onBack={() => setStage(4)}
-            isDemoMode={isDemoMode}
-            isSubmitting={isSubmittingStage}
-            errorMessage={stageError}
-          />
-        )}
-
-        {stage === 6 && currentParticipant && (
-          <Stage6AiSimulation
-            cases={simCases}
-            participant={currentParticipant}
-            isDemoMode={isDemoMode}
-            initialRecords={restoredAiInteractions}
-            initialFollowupEvents={restoredFollowupEvents}
-            onOpenCase={
-              isDemoMode
-                ? undefined
-                : (caseId) => researchStore.openLiveCaseSession(currentParticipant.id, caseId).then(() => undefined)
-            }
-            onHeartbeatTimer={
-              isDemoMode
-                ? undefined
-                : (caseId, deltaSeconds) =>
-                    researchStore
-                      .heartbeatLiveCaseTimer(currentParticipant.id, caseId, deltaSeconds)
-                      .then(() => undefined)
-            }
-            onLogFollowup={
-              isDemoMode
-                ? undefined
-                : (caseId, suggestionId) =>
-                    researchStore
-                      .logLiveCdssFollowup(currentParticipant.id, caseId, suggestionId)
-                      .then(() => undefined)
-            }
-            onSubmitCase={
-              isDemoMode
-                ? undefined
-                : async (input) => {
-                    const saved = await researchStore.submitLiveAiInteraction(input);
-                    setRestoredAiInteractions(prev => [
-                      ...prev.filter(r => r.caseId !== saved.caseId),
-                      saved
-                    ]);
-                    return saved;
-                  }
-            }
-            onComplete={handleAiSimulationComplete}
-            onLogEvent={logEventSafely}
-          />
-        )}
-
-        {stage === 7 && currentParticipant && (
-          <Stage7PostAiAssessment
-            cases={postAiCases}
-            participant={currentParticipant}
-            isDemoMode={isDemoMode}
-            initialAnswers={restoredVignetteAnswers}
-            onOpenCase={
-              isDemoMode
-                ? undefined
-                : (caseId) => researchStore.openLiveCaseSession(currentParticipant.id, caseId).then(() => undefined)
-            }
-            onHeartbeatTimer={
-              isDemoMode
-                ? undefined
-                : (caseId, deltaSeconds) =>
-                    researchStore
-                      .heartbeatLiveCaseTimer(currentParticipant.id, caseId, deltaSeconds)
-                      .then(() => undefined)
-            }
-            onSubmitCase={
-              isDemoMode
-                ? undefined
-                : async (input) => {
-                    const saved = await researchStore.submitLiveVignetteAnswer(input);
-                    setRestoredVignetteAnswers(prev => [
-                      ...prev.filter(r => r.caseId !== saved.caseId),
-                      saved
-                    ]);
-                    return saved;
-                  }
-            }
-            onComplete={handlePostAiComplete}
-            onLogEvent={logEventSafely}
-          />
-        )}
-
-        {stage === 8 && currentParticipant && (
-          <Stage8Debriefing
-            participant={currentParticipant}
             onCompleteReturnToLogin={() => void handleFinishAndReturnToLogin()}
             protocolNumber={settings.protocolNumber}
           />

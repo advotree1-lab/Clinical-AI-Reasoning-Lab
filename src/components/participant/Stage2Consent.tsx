@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowRight, ArrowLeft } from 'lucide-react';
 
 interface Stage2ConsentProps {
@@ -6,17 +6,27 @@ interface Stage2ConsentProps {
   onBack: () => void;
   protocolNumber: string;
   isDemoMode: boolean;
+  initialConsented?: boolean;
 }
 
 export const Stage2Consent: React.FC<Stage2ConsentProps> = ({
   onConsent,
   onBack,
   protocolNumber,
-  isDemoMode
+  isDemoMode,
+  initialConsented = false
 }) => {
-  const [agreedTerms, setAgreedTerms] = useState(false);
-  const [agreedAnonymous, setAgreedAnonymous] = useState(false);
-  const [agreedSimulated, setAgreedSimulated] = useState(false);
+  const [agreedTerms, setAgreedTerms] = useState(initialConsented);
+  const [agreedAnonymous, setAgreedAnonymous] = useState(initialConsented);
+  const [agreedSimulated, setAgreedSimulated] = useState(initialConsented);
+
+  useEffect(() => {
+    if (initialConsented) {
+      setAgreedTerms(true);
+      setAgreedAnonymous(true);
+      setAgreedSimulated(true);
+    }
+  }, [initialConsented]);
 
   const canProceed = agreedTerms && agreedAnonymous && agreedSimulated;
   const isBlocked = !isDemoMode && !canProceed;
@@ -141,7 +151,7 @@ export const Stage2Consent: React.FC<Stage2ConsentProps> = ({
               disabled={isBlocked}
               className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-semibold rounded-lg transition-colors bg-teal-600 hover:bg-teal-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white shadow-2xs cursor-pointer"
             >
-              <span>{canProceed ? 'Confirm Consent & Continue' : 'Continue to Profile'}</span>
+              <span>{canProceed ? 'Confirm Consent & Continue' : 'Continue to Registration'}</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>

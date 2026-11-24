@@ -7,11 +7,16 @@ import {
   AiAgreementLevel,
   CdssFollowUpSuggestion,
   CdssFollowupEvent,
+  CdssOptionOrderItem,
   ResearchEventType
 } from '../../types';
 import { SubmitAiInteractionInput } from '../../services/supabaseResearchService';
 import { ClinicalImageGallery } from '../common/ClinicalImageGallery';
 import { useCaseActiveTimer } from '../../hooks/useCaseActiveTimer';
+import {
+  buildDisplayedCdssOptions,
+  resolveOptionIdFromDiagnosis
+} from '../../utils/cdssOptions';
 
 interface Stage6AiSimulationProps {
   cases: ParticipantClinicalCase[];
@@ -19,7 +24,7 @@ interface Stage6AiSimulationProps {
   isDemoMode: boolean;
   initialRecords?: AiInteractionRecord[];
   initialFollowupEvents?: CdssFollowupEvent[];
-  onOpenCase?: (caseId: string) => Promise<void> | void;
+  onOpenCase?: (caseId: string, displayedOptionOrder?: CdssOptionOrderItem[]) => Promise<void> | void;
   onHeartbeatTimer?: (caseId: string, deltaSeconds: number) => Promise<void> | void;
   onLogFollowup?: (caseId: string, suggestionId: 'followup_1' | 'followup_2') => Promise<void> | void;
   onSubmitCase?: (input: SubmitAiInteractionInput) => Promise<AiInteractionRecord | void>;
@@ -41,6 +46,7 @@ interface ChatMessage {
 
 interface CaseEvaluationState {
   aiAgreement: AiAgreementLevel;
+  selectedOptionId: string;
   finalDiagnosis: string;
   customOtherFinal: string;
   switchedAfterCdss: boolean;
@@ -84,8 +90,12 @@ export const Stage6AiSimulation: React.FC<Stage6AiSimulationProps> = ({
     initialRecords.forEach(rec => {
       const matchedCase = cases.find(c => c.id === rec.caseId);
       const isOptionMatch = matchedCase?.mcqOptions.includes(rec.finalDiagnosis);
+      const resolvedOptionId =
+        rec.selectedOptionId ||
+        resolveOptionIdFromDiagnosis(matchedCase?.mcqOptions || [], rec.finalDiagnosis);
       initial[rec.caseId] = {
         aiAgreement: rec.aiAgreement,
+        selectedOptionId: resolvedOptionId,
         finalDiagnosis: isOptionMatch ? rec.finalDiagnosis : 'Other',
         customOtherFinal: isOptionMatch ? '' : rec.finalDiagnosis,
         switchedAfterCdss: rec.switchedDiagnosis,
@@ -149,13 +159,28 @@ export const Stage6AiSimulation: React.FC<Stage6AiSimulationProps> = ({
 
   const currentCase = cases[currentCaseIndex];
   const currentSubmittedRecord = currentCase ? submittedRecords[currentCase.id] : undefined;
-  const isCurrentSubmittedLocked = !isDemoMode && Boolean(currentSubmittedRecord);
+  const isCurrentSubmittedLocked = Boolean(currentSubmittedRecord);
+
+  const firstUnsubmittedIndex = cases.findIndex(c => !submittedRecords[c.id]);
+  const maxUnlockedIndex = firstUnsubmittedIndex === -1 ? Math.max(0, cases.length - 1) : firstUnsubmittedIndex;
+
+  const handleOpenCaseWithOrder = React.useCallback(
+    (caseId: string) => {
+      if (!onOpenCase) return;
+      const target = cases.find(c => c.id === caseId);
+      const order = target
+        ? buildDisplayedCdssOptions(participant.id, target.id, target.mcqOptions)
+        : undefined;
+      return onOpenCase(caseId, order);
+    },
+    [onOpenCase, cases, participant.id]
+  );
 
   const { flushCurrent, getLocalTiming } = useCaseActiveTimer({
     caseId: currentCase?.id,
     isLocked: isCurrentSubmittedLocked,
     isDemoMode,
-    onOpenCase,
+    onOpenCase: handleOpenCaseWithOrder,
     onHeartbeatTimer,
     onLogEvent
   });
@@ -205,9 +230,15 @@ export const Stage6AiSimulation: React.FC<Stage6AiSimulationProps> = ({
     }
   ];
 
+  const displayedOptions: CdssOptionOrderItem[] =
+    currentSubmittedRecord?.displayedOptionOrder && currentSubmittedRecord.displayedOptionOrder.length > 0
+      ? currentSubmittedRecord.displayedOptionOrder
+      : buildDisplayedCdssOptions(participant.id, currentCase.id, currentCase.mcqOptions);
+
   const currentEval: CaseEvaluationState = evaluations[currentCase.id] || {
     aiAgreement: 'Completely agree',
-    finalDiagnosis: currentCase.mcqOptions[0] || 'Other',
+    selectedOptionId: '',
+    finalDiagnosis: '',
     customOtherFinal: '',
     switchedAfterCdss: false,
     reasonForDecision: '',
@@ -231,8 +262,21 @@ export const Stage6AiSimulation: React.FC<Stage6AiSimulationProps> = ({
     }));
   };
 
+  const selectMcqOption = (opt: CdssOptionOrderItem) => {
+    if (isCurrentSubmittedLocked) return;
+    setErrorMessage(null);
+    setEvaluations(prev => ({
+      ...prev,
+      [currentCase.id]: {
+        ...(prev[currentCase.id] || currentEval),
+        selectedOptionId: opt.optionId,
+        finalDiagnosis: opt.text
+      }
+    }));
+  };
+
   const handleSelectSuggestion = (suggestion: CdssFollowUpSuggestion) => {
-    if (currentAskedIds.includes(suggestion.id) || isTyping) return;
+    if (isCurrentSubmittedLocked || currentAskedIds.includes(suggestion.id) || isTyping) return;
     const caseId = currentCase.id;
 
     setAskedByCase(prev => ({
@@ -297,6 +341,13 @@ export const Stage6AiSimulation: React.FC<Stage6AiSimulationProps> = ({
   };
 
   const handleSelectCase = async (idx: number) => {
+    if (idx < 0 || idx >= cases.length) return;
+    if (idx > maxUnlockedIndex) {
+      setErrorMessage(
+        `Please complete and submit Case ${maxUnlockedIndex + 1} before opening Case ${idx + 1}.`
+      );
+      return;
+    }
     await flushCurrent();
     setCurrentCaseIndex(idx);
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -308,6 +359,9 @@ export const Stage6AiSimulation: React.FC<Stage6AiSimulationProps> = ({
       : ev.finalDiagnosis;
 
   const validateEvaluation = (ev: CaseEvaluationState): string | null => {
+    if (!ev.finalDiagnosis) {
+      return 'Please select your working diagnosis option before submitting this case.';
+    }
     if (ev.finalDiagnosis === 'Other' && !ev.customOtherFinal.trim()) {
       return 'Please specify your alternative working diagnosis before submitting this case.';
     }
@@ -322,11 +376,14 @@ export const Stage6AiSimulation: React.FC<Stage6AiSimulationProps> = ({
 
   const buildDemoRecord = (
     c: ParticipantClinicalCase,
-    ev: CaseEvaluationState
+    ev: CaseEvaluationState,
+    order: CdssOptionOrderItem[]
   ): AiInteractionRecord => {
     const timing = getLocalTiming(c.id);
     const actualFinal = resolveFinalDiagnosis(ev);
     const rationaleText = ev.reasonForDecision.trim() || 'Reviewed in demo walkthrough';
+    const selectedId =
+      ev.selectedOptionId || resolveOptionIdFromDiagnosis(c.mcqOptions, actualFinal);
     return {
       id: `ai-sim-${participant.id}-${c.id}`,
       participantId: participant.id,
@@ -334,6 +391,8 @@ export const Stage6AiSimulation: React.FC<Stage6AiSimulationProps> = ({
       isDemo: true,
       aiAgreement: ev.aiAgreement,
       finalDiagnosis: actualFinal,
+      selectedOptionId: selectedId,
+      displayedOptionOrder: order,
       reasonForDecision: rationaleText,
       finalConfidence: ev.finalConfidence,
       willVerify: ev.willVerify,
@@ -363,11 +422,16 @@ export const Stage6AiSimulation: React.FC<Stage6AiSimulationProps> = ({
       await flushCurrent();
 
       const actualFinal = resolveFinalDiagnosis(currentEval);
+      const selectedId =
+        currentEval.selectedOptionId ||
+        resolveOptionIdFromDiagnosis(currentCase.mcqOptions, actualFinal);
       const input: SubmitAiInteractionInput = {
         participantId: participant.id,
         caseId: currentCase.id,
         aiAgreement: currentEval.aiAgreement,
         finalDiagnosis: actualFinal,
+        selectedOptionId: selectedId,
+        displayedOptionOrder: displayedOptions,
         switchedDiagnosis: currentEval.switchedAfterCdss,
         reasonForDecision: currentEval.reasonForDecision.trim(),
         finalConfidence: currentEval.finalConfidence,
@@ -379,7 +443,15 @@ export const Stage6AiSimulation: React.FC<Stage6AiSimulationProps> = ({
 
       const saved = onSubmitCase ? await onSubmitCase(input) : undefined;
       if (saved) {
-        const nextMap = { ...submittedRecords, [currentCase.id]: saved };
+        const enrichedSaved: AiInteractionRecord = {
+          ...saved,
+          selectedOptionId: saved.selectedOptionId || selectedId,
+          displayedOptionOrder:
+            saved.displayedOptionOrder && saved.displayedOptionOrder.length > 0
+              ? saved.displayedOptionOrder
+              : displayedOptions
+        };
+        const nextMap = { ...submittedRecords, [currentCase.id]: enrichedSaved };
         setSubmittedRecords(nextMap);
         return nextMap;
       }
@@ -395,19 +467,11 @@ export const Stage6AiSimulation: React.FC<Stage6AiSimulationProps> = ({
   };
 
   const handleCompleteStageDemo = () => {
-    const records: AiInteractionRecord[] = cases.map(c => {
-      const ev = evaluations[c.id] || {
-        aiAgreement: 'Completely agree' as AiAgreementLevel,
-        finalDiagnosis: c.mcqOptions[0] || 'Other',
-        customOtherFinal: '',
-        switchedAfterCdss: false,
-        reasonForDecision: '',
-        finalConfidence: 3,
-        willVerify: true,
-        verificationTargets: ''
-      };
-      return buildDemoRecord(c, ev);
-    });
+    if (!cases.every(c => Boolean(submittedRecords[c.id]))) {
+      setErrorMessage('Please complete and submit all 5 cases sequentially before continuing.');
+      return;
+    }
+    const records = cases.map(c => submittedRecords[c.id]);
     void onComplete(records);
   };
 
@@ -415,11 +479,48 @@ export const Stage6AiSimulation: React.FC<Stage6AiSimulationProps> = ({
 
   const handleNextOrFinish = async () => {
     if (isDemoMode) {
-      await flushCurrent();
+      let latestMap = submittedRecords;
+      if (!isCurrentSubmittedLocked) {
+        const validationErr = validateEvaluation(currentEval);
+        if (validationErr) {
+          setErrorMessage(validationErr);
+          return;
+        }
+        await flushCurrent();
+        const demoRecord = buildDemoRecord(currentCase, currentEval, displayedOptions);
+        latestMap = { ...submittedRecords, [currentCase.id]: demoRecord };
+        setSubmittedRecords(latestMap);
+        if (onSubmitCase) {
+          await onSubmitCase({
+            participantId: participant.id,
+            caseId: currentCase.id,
+            aiAgreement: demoRecord.aiAgreement,
+            finalDiagnosis: demoRecord.finalDiagnosis,
+            selectedOptionId: demoRecord.selectedOptionId,
+            displayedOptionOrder: demoRecord.displayedOptionOrder,
+            switchedDiagnosis: demoRecord.switchedDiagnosis,
+            reasonForDecision: demoRecord.reasonForDecision,
+            finalConfidence: demoRecord.finalConfidence,
+            willVerify: demoRecord.willVerify,
+            verificationTargets: demoRecord.verificationTargets
+          });
+        }
+      }
+
       if (currentCaseIndex < cases.length - 1) {
-        await handleSelectCase(currentCaseIndex + 1);
+        await flushCurrent();
+        setCurrentCaseIndex(currentCaseIndex + 1);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       } else {
-        handleCompleteStageDemo();
+        const finalRecords = cases.map(c => latestMap[c.id]).filter(Boolean);
+        if (finalRecords.length < cases.length) {
+          const nextIdx = cases.findIndex(c => !latestMap[c.id]);
+          if (nextIdx >= 0) {
+            setCurrentCaseIndex(nextIdx);
+          }
+          return;
+        }
+        void onComplete(finalRecords);
       }
       return;
     }
@@ -429,6 +530,11 @@ export const Stage6AiSimulation: React.FC<Stage6AiSimulationProps> = ({
       const savedMap = await handleSubmitCurrentLiveCase();
       if (!savedMap) return;
       latestMap = savedMap;
+    }
+
+    if (isCurrentSubmittedLocked && currentCaseIndex < cases.length - 1) {
+      await handleSelectCase(currentCaseIndex + 1);
+      return;
     }
 
     const nextUnsubmittedIdx = cases.findIndex((c, idx) => idx > currentCaseIndex && !latestMap[c.id]);
@@ -474,32 +580,47 @@ export const Stage6AiSimulation: React.FC<Stage6AiSimulationProps> = ({
               <span>CDSS SIMULATION</span>
             </div>
             <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
-              CDSS Case {currentCaseIndex + 1} of {cases.length}: {currentCase.domain}
+              Case {currentCaseIndex + 1}
             </h2>
           </div>
 
-          {/* Case Stepper */}
+          {/* Sequential Case Stepper */}
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 mr-1">
               Cases ({Object.keys(submittedRecords).length}/{cases.length}):
             </span>
-            {cases.map((c, i) => (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => void handleSelectCase(i)}
-                title={`Jump to Case ${i + 1}: ${c.domain}`}
-                className={`w-8 h-8 rounded text-xs font-mono font-bold flex items-center justify-center transition-colors cursor-pointer ${
-                  i === currentCaseIndex
-                    ? 'bg-slate-900 text-white'
-                    : isCaseStartedOrFilled(c)
-                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-300 hover:bg-emerald-100'
-                    : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-100'
-                }`}
-              >
-                {i + 1}
-              </button>
-            ))}
+            {cases.map((c, i) => {
+              const isSubmitted = Boolean(submittedRecords[c.id]);
+              const isLockedAhead = i > maxUnlockedIndex;
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  disabled={isLockedAhead}
+                  onClick={() => void handleSelectCase(i)}
+                  title={
+                    isSubmitted
+                      ? `Case ${i + 1} submitted (locked read-only)`
+                      : isLockedAhead
+                      ? `Complete Case ${maxUnlockedIndex + 1} first to unlock Case ${i + 1}`
+                      : `Case ${i + 1}`
+                  }
+                  className={`h-8 px-2.5 rounded text-xs font-mono font-bold inline-flex items-center justify-center gap-1 transition-colors ${
+                    isLockedAhead
+                      ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
+                      : i === currentCaseIndex
+                      ? 'bg-slate-900 text-white cursor-pointer'
+                      : isSubmitted
+                      ? 'bg-emerald-50 text-emerald-800 border border-emerald-300 hover:bg-emerald-100 cursor-pointer'
+                      : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-100 cursor-pointer'
+                  }`}
+                >
+                  {isLockedAhead && <Lock className="w-3 h-3" />}
+                  {isSubmitted && i !== currentCaseIndex && <Check className="w-3 h-3 text-emerald-700" />}
+                  <span>{i + 1}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -508,15 +629,6 @@ export const Stage6AiSimulation: React.FC<Stage6AiSimulationProps> = ({
           
           {/* Left Column: Clinical Case Details */}
           <div className="lg:col-span-7 p-5 rounded bg-slate-50 border border-slate-200 space-y-4">
-            <div className="pb-2 border-b border-slate-200 flex items-center justify-between">
-              <span className="font-mono text-xs font-bold uppercase tracking-wider text-slate-900">
-                Clinical Case · {currentCase.title}
-              </span>
-              <span className="font-mono text-[10px] text-slate-500 uppercase">
-                {currentCase.domain}
-              </span>
-            </div>
-
             <div>
               <span className="text-[10px] font-mono uppercase tracking-wider text-slate-500 block mb-1">
                 Clinical Presentation
@@ -615,8 +727,14 @@ export const Stage6AiSimulation: React.FC<Stage6AiSimulationProps> = ({
                   </div>
                 </div>
               </div>
-              <span className="text-[10px] font-mono text-emerald-300 bg-slate-800 px-2 py-0.5 rounded border border-slate-700">
-                ACTIVE
+              <span
+                className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
+                  isCurrentSubmittedLocked
+                    ? 'text-amber-300 bg-slate-800 border-slate-700'
+                    : 'text-emerald-300 bg-slate-800 border-slate-700'
+                }`}
+              >
+                {isCurrentSubmittedLocked ? 'LOCKED' : 'ACTIVE'}
               </span>
             </div>
 
@@ -732,14 +850,15 @@ export const Stage6AiSimulation: React.FC<Stage6AiSimulationProps> = ({
               <div className="space-y-1.5">
                 {followUpSuggestions.slice(0, 2).map((suggestion) => {
                   const isAsked = currentAskedIds.includes(suggestion.id);
+                  const isDisabledPrompt = isCurrentSubmittedLocked || isAsked || isTyping;
                   return (
                     <button
                       key={suggestion.id}
                       type="button"
-                      disabled={isAsked || isTyping}
+                      disabled={isDisabledPrompt}
                       onClick={() => handleSelectSuggestion(suggestion)}
                       className={`w-full text-left px-3 py-2 rounded border text-xs transition-colors flex items-center justify-between gap-2 ${
-                        isAsked
+                        isDisabledPrompt
                           ? 'bg-slate-50 border-slate-200 text-slate-400 cursor-default'
                           : 'bg-white border-slate-300 hover:border-slate-900 hover:bg-slate-50 text-slate-800 font-medium cursor-pointer shadow-2xs'
                       }`}
@@ -747,23 +866,31 @@ export const Stage6AiSimulation: React.FC<Stage6AiSimulationProps> = ({
                       <span className="flex items-center gap-2">
                         {isAsked ? (
                           <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        ) : isCurrentSubmittedLocked ? (
+                          <Lock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                         ) : (
                           <CornerDownRight className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                         )}
                         <span>{suggestion.promptLabel}</span>
                       </span>
-                      {isAsked && (
+                      {isAsked ? (
                         <span className="text-[10px] font-mono uppercase text-slate-400 shrink-0">
                           Asked
                         </span>
-                      )}
+                      ) : isCurrentSubmittedLocked ? (
+                        <span className="text-[10px] font-mono uppercase text-slate-400 shrink-0">
+                          Locked
+                        </span>
+                      ) : null}
                     </button>
                   );
                 })}
               </div>
 
               <div className="pt-1 text-[10px] font-mono text-slate-400">
-                Standardized CDSS interface · Responses are identical for all participants.
+                {isCurrentSubmittedLocked
+                  ? 'Case locked after submission · Prompts and responses are read-only.'
+                  : 'Standardized CDSS interface · Responses are identical for all participants.'}
               </div>
             </div>
           </div>
@@ -782,15 +909,17 @@ export const Stage6AiSimulation: React.FC<Stage6AiSimulationProps> = ({
               </p>
             </div>
 
-            {isDemoMode && (
+            {isDemoMode && !isCurrentSubmittedLocked && (
               <button
                 type="button"
                 onClick={() => {
+                  const defaultOpt = displayedOptions[0];
                   setEvaluations(prev => ({
                     ...prev,
                     [currentCase.id]: {
                       aiAgreement: 'Uncertain; requires verification',
-                      finalDiagnosis: currentCase.mcqOptions[0] || 'Other',
+                      selectedOptionId: defaultOpt?.optionId || 'opt_other',
+                      finalDiagnosis: defaultOpt?.text || 'Other',
                       customOtherFinal: '',
                       switchedAfterCdss: false,
                       reasonForDecision:
@@ -805,7 +934,7 @@ export const Stage6AiSimulation: React.FC<Stage6AiSimulationProps> = ({
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded transition-colors shrink-0 self-start sm:self-auto"
                 title="Fill sample CDSS evaluation for demo walkthrough"
               >
-                <span>⚡ Auto-Fill CDSS Evaluation</span>
+                <span>Auto-Fill CDSS Evaluation</span>
               </button>
             )}
           </div>
@@ -815,7 +944,7 @@ export const Stage6AiSimulation: React.FC<Stage6AiSimulationProps> = ({
               <div className="flex items-center gap-2 font-medium">
                 <Lock className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
                 <span>
-                  Case evaluation submitted and securely recorded.
+                  CDSS case submitted and locked. Responses cannot be modified.
                 </span>
               </div>
               {typeof currentSubmittedRecord.activeSeconds === 'number' && (
@@ -861,34 +990,42 @@ export const Stage6AiSimulation: React.FC<Stage6AiSimulationProps> = ({
             </div>
           </div>
 
-          {/* 2. Final Working Diagnosis */}
+          {/* 2. Final Working Diagnosis (Deterministically shuffled per participant) */}
           <div>
             <label className="block text-xs font-semibold text-slate-800 uppercase tracking-wider mb-2 font-mono">
               2. Final Working Diagnosis
             </label>
             <div className="space-y-1.5">
-              {currentCase.mcqOptions.map(opt => (
-                <label
-                  key={opt}
-                  className={`flex items-center gap-3 p-2.5 rounded border text-xs ${
-                    isCurrentSubmittedLocked ? 'cursor-default opacity-85' : 'cursor-pointer'
-                  } ${
-                    currentEval.finalDiagnosis === opt
-                      ? 'border-slate-900 bg-slate-50 font-semibold text-slate-900'
-                      : 'border-slate-200 hover:bg-slate-50 text-slate-700'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name={`final-mcq-${currentCase.id}`}
-                    disabled={isCurrentSubmittedLocked}
-                    checked={currentEval.finalDiagnosis === opt}
-                    onChange={() => updateCurrentEval('finalDiagnosis', opt)}
-                    className="text-slate-900 focus:ring-slate-900"
-                  />
-                  <span>{opt}</span>
-                </label>
-              ))}
+              {displayedOptions.map(opt => {
+                const isSelected =
+                  currentEval.selectedOptionId === opt.optionId ||
+                  currentEval.finalDiagnosis === opt.text;
+                return (
+                  <label
+                    key={opt.optionId}
+                    className={`flex items-center gap-3 p-2.5 rounded border text-xs ${
+                      isCurrentSubmittedLocked ? 'cursor-default opacity-85' : 'cursor-pointer'
+                    } ${
+                      isSelected
+                        ? 'border-slate-900 bg-slate-50 font-semibold text-slate-900'
+                        : 'border-slate-200 hover:bg-slate-50 text-slate-700'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name={`final-mcq-${currentCase.id}`}
+                      disabled={isCurrentSubmittedLocked}
+                      checked={isSelected}
+                      onChange={() => selectMcqOption(opt)}
+                      className="text-slate-900 focus:ring-slate-900"
+                    />
+                    <span className="font-mono font-bold text-slate-500 w-4 shrink-0">
+                      {opt.letter}.
+                    </span>
+                    <span>{opt.text}</span>
+                  </label>
+                );
+              })}
             </div>
 
             {currentEval.finalDiagnosis === 'Other' && (
@@ -1042,11 +1179,11 @@ export const Stage6AiSimulation: React.FC<Stage6AiSimulationProps> = ({
             </button>
 
             <div className="flex items-center gap-2 self-end sm:self-auto">
-              {isDemoMode && currentCaseIndex < cases.length - 1 && (
+              {isDemoMode && allCasesSubmitted && currentCaseIndex < cases.length - 1 && (
                 <button
                   type="button"
                   onClick={handleCompleteStageDemo}
-                  className="px-3.5 py-2 text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 rounded transition-colors"
+                  className="px-3.5 py-2 text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 rounded transition-colors cursor-pointer"
                 >
                   Proceed to Vignette Cases
                 </button>
@@ -1063,17 +1200,15 @@ export const Stage6AiSimulation: React.FC<Stage6AiSimulationProps> = ({
                     ? 'Saving Case...'
                     : isCompletingStage
                     ? 'Finalizing CDSS Stage...'
-                    : isDemoMode
-                    ? currentCaseIndex === cases.length - 1
-                      ? 'Complete CDSS & Proceed to Vignette Cases'
-                      : 'Next CDSS Case'
                     : isCurrentSubmittedLocked
-                    ? allCasesSubmitted
+                    ? currentCaseIndex < cases.length - 1
+                      ? 'Next Case'
+                      : allCasesSubmitted
                       ? 'Complete CDSS & Proceed to Vignette Cases'
-                      : 'Next CDSS Case'
-                    : Object.keys(submittedRecords).length === cases.length - 1
+                      : 'Next Case'
+                    : currentCaseIndex === cases.length - 1
                     ? 'Submit Final Case & Proceed to Vignette Cases'
-                    : 'Save & Submit Case Evaluation'}
+                    : `Save & Submit Case ${currentCaseIndex + 1}`}
                 </span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>

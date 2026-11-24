@@ -381,7 +381,7 @@ export const EnrollmentPrepView: React.FC<EnrollmentPrepViewProps> = ({
                     Create an isolated, anonymous participant session exclusively for the incoming clinician participant.
                   </li>
                   <li>
-                    Launch the eight-stage study protocol and require fresh staff sign-in once the participant finishes debriefing.
+                    Launch the seven-stage study protocol and require fresh staff sign-in once the participant finishes debriefing.
                   </li>
                 </ul>
               </div>

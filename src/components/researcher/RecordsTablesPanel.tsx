@@ -71,10 +71,10 @@ export const OperationalParticipantsTable: React.FC<OperationalParticipantsTable
   });
 
   const stageName = (dbStage: number, done: boolean) => {
-    if (done || dbStage >= 7) return 'Completed (8/8)';
-    if (dbStage === 4) return 'Survey (5/8)';
-    if (dbStage === 5) return 'CDSS (6/8)';
-    if (dbStage === 6) return 'Vignettes (7/8)';
+    if (done || dbStage >= 7) return 'Completed (7/7)';
+    if (dbStage === 4) return 'Survey (4/7)';
+    if (dbStage === 5) return 'CDSS (5/7)';
+    if (dbStage === 6) return 'Vignettes (6/7)';
     return `Stage ${dbStage}`;
   };
 

@@ -7,6 +7,7 @@ import {
   CaseStage,
   CdssFollowUpSuggestion,
   CdssFollowupEvent,
+  CdssOptionOrderItem,
   ClinicalCase,
   ClinicalImage,
   ClinicalInvestigation,
@@ -93,6 +94,8 @@ export interface SubmitAiInteractionInput {
   finalConfidence: number;
   willVerify: boolean;
   verificationTargets: string;
+  selectedOptionId?: string;
+  displayedOptionOrder?: CdssOptionOrderItem[];
 }
 
 export interface SubmitVignetteAnswerInput {
@@ -208,6 +211,7 @@ interface CaseSessionTimerRow {
   active_seconds: number;
   open_count: number;
   submitted_at: string | null;
+  displayed_option_order?: CdssOptionOrderItem[] | null;
 }
 
 interface AiInteractionRow {
@@ -221,6 +225,8 @@ interface AiInteractionRow {
   initial_submitted_at: string | null;
   ai_agreement: AiAgreementLevel;
   final_diagnosis: string;
+  selected_option_id?: string | null;
+  displayed_option_order?: CdssOptionOrderItem[] | null;
   switched_diagnosis: boolean;
   reason_for_decision: string;
   final_confidence: number;
@@ -369,6 +375,87 @@ export interface SubmitAssessorScoreInput {
   notes?: string;
 }
 
+const AI_INTERACTION_SELECT_LEGACY =
+  'id, participant_id, case_id, is_demo, initial_diagnosis, initial_justification, initial_confidence, initial_submitted_at, ai_agreement, final_diagnosis, switched_diagnosis, reason_for_decision, final_confidence, will_verify, verification_targets, first_displayed_at, last_opened_at, submitted_at, active_seconds, wall_clock_seconds, completed_at';
+
+const AI_INTERACTION_SELECT_WITH_OPTIONS =
+  'id, participant_id, case_id, is_demo, initial_diagnosis, initial_justification, initial_confidence, initial_submitted_at, ai_agreement, final_diagnosis, selected_option_id, displayed_option_order, switched_diagnosis, reason_for_decision, final_confidence, will_verify, verification_targets, first_displayed_at, last_opened_at, submitted_at, active_seconds, wall_clock_seconds, completed_at';
+
+function isSchemaCompatError(error: { code?: string; message?: string } | null | undefined): boolean {
+  if (!error) return false;
+  return (
+    error.code === '42703' ||
+    error.code === 'PGRST202' ||
+    error.code === 'PGRST204' ||
+    error.code === '42883' ||
+    /column .* does not exist|Could not find the function/i.test(error.message || '')
+  );
+}
+
+const CDSS_CASE_SEQUENCE: Record<string, number> = {
+  'sim-04': 1,
+  'sim-05': 2,
+  'sim-01': 3,
+  'sim-02': 4,
+  'sim-03': 5,
+};
+
+function normalizeCdssCasePresentation<T extends ParticipantClinicalCase>(c: T): T {
+  const cleanedImages = (c.clinicalImages || []).map(img => {
+    if (c.id === 'sim-01' || img.id === 'img-case-02') {
+      return { ...img, title: '', caption: undefined };
+    }
+    if (c.id === 'sim-02' || img.id === 'img-case-03') {
+      return { ...img, title: img.title.replace(/\s*\(Case \d+\)/i, '') };
+    }
+    if (c.id === 'sim-03' || img.id === 'img-case-05') {
+      return {
+        ...img,
+        title: img.title.replace(/\s*\(Case \d+\)/i, ''),
+        caption: undefined,
+      };
+    }
+    return img;
+  });
+
+  const cleanedInvestigations =
+    c.id === 'sim-03'
+      ? (c.investigations || []).filter(
+          inv =>
+            inv.name.trim().toLowerCase() !== 'chest x-ray' &&
+            !inv.result.toLowerCase().includes('hyperinflation')
+        )
+      : c.investigations;
+
+  return {
+    ...c,
+    investigations: cleanedInvestigations,
+    clinicalImages: cleanedImages,
+  };
+}
+
+function applyCdssCaseSequence<T extends ParticipantClinicalCase>(cases: T[]): T[] {
+  const simCases = cases
+    .filter(c => c.stage === 'ai_simulation')
+    .sort((a, b) => {
+      const aOrder = CDSS_CASE_SEQUENCE[a.id] ?? 100 + a.caseNumber;
+      const bOrder = CDSS_CASE_SEQUENCE[b.id] ?? 100 + b.caseNumber;
+      return aOrder - bOrder;
+    })
+    .map((c, idx) =>
+      normalizeCdssCasePresentation({
+        ...c,
+        caseNumber: idx + 1,
+      })
+    );
+
+  const postCases = cases
+    .filter(c => c.stage !== 'ai_simulation')
+    .sort((a, b) => a.caseNumber - b.caseNumber);
+
+  return [...simCases, ...postCases];
+}
+
 function mapClinicalCaseRow(row: ClinicalCaseRow): ParticipantClinicalCase {
   return {
     id: row.id,
@@ -476,6 +563,7 @@ function mapCaseTimerRow(row: CaseSessionTimerRow): CaseSessionTimer {
     activeSeconds: row.active_seconds,
     openCount: row.open_count,
     submittedAt: row.submitted_at,
+    displayedOptionOrder: row.displayed_option_order ?? undefined,
   };
 }
 
@@ -491,6 +579,8 @@ function mapAiInteractionRow(row: AiInteractionRow): AiInteractionRecord {
     initialSubmittedAt: row.initial_submitted_at ?? undefined,
     aiAgreement: row.ai_agreement,
     finalDiagnosis: row.final_diagnosis,
+    selectedOptionId: row.selected_option_id ?? undefined,
+    displayedOptionOrder: row.displayed_option_order ?? undefined,
     reasonForDecision: row.reason_for_decision,
     finalConfidence: row.final_confidence,
     willVerify: row.will_verify,
@@ -730,7 +820,7 @@ export const supabaseResearchService = {
       throw new Error('Unable to load clinical study cases right now. Please refresh or contact your supervising researcher.');
     }
 
-    return ((data || []) as ClinicalCaseRow[]).map(mapClinicalCaseRow);
+    return applyCdssCaseSequence(((data || []) as ClinicalCaseRow[]).map(mapClinicalCaseRow));
   },
 
   async restoreParticipantSession(): Promise<ParticipantSessionSnapshot | null> {
@@ -766,9 +856,7 @@ export const supabaseResearchService = {
         .maybeSingle(),
       client
         .from('ai_interactions')
-        .select(
-          'id, participant_id, case_id, is_demo, initial_diagnosis, initial_justification, initial_confidence, initial_submitted_at, ai_agreement, final_diagnosis, switched_diagnosis, reason_for_decision, final_confidence, will_verify, verification_targets, first_displayed_at, last_opened_at, submitted_at, active_seconds, wall_clock_seconds, completed_at'
-        )
+        .select(AI_INTERACTION_SELECT_WITH_OPTIONS)
         .eq('participant_id', participant.id),
       client
         .from('followup_events')
@@ -787,8 +875,16 @@ export const supabaseResearchService = {
         .eq('participant_id', participant.id),
     ]);
 
+    let finalAiRes = aiRes;
+    if (aiRes.error && isSchemaCompatError(aiRes.error)) {
+      finalAiRes = await client
+        .from('ai_interactions')
+        .select(AI_INTERACTION_SELECT_LEGACY)
+        .eq('participant_id', participant.id);
+    }
+
     if (qRes.error) throw new Error('Unable to restore saved questionnaire responses. Please refresh the page.');
-    if (aiRes.error) throw new Error('Unable to restore clinical simulation records. Please refresh the page.');
+    if (finalAiRes.error) throw new Error('Unable to restore clinical simulation records. Please refresh the page.');
     if (followRes.error) throw new Error('Unable to restore simulation prompt history. Please refresh the page.');
     if (vigRes.error) throw new Error('Unable to restore clinical vignette answers. Please refresh the page.');
     if (timerRes.error) throw new Error('Unable to restore case timing state. Please refresh the page.');
@@ -804,7 +900,7 @@ export const supabaseResearchService = {
     return {
       participant,
       questionnaire: qRes.data ? mapQuestionnaireRow(qRes.data as QuestionnaireRow) : null,
-      aiInteractions: ((aiRes.data || []) as AiInteractionRow[]).map(mapAiInteractionRow),
+      aiInteractions: ((finalAiRes.data || []) as AiInteractionRow[]).map(mapAiInteractionRow),
       followupEvents: ((followRes.data || []) as FollowupEventRow[]).map(mapFollowupRow),
       vignetteAnswers: ((vigRes.data || []) as VignetteAnswerRow[]).map(mapVignetteAnswerRow),
       caseTimers: ((timerRes.data || []) as CaseSessionTimerRow[]).map(mapCaseTimerRow),
@@ -900,14 +996,27 @@ export const supabaseResearchService = {
     return mapQuestionnaireRow(qRow as QuestionnaireRow);
   },
 
-  async openStudyCase(participantId: string, caseId: string): Promise<CaseTimerOpenResult> {
+  async openStudyCase(
+    participantId: string,
+    caseId: string,
+    displayedOptionOrder?: CdssOptionOrderItem[]
+  ): Promise<CaseTimerOpenResult> {
     const client = requireSupabaseClient();
-    const { data, error } = await client.rpc('open_study_case', {
+    let { data, error } = await client.rpc('open_study_case', {
       p_participant_id: participantId,
       p_case_id: caseId,
+      p_displayed_option_order: displayedOptionOrder ?? null,
     });
+    if (error && isSchemaCompatError(error)) {
+      const retry = await client.rpc('open_study_case', {
+        p_participant_id: participantId,
+        p_case_id: caseId,
+      });
+      data = retry.data;
+      error = retry.error;
+    }
     if (error) {
-      throw new Error('Unable to open this clinical case. Please refresh and try again.');
+      throw new Error(error.message || 'Unable to open this clinical case. Please refresh and try again.');
     }
     const row = Array.isArray(data) ? data[0] : data;
     return {
@@ -951,7 +1060,7 @@ export const supabaseResearchService = {
 
   async submitAiInteraction(input: SubmitAiInteractionInput): Promise<AiInteractionRecord> {
     const client = requireSupabaseClient();
-    const { data: interactionId, error } = await client.rpc('submit_ai_interaction', {
+    let { data: interactionId, error } = await client.rpc('submit_ai_interaction', {
       p_participant_id: input.participantId,
       p_case_id: input.caseId,
       p_ai_agreement: input.aiAgreement,
@@ -961,19 +1070,45 @@ export const supabaseResearchService = {
       p_final_confidence: input.finalConfidence,
       p_will_verify: input.willVerify,
       p_verification_targets: input.verificationTargets,
+      p_selected_option_id: input.selectedOptionId ?? null,
+      p_displayed_option_order: input.displayedOptionOrder ?? null,
     });
 
-    if (error) {
-      throw new Error('Unable to save this case evaluation. Please ensure all required fields are completed.');
+    if (error && isSchemaCompatError(error)) {
+      const retry = await client.rpc('submit_ai_interaction', {
+        p_participant_id: input.participantId,
+        p_case_id: input.caseId,
+        p_ai_agreement: input.aiAgreement,
+        p_final_diagnosis: input.finalDiagnosis,
+        p_switched_diagnosis: input.switchedDiagnosis,
+        p_reason_for_decision: input.reasonForDecision,
+        p_final_confidence: input.finalConfidence,
+        p_will_verify: input.willVerify,
+        p_verification_targets: input.verificationTargets,
+      });
+      interactionId = retry.data;
+      error = retry.error;
     }
 
-    const { data: row, error: fetchError } = await client
+    if (error) {
+      throw new Error(error.message || 'Unable to save this case evaluation. Please ensure all required fields are completed.');
+    }
+
+    let { data: row, error: fetchError } = await client
       .from('ai_interactions')
-      .select(
-        'id, participant_id, case_id, is_demo, initial_diagnosis, initial_justification, initial_confidence, initial_submitted_at, ai_agreement, final_diagnosis, switched_diagnosis, reason_for_decision, final_confidence, will_verify, verification_targets, first_displayed_at, last_opened_at, submitted_at, active_seconds, wall_clock_seconds, completed_at'
-      )
+      .select(AI_INTERACTION_SELECT_WITH_OPTIONS)
       .eq('id', interactionId)
       .single();
+
+    if (fetchError && isSchemaCompatError(fetchError)) {
+      const retryFetch = await client
+        .from('ai_interactions')
+        .select(AI_INTERACTION_SELECT_LEGACY)
+        .eq('id', interactionId)
+        .single();
+      row = retryFetch.data;
+      fetchError = retryFetch.error;
+    }
 
     if (fetchError || !row) {
       throw new Error('Your case evaluation was recorded, but could not be refreshed. Please reload the page.');
@@ -1246,7 +1381,9 @@ export const supabaseResearchService = {
       throw new Error('Unable to load the participant progress roster. Please refresh and try again.');
     }
 
-    const participantCases = ((casesRes.data || []) as ClinicalCaseRow[]).map(mapClinicalCaseRow);
+    const participantCases = applyCdssCaseSequence(
+      ((casesRes.data || []) as ClinicalCaseRow[]).map(mapClinicalCaseRow)
+    );
     const recruitmentLinks = ((linksRes.data || []) as RecruitmentLinkRow[]).map(mapRecruitmentLinkRow);
     const operationalParticipants = ((opRes.data || []) as OperationalParticipantRow[]).map(
       mapOperationalParticipantRow
@@ -1371,9 +1508,7 @@ export const supabaseResearchService = {
       client.from('questionnaire_responses').select('*').order('created_at', { ascending: false }),
       client
         .from('ai_interactions')
-        .select(
-          'id, participant_id, case_id, is_demo, initial_diagnosis, initial_justification, initial_confidence, initial_submitted_at, ai_agreement, final_diagnosis, switched_diagnosis, reason_for_decision, final_confidence, will_verify, verification_targets, first_displayed_at, last_opened_at, submitted_at, active_seconds, wall_clock_seconds, completed_at'
-        )
+        .select(AI_INTERACTION_SELECT_WITH_OPTIONS)
         .order('completed_at', { ascending: false }),
       client.from('ai_interaction_evaluations').select('*'),
       client.from('followup_events').select('*').order('clicked_at', { ascending: false }),
@@ -1382,9 +1517,17 @@ export const supabaseResearchService = {
       client.from('case_session_timers').select('*').order('last_opened_at', { ascending: false }),
     ]);
 
+    let finalAiRes = aiRes;
+    if (aiRes.error && isSchemaCompatError(aiRes.error)) {
+      finalAiRes = await client
+        .from('ai_interactions')
+        .select(AI_INTERACTION_SELECT_LEGACY)
+        .order('completed_at', { ascending: false });
+    }
+
     if (pRes.error) throw new Error('Unable to load enrolled participant records. Please refresh and try again.');
     if (qRes.error) throw new Error('Unable to load questionnaire responses. Please refresh and try again.');
-    if (aiRes.error) throw new Error('Unable to load AI simulation records. Please refresh and try again.');
+    if (finalAiRes.error) throw new Error('Unable to load AI simulation records. Please refresh and try again.');
     if (evalRes.error) throw new Error('Unable to load simulation evaluation flags. Please refresh and try again.');
     if (followRes.error) throw new Error('Unable to load follow-up prompt records. Please refresh and try again.');
     if (teamRes.error) throw new Error('Unable to load the research team roster. Please refresh and try again.');
@@ -1399,12 +1542,13 @@ export const supabaseResearchService = {
     const evalByInteractionId = new Map<string, AiInteractionEvaluation>();
     aiEvaluations.forEach(ev => evalByInteractionId.set(ev.aiInteractionId, ev));
 
-    const aiInteractions = ((aiRes.data || []) as AiInteractionRow[]).map(row => {
+    const aiInteractions = ((finalAiRes.data || []) as AiInteractionRow[]).map(row => {
       const mapped = mapAiInteractionRow(row);
       const ev = evalByInteractionId.get(mapped.id);
       return ev
         ? {
             ...mapped,
+            matchedGoldStandard: ev.matchedGoldStandard,
             switchedTowardsCorrect: ev.switchedTowardsCorrect,
             acceptedMisleading: ev.acceptedMisleading,
           }

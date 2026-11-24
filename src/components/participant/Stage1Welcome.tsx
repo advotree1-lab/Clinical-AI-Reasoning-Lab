@@ -83,7 +83,7 @@ export const Stage1Welcome: React.FC<Stage1WelcomeProps> = ({
               03. Automation Bias Evaluation
             </h3>
             <p className="text-xs text-slate-600 leading-relaxed">
-              Measures diagnostic switching and acceptance rates when clinicians evaluate standardized clinically appropriate versus subtly misleading AI recommendations.
+              Measures diagnostic switching, verification vigilance, and acceptance rates when clinicians evaluate standardized clinical decision support recommendations across diagnostic scenarios.
             </p>
           </div>
 

@@ -17,6 +17,11 @@ import {
   InstitutionalPolicyStatus
 } from '../types';
 import { INITIAL_CLINICAL_CASES } from './clinicalCases';
+import {
+  buildDisplayedCdssOptions,
+  resolveOptionIdFromDiagnosis,
+  evaluateMatchedGoldStandard
+} from '../utils/cdssOptions';
 
 interface SeedDataResult {
   participants: Participant[];
@@ -257,6 +262,17 @@ export function generateSeedDemoData(): SeedDataResult {
         ? clamp(initialConfidence + (rand() > 0.5 ? 1 : 0))
         : clamp(initialConfidence - (rand() > 0.6 ? 1 : 0));
 
+      const displayedOptionOrder = buildDisplayedCdssOptions(
+        participantId,
+        sCase.id,
+        sCase.mcqOptions
+      );
+      const selectedOptionId = resolveOptionIdFromDiagnosis(sCase.mcqOptions, finalDiagnosis);
+      const matchedGoldStandard = evaluateMatchedGoldStandard(
+        { finalDiagnosis, selectedOptionId },
+        sCase
+      );
+
       const aiRecord: AiInteractionRecord = {
         id: `demo-ai-${participantId}-${sCase.id}`,
         participantId,
@@ -268,6 +284,8 @@ export function generateSeedDemoData(): SeedDataResult {
         initialSubmittedAt: participant.createdAt,
         aiAgreement,
         finalDiagnosis,
+        selectedOptionId,
+        displayedOptionOrder,
         reasonForDecision: acceptedAi
           ? `AI recommendation aligned with clinical assessment or provided plausible guidance.`
           : `AI recommendation conflicted with clinical evidence, patient hemodynamics, or established guidelines.`,
@@ -275,6 +293,7 @@ export function generateSeedDemoData(): SeedDataResult {
         willVerify,
         verificationTargets: willVerify ? 'Check clinical practice guidelines, confirmatory CT/biomarkers, and consult senior colleague.' : 'None required.',
         switchedDiagnosis,
+        matchedGoldStandard,
         switchedTowardsCorrect,
         acceptedMisleading: acceptedAi && isMisleading,
         timeSpentSeconds: Math.floor(110 + rand() * 180),

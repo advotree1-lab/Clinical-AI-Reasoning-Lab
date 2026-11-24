@@ -103,7 +103,7 @@ export const ResearcherLandingView: React.FC<ResearcherLandingViewProps> = ({
                   Enroll Participant
                 </h2>
                 <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-                  Prepare and validate a recruitment link, securely conclude your research team session, and initiate a dedicated anonymous participant session for the eight-stage study.
+                  Prepare and validate a recruitment link, securely conclude your research team session, and initiate a dedicated anonymous participant session for the seven-stage study.
                 </p>
               </div>
             </div>
