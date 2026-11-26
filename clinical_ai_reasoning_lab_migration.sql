@@ -2255,7 +2255,7 @@ INSERT INTO public.clinical_cases (
       {"name":"Echocardiography","result":"Regional posterior wall hypokinesia and LVEF of 35%","isAbnormal":true}
     ]$sql$::jsonb,
     $sql$[
-      {"id":"img-case-02","url":"/assets/cases/case-02-ecg.jpg","title":"12-Lead ECG (Case 2)","caption":"12-Lead ECG demonstrating ST depression in V1–V3, tall R waves in V2–V3, upright T waves in V1–V3, and mild ST elevation in II, III, aVF."}
+      {"id":"img-case-02","url":"/assets/cases/case-02-ecg.jpg","title":""}
     ]$sql$::jsonb,
     ARRAY[
       $sql$Acute True Posterior Wall STEMI (STEMI Equivalent) with Left Ventricular Dysfunction$sql$,
@@ -2446,7 +2446,7 @@ INSERT INTO public.clinical_cases (
       {"name":"Chest X-ray","result":"Hyperinflation without obvious consolidation or pneumothorax","isAbnormal":true}
     ]$sql$::jsonb,
     $sql$[
-      {"id":"img-case-05","url":"/assets/cases/case-05-cxr.jpg","title":"Chest X-ray — AP (a) and Lateral (b) (Case 5)","caption":"Figura 5 a, b. Crisis asmática: hiperinsuflación pulmonar y atelectasias bibasales. Rx de tórax AP (a) y lateral (b)."}
+      {"id":"img-case-05","url":"/assets/cases/case-05-cxr.jpg","title":"Chest X-ray — AP (a) and Lateral (b)"}
     ]$sql$::jsonb,
     ARRAY[
       $sql$Life-Threatening / Near-Fatal Acute Asthma Exacerbation with Silent Chest and Hypercapnic Respiratory Failure$sql$,
@@ -2718,7 +2718,7 @@ INSERT INTO public.clinical_cases (
       {"name":"ECG","result":"ST elevation in leads II, III and aVF, with reciprocal changes in leads I and aVL, consistent with inferior STEMI","isAbnormal":true}
     ]$sql$::jsonb,
     $sql$[
-      {"id":"img-case-01","url":"/assets/cases/case-01-ecg.jpg","title":"12-Lead ECG (Case 1)","caption":"ECG showing ST elevation in leads II, III and aVF, with reciprocal changes in leads I and aVL."}
+      {"id":"img-case-01","url":"/assets/cases/case-01-ecg.jpg","title":""}
     ]$sql$::jsonb,
     ARRAY[
       $sql$Acute Inferior Wall STEMI with Right Ventricular Myocardial Infarction (RVMI) and Cardiogenic Shock$sql$,
@@ -2793,7 +2793,7 @@ INSERT INTO public.clinical_cases (
       {"name":"Blood cultures","result":"Pending","isAbnormal":false}
     ]$sql$::jsonb,
     $sql$[
-      {"id":"img-case-04","url":"/assets/cases/case-04-ct-slices.jpg","title":"CT Brain Slices & IV Contrast Series (Case 4)","caption":"Serial non-contrast and contrast-enhanced CT brain slices demonstrating atypical left frontal lesion, surrounding vasogenic oedema, mass effect, and ring enhancement."}
+      {"id":"img-case-04","url":"/assets/cases/case-04-ct-slices.jpg","title":""}
     ]$sql$::jsonb,
     ARRAY[
       $sql$Pyogenic Brain Abscess (Left Frontal Lobe, Odontogenic Source) with Raised Intracranial Pressure$sql$,

@@ -24,49 +24,45 @@ export const ClinicalImageGallery: React.FC<ClinicalImageGalleryProps> = ({ imag
 
   return (
     <div className="pt-1">
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-[10px] font-mono uppercase tracking-wider text-slate-500">
-          Diagnostic Imaging &amp; ECG Tracings
-        </span>
-        <span className="text-[10px] font-mono text-slate-400">
-          Click image to enlarge
-        </span>
-      </div>
-
       <div className="space-y-3">
         {images.map((img) => (
           <div
             key={img.id}
             className="rounded border border-slate-200 bg-white overflow-hidden shadow-2xs"
           >
-            <div className="px-3 py-2 border-b border-slate-100 bg-slate-50/70 flex items-center justify-between gap-2">
-              {img.title ? (
+            {img.title ? (
+              <div className="px-3 py-2 border-b border-slate-100 bg-slate-50/70 flex items-center justify-between gap-2">
                 <span className="text-xs font-semibold text-slate-800">{img.title}</span>
-              ) : (
-                <span aria-hidden="true" />
-              )}
-              <button
-                type="button"
-                onClick={() => setActiveImage(img)}
-                className="inline-flex items-center gap-1 text-[11px] font-mono font-medium text-slate-600 hover:text-slate-900 px-2 py-0.5 rounded hover:bg-slate-200/70 transition-colors cursor-pointer"
-                title="Inspect full-resolution clinical image"
-              >
-                <Maximize2 className="w-3 h-3" />
-                <span>Enlarge</span>
-              </button>
-            </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveImage(img)}
+                  className="inline-flex items-center gap-1 text-[11px] font-mono font-medium text-slate-600 hover:text-slate-900 px-2 py-0.5 rounded hover:bg-slate-200/70 transition-colors cursor-pointer"
+                  title="Inspect full-resolution clinical image"
+                >
+                  <Maximize2 className="w-3 h-3" />
+                  <span>Enlarge</span>
+                </button>
+              </div>
+            ) : null}
 
             <button
               type="button"
               onClick={() => setActiveImage(img)}
               className="group relative block w-full bg-white text-left cursor-zoom-in focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-inset"
+              title="Click image to inspect full-resolution view"
             >
               <img
                 src={img.url}
-                alt={img.title || 'Clinical diagnostic tracing'}
+                alt={img.title || 'Clinical diagnostic image'}
                 className="w-full h-auto max-h-[420px] object-contain mx-auto bg-white"
                 loading="lazy"
               />
+              {!img.title && (
+                <span className="pointer-events-none absolute top-2 right-2 inline-flex items-center gap-1 rounded bg-slate-900/75 px-2 py-1 text-[10px] font-mono text-white shadow-xs">
+                  <Maximize2 className="w-3 h-3" />
+                  <span>Enlarge</span>
+                </span>
+              )}
               <span className="pointer-events-none absolute bottom-2 right-2 inline-flex items-center gap-1 rounded bg-slate-900/75 px-2 py-1 text-[10px] font-mono text-white opacity-0 transition-opacity group-hover:opacity-100">
                 <ZoomIn className="w-3 h-3" />
                 <span>Full View</span>

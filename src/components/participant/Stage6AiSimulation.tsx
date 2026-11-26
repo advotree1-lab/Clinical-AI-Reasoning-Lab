@@ -1020,7 +1020,7 @@ export const Stage6AiSimulation: React.FC<Stage6AiSimulationProps> = ({
                       className="text-slate-900 focus:ring-slate-900"
                     />
                     <span className="font-mono font-bold text-slate-500 w-4 shrink-0">
-                      {opt.letter}.
+                      {opt.label}.
                     </span>
                     <span>{opt.text}</span>
                   </label>

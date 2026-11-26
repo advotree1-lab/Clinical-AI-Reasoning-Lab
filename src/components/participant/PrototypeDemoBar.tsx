@@ -4,12 +4,14 @@ import {
   CheckCircle2,
   RotateCcw,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Lock
 } from 'lucide-react';
 import { Participant } from '../../types';
 
 interface PrototypeDemoBarProps {
   currentStage: number;
+  maxAccessibleStage?: number;
   onJumpToStage: (stage: number) => void;
   onQuickFillStep: () => void;
   onLoadCompleteSession: () => void;
@@ -19,6 +21,7 @@ interface PrototypeDemoBarProps {
 
 export const PrototypeDemoBar: React.FC<PrototypeDemoBarProps> = ({
   currentStage,
+  maxAccessibleStage = 8,
   onJumpToStage,
   onQuickFillStep,
   onLoadCompleteSession,
@@ -31,10 +34,11 @@ export const PrototypeDemoBar: React.FC<PrototypeDemoBarProps> = ({
     { num: 1, label: 'Welcome' },
     { num: 2, label: 'Eligibility' },
     { num: 3, label: 'Consent' },
-    { num: 4, label: 'Survey' },
-    { num: 5, label: 'CDSS (5)' },
-    { num: 6, label: 'Vignettes (6)' },
-    { num: 7, label: 'Debriefing' }
+    { num: 4, label: 'Registration' },
+    { num: 5, label: 'Questionnaire' },
+    { num: 6, label: 'CDSS (5)' },
+    { num: 7, label: 'Vignettes (6)' },
+    { num: 8, label: 'Debriefing' }
   ];
 
   return (
@@ -59,7 +63,7 @@ export const PrototypeDemoBar: React.FC<PrototypeDemoBarProps> = ({
           <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={onQuickFillStep}
-              className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-slate-950 bg-emerald-400 hover:bg-emerald-300 rounded transition-colors shadow-2xs"
+              className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold text-slate-950 bg-emerald-400 hover:bg-emerald-300 rounded transition-colors shadow-2xs cursor-pointer"
               title="Automatically fill current stage with realistic resident physician data and advance"
             >
               <Zap className="w-3 h-3 fill-current" />
@@ -68,8 +72,8 @@ export const PrototypeDemoBar: React.FC<PrototypeDemoBarProps> = ({
 
             <button
               onClick={onLoadCompleteSession}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-slate-300 bg-slate-800 hover:bg-slate-700 hover:text-white rounded transition-colors border border-slate-700"
-              title="Instantly generate a complete participant run across all 7 stages"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-slate-300 bg-slate-800 hover:bg-slate-700 hover:text-white rounded transition-colors border border-slate-700 cursor-pointer"
+              title="Instantly generate a complete participant run across all 8 stages"
             >
               <CheckCircle2 className="w-3 h-3 text-emerald-400" />
               <span className="hidden sm:inline">Populate Full Run</span>
@@ -77,7 +81,7 @@ export const PrototypeDemoBar: React.FC<PrototypeDemoBarProps> = ({
 
             <button
               onClick={onResetSession}
-              className="p-1 text-slate-400 hover:text-white transition-colors"
+              className="p-1 text-slate-400 hover:text-white transition-colors cursor-pointer"
               title="Reset walkthrough to Stage 1"
             >
               <RotateCcw className="w-3.5 h-3.5" />
@@ -85,7 +89,7 @@ export const PrototypeDemoBar: React.FC<PrototypeDemoBarProps> = ({
 
             <button
               onClick={() => setIsExpanded(!isExpanded)}
-              className="p-1 text-slate-400 hover:text-white transition-colors"
+              className="p-1 text-slate-400 hover:text-white transition-colors cursor-pointer"
               title={isExpanded ? 'Collapse stage selector' : 'Expand stage selector'}
             >
               {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
@@ -98,22 +102,29 @@ export const PrototypeDemoBar: React.FC<PrototypeDemoBarProps> = ({
         {isExpanded && (
           <div className="mt-2 pt-2 border-t border-slate-800/80 flex items-center gap-1 overflow-x-auto pb-0.5 text-xs">
             <span className="text-[10px] text-slate-400 uppercase font-mono tracking-wider mr-1.5 shrink-0">
-              Jump:
+              Navigate:
             </span>
             {stageNames.map(s => {
               const isActive = currentStage === s.num;
+              const isLocked = s.num > maxAccessibleStage;
               return (
                 <button
                   key={s.num}
+                  type="button"
+                  disabled={isLocked}
                   onClick={() => onJumpToStage(s.num)}
-                  className={`px-2.5 py-1 rounded text-xs transition-colors whitespace-nowrap ${
+                  title={isLocked ? `Complete earlier stages to unlock ${s.label}` : `Go to Stage ${s.num}: ${s.label}`}
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs transition-colors whitespace-nowrap ${
                     isActive
-                      ? 'bg-slate-100 text-slate-900 font-bold'
-                      : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800'
+                      ? 'bg-slate-100 text-slate-900 font-bold cursor-pointer'
+                      : isLocked
+                      ? 'text-slate-600 cursor-not-allowed opacity-60'
+                      : 'text-slate-300 hover:text-white hover:bg-slate-800 cursor-pointer'
                   }`}
                 >
-                  <span className="font-mono text-[10px] opacity-70 mr-1">{s.num}</span>
+                  <span className="font-mono text-[10px] opacity-70">{s.num}.</span>
                   <span>{s.label}</span>
+                  {isLocked && <Lock className="w-2.5 h-2.5 ml-0.5 opacity-70" />}
                 </button>
               );
             })}

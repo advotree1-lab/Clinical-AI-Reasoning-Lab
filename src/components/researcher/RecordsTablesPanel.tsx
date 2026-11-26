@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search } from 'lucide-react';
+import { Search, ChevronDown, ChevronUp } from 'lucide-react';
 import {
   Participant,
   QuestionnaireResponse,
@@ -8,6 +8,12 @@ import {
   ClinicalCase,
   ResearcherOperationalParticipant
 } from '../../types';
+import {
+  evaluateMatchedGoldStandard,
+  getEffectiveDisplayedOrder,
+  resolveGoldStandardOptionId,
+  resolveOptionIdFromDiagnosis
+} from '../../utils/cdssOptions';
 
 interface OperationalParticipantsTableProps {
   participants: Participant[];
@@ -71,10 +77,10 @@ export const OperationalParticipantsTable: React.FC<OperationalParticipantsTable
   });
 
   const stageName = (dbStage: number, done: boolean) => {
-    if (done || dbStage >= 7) return 'Completed (7/7)';
-    if (dbStage === 4) return 'Survey (4/7)';
-    if (dbStage === 5) return 'CDSS (5/7)';
-    if (dbStage === 6) return 'Vignettes (6/7)';
+    if (done || dbStage >= 7) return 'Completed (8/8)';
+    if (dbStage === 4) return 'Questionnaire (5/8)';
+    if (dbStage === 5) return 'CDSS (6/8)';
+    if (dbStage === 6) return 'Vignettes (7/8)';
     return `Stage ${dbStage}`;
   };
 
@@ -221,21 +227,52 @@ export const QuestionnaireStatusTable: React.FC<QuestionnaireStatusTableProps> =
           <table className="w-full text-xs text-left border-collapse">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50 text-slate-700">
-                <th className="p-3 font-semibold">Participant</th>
-                <th className="p-3 font-semibold">Survey Status</th>
-                <th className="p-3 font-semibold">Q1 · GenAI 3 Mo</th>
-                <th className="p-3 font-semibold">Frequency</th>
-                <th className="p-3 font-semibold">Tools Used</th>
-                <th className="p-3 font-semibold">Q11 · Verify Freq</th>
-                <th className="p-3 font-semibold">Submitted</th>
+                <th className="p-3 font-semibold whitespace-nowrap">Participant</th>
+                <th className="p-3 font-semibold whitespace-nowrap">Q1 · Designation</th>
+                <th className="p-3 font-semibold whitespace-nowrap">Q2 · Specialty</th>
+                <th className="p-3 font-semibold whitespace-nowrap">Q3 · MBBS</th>
+                <th className="p-3 font-semibold whitespace-nowrap">Q4 · Hospital</th>
+                <th className="p-3 font-semibold whitespace-nowrap">Q5 · Training</th>
+                <th className="p-3 font-semibold whitespace-nowrap">Survey Status</th>
+                <th className="p-3 font-semibold whitespace-nowrap">Q6 · GenAI 3 Mo</th>
+                <th className="p-3 font-semibold whitespace-nowrap">Tools Used</th>
+                <th className="p-3 font-semibold whitespace-nowrap">Q16 · Verify Freq</th>
+                <th className="p-3 font-semibold whitespace-nowrap">Submitted</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {participants.map(p => {
                 const q = qByParticipant.get(p.id);
+                const designationVal =
+                  q?.designation === 'Other' && q.designationOther
+                    ? q.designationOther
+                    : q?.designation ||
+                      (p.designation === 'Other' && p.designationOther
+                        ? p.designationOther
+                        : p.designation);
+                const specialtyVal =
+                  q?.specialty === 'Other' && q.specialtyOther
+                    ? q.specialtyOther
+                    : q?.specialty ||
+                      (p.specialty === 'Other' && p.specialtyOther ? p.specialtyOther : p.specialty);
+                const yearsVal = q?.yearsSinceMbbsBracket || p.yearsSinceMbbsBracket;
+                const hospitalVal =
+                  q?.hospitalType === 'Other' && q.hospitalTypeOther
+                    ? q.hospitalTypeOther
+                    : q?.hospitalType ||
+                      (p.institutionType === 'Other' && p.institutionOther
+                        ? p.institutionOther
+                        : p.institutionType);
+                const trainingVal = q ? q.formalGenAiTraining : p.formalGenAiTraining;
+
                 return (
                   <tr key={p.id} className="hover:bg-slate-50/70">
-                    <td className="p-3 font-mono font-bold text-slate-900">{p.code}</td>
+                    <td className="p-3 font-mono font-bold text-slate-900 whitespace-nowrap">{p.code}</td>
+                    <td className="p-3 text-slate-800 whitespace-nowrap">{designationVal || '—'}</td>
+                    <td className="p-3 text-slate-700 whitespace-nowrap">{specialtyVal || '—'}</td>
+                    <td className="p-3 text-slate-700 whitespace-nowrap">{yearsVal || '—'}</td>
+                    <td className="p-3 text-slate-700 whitespace-nowrap">{hospitalVal || '—'}</td>
+                    <td className="p-3 font-mono text-slate-700">{trainingVal ? 'Yes' : 'No'}</td>
                     <td className="p-3 font-mono">
                       {q ? (
                         <span className="text-emerald-700 font-semibold">Completed</span>
@@ -243,15 +280,14 @@ export const QuestionnaireStatusTable: React.FC<QuestionnaireStatusTableProps> =
                         <span className="text-amber-700">Pending</span>
                       )}
                     </td>
-                    <td className="p-3 text-slate-700">
-                      {q ? (q.usedGenAiLast3Months ? 'Yes' : 'No (Skipped Q2–12)') : '—'}
+                    <td className="p-3 text-slate-700 whitespace-nowrap">
+                      {q ? (q.usedGenAiLast3Months ? 'Yes' : 'No (Skipped Q7–17)') : '—'}
                     </td>
-                    <td className="p-3 text-slate-700">{q?.usageFrequency || '—'}</td>
                     <td className="p-3 text-slate-700 max-w-xs truncate">
                       {q?.toolsUsed && q.toolsUsed.length > 0 ? q.toolsUsed.join(', ') : '—'}
                     </td>
                     <td className="p-3 text-slate-700">{q?.verificationFrequency || '—'}</td>
-                    <td className="p-3 font-mono text-[11px] text-slate-500">
+                    <td className="p-3 font-mono text-[11px] text-slate-500 whitespace-nowrap">
                       {q ? new Date(q.submittedAt || q.createdAt).toLocaleString() : '—'}
                     </td>
                   </tr>
@@ -270,15 +306,18 @@ interface AiRecordsAndFollowupsPanelProps {
   aiInteractions: AiInteractionRecord[];
   followupEvents: CdssFollowupEvent[];
   cases: ClinicalCase[];
+  isPiOrDemo?: boolean;
 }
 
 export const AiRecordsAndFollowupsPanel: React.FC<AiRecordsAndFollowupsPanelProps> = ({
   participants,
   aiInteractions,
   followupEvents,
-  cases
+  cases,
+  isPiOrDemo = true
 }) => {
   const [subView, setSubView] = useState<'interactions' | 'followups'>('interactions');
+  const [expandedRecordId, setExpandedRecordId] = useState<string | null>(null);
   const participantById = new Map<string, Participant>();
   participants.forEach(p => participantById.set(p.id, p));
   const caseById = new Map<string, ClinicalCase>();
@@ -292,7 +331,7 @@ export const AiRecordsAndFollowupsPanel: React.FC<AiRecordsAndFollowupsPanelProp
             Simulation Interaction Logs &amp; Follow-up Events
           </h3>
           <p className="text-xs text-slate-500">
-            Individual CDSS decisions, active case timing, and standardized follow-up prompt clicks.
+            Individual CDSS decisions, canonical answer matching, per-participant randomized MCQ order, and standardized follow-up prompt clicks.
           </p>
         </div>
 
@@ -324,18 +363,20 @@ export const AiRecordsAndFollowupsPanel: React.FC<AiRecordsAndFollowupsPanelProp
             No CDSS interaction records recorded yet.
           </div>
         ) : (
-          <div className="overflow-x-auto max-h-[480px]">
+          <div className="overflow-x-auto max-h-[540px]">
             <table className="w-full text-xs text-left border-collapse">
-              <thead className="sticky top-0 bg-slate-50">
+              <thead className="sticky top-0 bg-slate-50 z-10">
                 <tr className="border-b border-slate-200 text-slate-700">
                   <th className="p-3 font-semibold">Participant</th>
                   <th className="p-3 font-semibold">Case</th>
                   <th className="p-3 font-semibold">Agreement</th>
-                  <th className="p-3 font-semibold">Final Diagnosis</th>
+                  <th className="p-3 font-semibold">Selected Answer (Seen Letter &amp; ID)</th>
+                  {isPiOrDemo && <th className="p-3 font-semibold">Gold Standard Match</th>}
                   <th className="p-3 font-semibold text-right">Conf.</th>
                   <th className="p-3 font-semibold text-right">Verify?</th>
                   <th className="p-3 font-semibold text-right">Active Time</th>
                   <th className="p-3 font-semibold">Misleading Eval</th>
+                  {isPiOrDemo && <th className="p-3 font-semibold text-right">Order</th>}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -343,37 +384,155 @@ export const AiRecordsAndFollowupsPanel: React.FC<AiRecordsAndFollowupsPanelProp
                   const p = participantById.get(rec.participantId);
                   const c = caseById.get(rec.caseId);
                   const isMis = c?.aiStimulus?.isMisleading;
+                  const effectiveOrder = getEffectiveDisplayedOrder(rec, c);
+                  const selectedOptId =
+                    rec.selectedOptionId ||
+                    resolveOptionIdFromDiagnosis(c?.mcqOptions || [], rec.finalDiagnosis);
+                  const matchedDisplayedOpt = effectiveOrder.find(
+                    opt => opt.optionId === selectedOptId
+                  );
+                  const goldOptId = c ? resolveGoldStandardOptionId(c) : null;
+                  const matchedGold = evaluateMatchedGoldStandard(rec, c);
+                  const isExpanded = expandedRecordId === rec.id;
+
                   return (
-                    <tr key={rec.id} className="hover:bg-slate-50/70">
-                      <td className="p-3 font-mono font-bold text-slate-900">
-                        {p?.code || rec.participantId.slice(0, 8)}
-                      </td>
-                      <td className="p-3 text-slate-700 whitespace-nowrap">
-                        Case {c?.caseNumber ?? rec.caseId} ({c?.domain || rec.caseId})
-                      </td>
-                      <td className="p-3 text-slate-700">{rec.aiAgreement}</td>
-                      <td className="p-3 text-slate-900 max-w-xs truncate" title={rec.finalDiagnosis}>
-                        {rec.finalDiagnosis}
-                      </td>
-                      <td className="p-3 text-right font-mono tabular-nums">{rec.finalConfidence}/5</td>
-                      <td className="p-3 text-right font-mono">
-                        {rec.willVerify ? 'Yes' : 'No'}
-                      </td>
-                      <td className="p-3 text-right font-mono tabular-nums text-slate-700">
-                        {typeof rec.activeSeconds === 'number' ? `${rec.activeSeconds}s` : '—'}
-                      </td>
-                      <td className="p-3 font-mono text-[11px]">
-                        {isMis ? (
-                          rec.acceptedMisleading ? (
-                            <span className="text-rose-700 font-semibold">Accepted Misleading</span>
-                          ) : (
-                            <span className="text-emerald-700 font-semibold">Rejected Misleading</span>
-                          )
-                        ) : (
-                          <span className="text-slate-600">Sound Stimulus</span>
+                    <React.Fragment key={rec.id}>
+                      <tr className="hover:bg-slate-50/70">
+                        <td className="p-3 font-mono font-bold text-slate-900">
+                          {p?.code || rec.participantId.slice(0, 8)}
+                        </td>
+                        <td className="p-3 text-slate-700 whitespace-nowrap">
+                          Case {c?.caseNumber ?? rec.caseId} ({c?.domain || rec.caseId})
+                        </td>
+                        <td className="p-3 text-slate-700">{rec.aiAgreement}</td>
+                        <td className="p-3 text-slate-900 max-w-xs" title={rec.finalDiagnosis}>
+                          <div className="flex items-center gap-1.5">
+                            {matchedDisplayedOpt && (
+                              <span className="font-mono font-bold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 text-[10px]">
+                                {matchedDisplayedOpt.label}
+                              </span>
+                            )}
+                            {selectedOptId && (
+                              <span className="font-mono text-[10px] text-slate-500">
+                                [{selectedOptId}]
+                              </span>
+                            )}
+                            <span className="truncate font-medium">{rec.finalDiagnosis}</span>
+                          </div>
+                        </td>
+                        {isPiOrDemo && (
+                          <td className="p-3 text-xs">
+                            {c?.goldStandardDiagnosis ? (
+                              <div className="space-y-0.5">
+                                <span
+                                  className={`inline-block font-mono text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+                                    matchedGold
+                                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                      : 'bg-amber-50 text-amber-800 border-amber-200'
+                                  }`}
+                                >
+                                  {matchedGold ? 'Matched Gold Standard' : 'Divergent'}
+                                </span>
+                                <div
+                                  className="text-[11px] text-slate-500 truncate max-w-[200px]"
+                                  title={`${goldOptId || ''} ${c.goldStandardDiagnosis}`}
+                                >
+                                  {goldOptId ? `[${goldOptId}] ` : ''}
+                                  {c.goldStandardDiagnosis}
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-slate-400">—</span>
+                            )}
+                          </td>
                         )}
-                      </td>
-                    </tr>
+                        <td className="p-3 text-right font-mono tabular-nums">{rec.finalConfidence}/5</td>
+                        <td className="p-3 text-right font-mono">
+                          {rec.willVerify ? 'Yes' : 'No'}
+                        </td>
+                        <td className="p-3 text-right font-mono tabular-nums text-slate-700">
+                          {typeof rec.activeSeconds === 'number' ? `${rec.activeSeconds}s` : '—'}
+                        </td>
+                        <td className="p-3 font-mono text-[11px]">
+                          {isMis ? (
+                            rec.acceptedMisleading ? (
+                              <span className="text-rose-700 font-semibold">Accepted Misleading</span>
+                            ) : (
+                              <span className="text-emerald-700 font-semibold">Rejected Misleading</span>
+                            )
+                          ) : (
+                            <span className="text-slate-600">Sound Stimulus</span>
+                          )}
+                        </td>
+                        {isPiOrDemo && (
+                          <td className="p-3 text-right">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setExpandedRecordId(prev => (prev === rec.id ? null : rec.id))
+                              }
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded border border-slate-200 bg-white hover:bg-slate-50 text-[11px] font-medium text-slate-700 cursor-pointer"
+                            >
+                              <span>{isExpanded ? 'Hide' : 'Order'}</span>
+                              {isExpanded ? (
+                                <ChevronUp className="w-3 h-3" />
+                              ) : (
+                                <ChevronDown className="w-3 h-3" />
+                              )}
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                      {isPiOrDemo && isExpanded && (
+                        <tr className="bg-slate-50/90">
+                          <td colSpan={10} className="p-3.5 border-t border-slate-200">
+                            <div className="space-y-2 text-[11px]">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <span className="font-mono font-bold text-slate-800 uppercase">
+                                  Randomized Option Order Presented to {p?.code || 'Participant'}
+                                </span>
+                                {c?.goldStandardDiagnosis && (
+                                  <span className="font-mono text-teal-800 font-semibold">
+                                    Authoritative Gold Standard: {goldOptId ? `[${goldOptId}] ` : ''}
+                                    {c.goldStandardDiagnosis}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                                {effectiveOrder.map(opt => {
+                                  const isSelected = opt.optionId === selectedOptId;
+                                  const isGold = goldOptId ? opt.optionId === goldOptId : false;
+                                  return (
+                                    <div
+                                      key={opt.optionId}
+                                      className={`p-2 rounded border flex items-start gap-2 ${
+                                        isSelected && isGold
+                                          ? 'bg-emerald-50 border-emerald-300 text-emerald-950'
+                                          : isSelected
+                                          ? 'bg-amber-50 border-amber-300 text-amber-950'
+                                          : isGold
+                                          ? 'bg-teal-50 border-teal-200 text-teal-950'
+                                          : 'bg-white border-slate-200 text-slate-700'
+                                      }`}
+                                    >
+                                      <span className="font-mono font-bold shrink-0">{opt.label}.</span>
+                                      <div className="min-w-0">
+                                        <div className="font-medium leading-snug">{opt.text}</div>
+                                        <div className="font-mono text-[10px] text-slate-500 mt-0.5">
+                                          ID: {opt.optionId}
+                                          {isSelected ? ' · Selected' : ''}
+                                          {isGold ? ' · Gold Key' : ''}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   );
                 })}
               </tbody>

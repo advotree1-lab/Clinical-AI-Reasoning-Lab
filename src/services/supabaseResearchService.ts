@@ -415,6 +415,9 @@ function normalizeCdssCasePresentation<T extends ParticipantClinicalCase>(c: T):
         caption: undefined,
       };
     }
+    if (c.id === 'post-01' || img.id === 'img-case-01' || c.id === 'post-02' || img.id === 'img-case-04') {
+      return { ...img, title: '', caption: undefined };
+    }
     return img;
   });
 
@@ -451,7 +454,8 @@ function applyCdssCaseSequence<T extends ParticipantClinicalCase>(cases: T[]): T
 
   const postCases = cases
     .filter(c => c.stage !== 'ai_simulation')
-    .sort((a, b) => a.caseNumber - b.caseNumber);
+    .sort((a, b) => a.caseNumber - b.caseNumber)
+    .map(c => normalizeCdssCasePresentation(c));
 
   return [...simCases, ...postCases];
 }
@@ -875,16 +879,19 @@ export const supabaseResearchService = {
         .eq('participant_id', participant.id),
     ]);
 
-    let finalAiRes = aiRes;
+    let finalAiData = (aiRes.data || []) as AiInteractionRow[];
+    let finalAiError = aiRes.error;
     if (aiRes.error && isSchemaCompatError(aiRes.error)) {
-      finalAiRes = await client
+      const legacyAiRes = await client
         .from('ai_interactions')
         .select(AI_INTERACTION_SELECT_LEGACY)
         .eq('participant_id', participant.id);
+      finalAiData = (legacyAiRes.data || []) as AiInteractionRow[];
+      finalAiError = legacyAiRes.error;
     }
 
     if (qRes.error) throw new Error('Unable to restore saved questionnaire responses. Please refresh the page.');
-    if (finalAiRes.error) throw new Error('Unable to restore clinical simulation records. Please refresh the page.');
+    if (finalAiError) throw new Error('Unable to restore clinical simulation records. Please refresh the page.');
     if (followRes.error) throw new Error('Unable to restore simulation prompt history. Please refresh the page.');
     if (vigRes.error) throw new Error('Unable to restore clinical vignette answers. Please refresh the page.');
     if (timerRes.error) throw new Error('Unable to restore case timing state. Please refresh the page.');
@@ -900,7 +907,7 @@ export const supabaseResearchService = {
     return {
       participant,
       questionnaire: qRes.data ? mapQuestionnaireRow(qRes.data as QuestionnaireRow) : null,
-      aiInteractions: ((finalAiRes.data || []) as AiInteractionRow[]).map(mapAiInteractionRow),
+      aiInteractions: finalAiData.map(mapAiInteractionRow),
       followupEvents: ((followRes.data || []) as FollowupEventRow[]).map(mapFollowupRow),
       vignetteAnswers: ((vigRes.data || []) as VignetteAnswerRow[]).map(mapVignetteAnswerRow),
       caseTimers: ((timerRes.data || []) as CaseSessionTimerRow[]).map(mapCaseTimerRow),
@@ -1094,11 +1101,14 @@ export const supabaseResearchService = {
       throw new Error(error.message || 'Unable to save this case evaluation. Please ensure all required fields are completed.');
     }
 
-    let { data: row, error: fetchError } = await client
+    const initialFetch = await client
       .from('ai_interactions')
       .select(AI_INTERACTION_SELECT_WITH_OPTIONS)
       .eq('id', interactionId)
       .single();
+
+    let row = initialFetch.data as AiInteractionRow | null;
+    let fetchError = initialFetch.error;
 
     if (fetchError && isSchemaCompatError(fetchError)) {
       const retryFetch = await client
@@ -1106,7 +1116,7 @@ export const supabaseResearchService = {
         .select(AI_INTERACTION_SELECT_LEGACY)
         .eq('id', interactionId)
         .single();
-      row = retryFetch.data;
+      row = retryFetch.data as AiInteractionRow | null;
       fetchError = retryFetch.error;
     }
 
@@ -1114,7 +1124,7 @@ export const supabaseResearchService = {
       throw new Error('Your case evaluation was recorded, but could not be refreshed. Please reload the page.');
     }
 
-    return mapAiInteractionRow(row as AiInteractionRow);
+    return mapAiInteractionRow(row);
   },
 
   async completeCdssStage(participantId: string): Promise<string> {
@@ -1517,17 +1527,20 @@ export const supabaseResearchService = {
       client.from('case_session_timers').select('*').order('last_opened_at', { ascending: false }),
     ]);
 
-    let finalAiRes = aiRes;
+    let finalAiData = (aiRes.data || []) as AiInteractionRow[];
+    let finalAiError = aiRes.error;
     if (aiRes.error && isSchemaCompatError(aiRes.error)) {
-      finalAiRes = await client
+      const legacyAiRes = await client
         .from('ai_interactions')
         .select(AI_INTERACTION_SELECT_LEGACY)
         .order('completed_at', { ascending: false });
+      finalAiData = (legacyAiRes.data || []) as AiInteractionRow[];
+      finalAiError = legacyAiRes.error;
     }
 
     if (pRes.error) throw new Error('Unable to load enrolled participant records. Please refresh and try again.');
     if (qRes.error) throw new Error('Unable to load questionnaire responses. Please refresh and try again.');
-    if (finalAiRes.error) throw new Error('Unable to load AI simulation records. Please refresh and try again.');
+    if (finalAiError) throw new Error('Unable to load AI simulation records. Please refresh and try again.');
     if (evalRes.error) throw new Error('Unable to load simulation evaluation flags. Please refresh and try again.');
     if (followRes.error) throw new Error('Unable to load follow-up prompt records. Please refresh and try again.');
     if (teamRes.error) throw new Error('Unable to load the research team roster. Please refresh and try again.');
@@ -1542,7 +1555,7 @@ export const supabaseResearchService = {
     const evalByInteractionId = new Map<string, AiInteractionEvaluation>();
     aiEvaluations.forEach(ev => evalByInteractionId.set(ev.aiInteractionId, ev));
 
-    const aiInteractions = ((finalAiRes.data || []) as AiInteractionRow[]).map(row => {
+    const aiInteractions = finalAiData.map(row => {
       const mapped = mapAiInteractionRow(row);
       const ev = evalByInteractionId.get(mapped.id);
       return ev

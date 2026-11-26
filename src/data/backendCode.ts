@@ -228,8 +228,9 @@ CREATE POLICY "Allow anonymous insert vignette_answers" ON public.vignette_answe
 `;
 
 export const SPSS_SYNTAX_SPS = `* ==============================================================================
-* CLINICAL AI REASONING LAB - SPSS STATISTICAL SYNTAX FILE (v2)
-* GenAI Exposure, Cognitive Offloading & Clinical Reasoning Analysis
+* CLINICAL AI REASONING LAB - SPSS STATISTICAL SYNTAX FILE (v3)
+* Section I: Respondent Profile (Q1-Q5)
+* Section II: GenAI Exposure, Cognitive Offloading & Reasoning (Q6-Q17)
 * ==============================================================================
 
 * 1. IMPORT QUESTIONNAIRE & COHORT DATASET
@@ -243,39 +244,63 @@ GET DATA  /TYPE=TXT
   /VARIABLES=
     response_id A36
     participant_id A36
-    designation A32
-    specialty A32
-    years_since_mbbs_bracket A24
-    hospital_type A24
-    formal_genai_training F1.0
-    used_genai_last_3_months F1.0
-    first_use_duration A24
-    usage_frequency A24
-    daily_time_spent A24
-    access_method A36
-    entered_patient_info A16
-    task_diff_dx F1.0
-    task_interp_inv F1.0
-    task_choose_inv F1.0
-    task_mgmt_opt F1.0
-    task_drug_dose F1.0
-    task_lit_summary F1.0
-    task_doc_letters F1.0
-    task_patient_comm F1.0
-    reasoning_stage A64
-    last_10_cases_consulted F2.0
-    verification_freq A16
-    institutional_policy A12.
+    q1_designation A48
+    q1_designation_category A32
+    q1_designation_other A48
+    q2_specialty A48
+    q2_specialty_category A32
+    q2_specialty_other A48
+    q3_years_since_mbbs_bracket A24
+    q4_hospital_type A48
+    q4_hospital_type_category A24
+    q4_hospital_type_other A48
+    q5_formal_genai_training F1.0
+    q6_used_genai_last_3_months F1.0
+    q7_first_use_duration A24
+    q8_usage_frequency A24
+    q9_daily_time_spent A24
+    q10_tools_used A128
+    q10_medical_specific_tool A64
+    q10_other_tool A64
+    q11_access_method A36
+    q12_entered_patient_info A24
+    q13a_task_diff_dx F1.0
+    q13b_task_interp_inv F1.0
+    q13c_task_choose_inv F1.0
+    q13d_task_mgmt_opt F1.0
+    q13e_task_drug_dose F1.0
+    q13f_task_lit_summary F1.0
+    q13g_task_doc_letters F1.0
+    q13h_task_patient_comm F1.0
+    q14_reasoning_consultation_stage A80
+    q15_last_10_cases_consulted_count F2.0
+    q16_verification_frequency A16
+    q17_institutional_policy A16
+    is_demo F1.0
+    created_at A32.
 DATASET NAME Survey WINDOW=FRONT.
 
-* 2. DESCRIPTIVE STATISTICS: GENAI EXPOSURE & COGNITIVE OFFLOADING
-FREQUENCIES VARIABLES=designation specialty years_since_mbbs_bracket formal_genai_training used_genai_last_3_months usage_frequency reasoning_stage institutional_policy
+VARIABLE LABELS
+  q1_designation "Q1. Designation (with Other text)"
+  q2_specialty "Q2. Specialty (with Other text)"
+  q3_years_since_mbbs_bracket "Q3. Years since MBBS completion"
+  q4_hospital_type "Q4. Type of hospital (with Other text)"
+  q5_formal_genai_training "Q5. Formal GenAI in healthcare training"
+  q6_used_genai_last_3_months "Q6. Used GenAI clinically in past 3 months"
+  q12_entered_patient_info "Q12. Entered identifiable/clinical patient info"
+  q14_reasoning_consultation_stage "Q14. Clinical reasoning consultation timing"
+  q15_last_10_cases_consulted_count "Q15. Out of last 10 cases GenAI consulted"
+  q16_verification_frequency "Q16. Frequency of guideline verification"
+  q17_institutional_policy "Q17. Institutional written GenAI policy".
+
+* 2. DESCRIPTIVE STATISTICS: RESPONDENT PROFILE & COGNITIVE OFFLOADING
+FREQUENCIES VARIABLES=q1_designation q2_specialty q3_years_since_mbbs_bracket q4_hospital_type q5_formal_genai_training q6_used_genai_last_3_months q8_usage_frequency q14_reasoning_consultation_stage q17_institutional_policy
   /STATISTICS=STDDEV MEAN MEDIAN
   /ORDER=ANALYSIS.
 
 * 3. PRIMARY OUTCOME: MISLEADING AI RECOMMENDATION ACCEPTANCE BY CADRE
 CROSSTABS
-  /TABLES=designation BY accepted_misleading_cat
+  /TABLES=q1_designation BY accepted_misleading_cat
   /FORMAT=AVALUE TABLES
   /STATISTICS=CHISQ CC BPHI PHI
   /CELLS=COUNT ROW COLUMN TOTAL
@@ -283,6 +308,6 @@ CROSSTABS
 
 * 4. LOGISTIC REGRESSION: FACTORS ASSOCIATED WITH AUTOMATION BIAS
 LOGISTIC REGRESSION VARIABLES accepted_misleading_any
-  /METHOD=ENTER formal_genai_training last_10_cases_consulted verification_freq
+  /METHOD=ENTER q5_formal_genai_training q15_last_10_cases_consulted_count q16_verification_frequency
   /CRITERIA=PIN(.05) POUT(.10) ITERATE(20) CUT(.5).
 `;

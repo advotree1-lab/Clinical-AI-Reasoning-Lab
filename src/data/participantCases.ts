@@ -394,8 +394,7 @@ export const PARTICIPANT_DEMO_CASES: ParticipantClinicalCase[] = [
       {
         id: 'img-case-01',
         url: '/assets/cases/case-01-ecg.jpg',
-        title: '12-Lead ECG (Case 1)',
-        caption: 'ECG showing ST elevation in leads II, III and aVF, with reciprocal changes in leads I and aVL.',
+        title: '',
       },
     ],
     mcqOptions: [
@@ -446,9 +445,7 @@ export const PARTICIPANT_DEMO_CASES: ParticipantClinicalCase[] = [
       {
         id: 'img-case-04',
         url: '/assets/cases/case-04-ct-slices.jpg',
-        title: 'CT Brain Slices & IV Contrast Series (Case 4)',
-        caption:
-          'Serial non-contrast and contrast-enhanced CT brain slices demonstrating atypical left frontal lesion, surrounding vasogenic oedema, mass effect, and ring enhancement.',
+        title: '',
       },
     ],
     mcqOptions: [

@@ -41,6 +41,13 @@ import {
   QuestionnaireStatusTable,
   AiRecordsAndFollowupsPanel
 } from './RecordsTablesPanel';
+import {
+  evaluateMatchedGoldStandard,
+  getCanonicalCdssOptions,
+  getEffectiveDisplayedOrder,
+  resolveGoldStandardOptionId,
+  resolveOptionIdFromDiagnosis
+} from '../../utils/cdssOptions';
 
 export type ResearcherTabId =
   | 'overview'
@@ -474,38 +481,56 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
     const rows = questionnaires.map(q => ({
       response_id: q.id,
       participant_id: q.participantId,
-      designation:
+      q1_designation:
         q.designation === 'Other' && q.designationOther ? q.designationOther : q.designation,
-      specialty: q.specialty === 'Other' && q.specialtyOther ? q.specialtyOther : q.specialty,
-      years_since_mbbs_bracket: q.yearsSinceMbbsBracket,
-      hospital_type:
+      q1_designation_category: q.designation,
+      q1_designation_other: q.designationOther ?? '',
+      q2_specialty: q.specialty === 'Other' && q.specialtyOther ? q.specialtyOther : q.specialty,
+      q2_specialty_category: q.specialty,
+      q2_specialty_other: q.specialtyOther ?? '',
+      q3_years_since_mbbs_bracket: q.yearsSinceMbbsBracket,
+      q4_hospital_type:
         q.hospitalType === 'Other' && q.hospitalTypeOther ? q.hospitalTypeOther : q.hospitalType,
-      formal_genai_training: q.formalGenAiTraining ? 1 : 0,
-      used_genai_last_3_months: q.usedGenAiLast3Months ? 1 : 0,
-      first_use_duration: q.firstUseDuration ?? '',
-      usage_frequency: q.usageFrequency ?? '',
-      daily_time_spent: q.dailyTimeSpent ?? '',
-      tools_used: (q.toolsUsed ?? []).join('; '),
-      medical_specific_tool: q.medicalSpecificToolName ?? '',
-      other_tool: q.otherToolName ?? '',
-      access_method: q.accessMethod ?? '',
-      entered_patient_info: q.enteredPatientInfo ?? '',
-      task_diff_dx: q.taskFrequency ? TASK_FREQ_NUMERIC[q.taskFrequency.differentialDiagnoses] : '',
-      task_interp_inv: q.taskFrequency
+      q4_hospital_type_category: q.hospitalType,
+      q4_hospital_type_other: q.hospitalTypeOther ?? '',
+      q5_formal_genai_training: q.formalGenAiTraining ? 1 : 0,
+      q6_used_genai_last_3_months: q.usedGenAiLast3Months ? 1 : 0,
+      q7_first_use_duration: q.firstUseDuration ?? '',
+      q8_usage_frequency: q.usageFrequency ?? '',
+      q9_daily_time_spent: q.dailyTimeSpent ?? '',
+      q10_tools_used: (q.toolsUsed ?? []).join('; '),
+      q10_medical_specific_tool: q.medicalSpecificToolName ?? '',
+      q10_other_tool: q.otherToolName ?? '',
+      q11_access_method: q.accessMethod ?? '',
+      q12_entered_patient_info: q.enteredPatientInfo ?? '',
+      q13a_task_diff_dx: q.taskFrequency
+        ? TASK_FREQ_NUMERIC[q.taskFrequency.differentialDiagnoses]
+        : '',
+      q13b_task_interp_inv: q.taskFrequency
         ? TASK_FREQ_NUMERIC[q.taskFrequency.interpretingInvestigations]
         : '',
-      task_choose_inv: q.taskFrequency ? TASK_FREQ_NUMERIC[q.taskFrequency.choosingInvestigations] : '',
-      task_mgmt_opt: q.taskFrequency ? TASK_FREQ_NUMERIC[q.taskFrequency.identifyingManagement] : '',
-      task_drug_dose: q.taskFrequency
+      q13c_task_choose_inv: q.taskFrequency
+        ? TASK_FREQ_NUMERIC[q.taskFrequency.choosingInvestigations]
+        : '',
+      q13d_task_mgmt_opt: q.taskFrequency
+        ? TASK_FREQ_NUMERIC[q.taskFrequency.identifyingManagement]
+        : '',
+      q13e_task_drug_dose: q.taskFrequency
         ? TASK_FREQ_NUMERIC[q.taskFrequency.drugDosesAndInteractions]
         : '',
-      task_lit_summary: q.taskFrequency ? TASK_FREQ_NUMERIC[q.taskFrequency.summarisingLiterature] : '',
-      task_doc_letters: q.taskFrequency ? TASK_FREQ_NUMERIC[q.taskFrequency.clinicalDocumentation] : '',
-      task_patient_comm: q.taskFrequency ? TASK_FREQ_NUMERIC[q.taskFrequency.patientCommunication] : '',
-      reasoning_consultation_stage: q.reasoningConsultationStage ?? '',
-      last_10_cases_consulted_count: q.last10CasesConsultedCount ?? '',
-      verification_frequency: q.verificationFrequency ?? '',
-      institutional_policy: q.institutionalPolicy ?? '',
+      q13f_task_lit_summary: q.taskFrequency
+        ? TASK_FREQ_NUMERIC[q.taskFrequency.summarisingLiterature]
+        : '',
+      q13g_task_doc_letters: q.taskFrequency
+        ? TASK_FREQ_NUMERIC[q.taskFrequency.clinicalDocumentation]
+        : '',
+      q13h_task_patient_comm: q.taskFrequency
+        ? TASK_FREQ_NUMERIC[q.taskFrequency.patientCommunication]
+        : '',
+      q14_reasoning_consultation_stage: q.reasoningConsultationStage ?? '',
+      q15_last_10_cases_consulted_count: q.last10CasesConsultedCount ?? '',
+      q16_verification_frequency: q.verificationFrequency ?? '',
+      q17_institutional_policy: q.institutionalPolicy ?? '',
       is_demo: q.isDemo ? 1 : 0,
       created_at: q.createdAt
     }));
@@ -513,24 +538,45 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
   };
 
   const handleExportAiInteractions = () => {
-    const rows = aiInteractions.map(r => ({
-      interaction_id: r.id,
-      participant_id: r.participantId,
-      case_id: r.caseId,
-      ai_agreement: r.aiAgreement,
-      final_diagnosis: r.finalDiagnosis,
-      reason_for_decision: r.reasonForDecision,
-      final_confidence: r.finalConfidence,
-      will_verify: r.willVerify ? 1 : 0,
-      verification_targets: r.verificationTargets,
-      switched_diagnosis: r.switchedDiagnosis ? 1 : 0,
-      switched_towards_correct: r.switchedTowardsCorrect ? 1 : 0,
-      accepted_misleading: r.acceptedMisleading ? 1 : 0,
-      active_seconds: r.activeSeconds ?? '',
-      wall_clock_seconds: r.wallClockSeconds ?? '',
-      is_demo: r.isDemo ? 1 : 0,
-      completed_at: r.completedAt
-    }));
+    const caseById = new Map(cases.map(c => [c.id, c]));
+    const rows = aiInteractions.map(r => {
+      const matchedCase = caseById.get(r.caseId);
+      const effectiveOrder = getEffectiveDisplayedOrder(r, matchedCase);
+      const selectedOptId =
+        r.selectedOptionId ||
+        resolveOptionIdFromDiagnosis(matchedCase?.mcqOptions || [], r.finalDiagnosis);
+      const matchedDisplayedOpt = effectiveOrder.find(o => o.optionId === selectedOptId);
+      const goldOptId = matchedCase ? resolveGoldStandardOptionId(matchedCase) : null;
+      const matchedGold = evaluateMatchedGoldStandard(r, matchedCase);
+
+      return {
+        interaction_id: r.id,
+        participant_id: r.participantId,
+        case_id: r.caseId,
+        case_number: matchedCase?.caseNumber ?? '',
+        ai_agreement: r.aiAgreement,
+        selected_option_id: selectedOptId,
+        selected_option_letter: matchedDisplayedOpt?.label ?? '',
+        final_diagnosis: r.finalDiagnosis,
+        gold_standard_option_id: goldOptId ?? '',
+        gold_standard_diagnosis: matchedCase?.goldStandardDiagnosis ?? '',
+        matched_gold_standard: matchedGold ? 1 : 0,
+        displayed_option_order: effectiveOrder
+          .map(o => `${o.label}:${o.optionId}(${o.text})`)
+          .join(' | '),
+        reason_for_decision: r.reasonForDecision,
+        final_confidence: r.finalConfidence,
+        will_verify: r.willVerify ? 1 : 0,
+        verification_targets: r.verificationTargets,
+        switched_diagnosis: r.switchedDiagnosis ? 1 : 0,
+        switched_towards_correct: r.switchedTowardsCorrect ? 1 : 0,
+        accepted_misleading: r.acceptedMisleading ? 1 : 0,
+        active_seconds: r.activeSeconds ?? '',
+        wall_clock_seconds: r.wallClockSeconds ?? '',
+        is_demo: r.isDemo ? 1 : 0,
+        completed_at: r.completedAt
+      };
+    });
     exportToCsv(`carl_cdss_interactions_${isDemoMode ? 'demo' : 'research'}.csv`, rows);
   };
 
@@ -904,7 +950,7 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
 
                 <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs">
                   <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-emerald-700 block">
-                    Completed (7/7)
+                    Completed (8/8)
                   </span>
                   <div className="text-2xl font-mono font-bold text-emerald-700 tabular-nums mt-1">
                     {analytics.completedCount}
@@ -1044,137 +1090,219 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
       {/* ==================================================== */}
       {/* TAB: QUESTIONNAIRE & OFFLOADING */}
       {/* ==================================================== */}
-      {activeTab === 'offloading' && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="p-4 rounded-xl bg-white border border-slate-200">
-              <span className="text-[10px] font-mono font-bold text-slate-500 uppercase block">
-                Q1 · 3-Month Clinical GenAI Use
-              </span>
-              <div className="text-2xl font-mono font-bold text-slate-900 mt-1 tabular-nums">
-                {analytics.genAiAdoptionRate}%
-              </div>
-              <div className="text-[11px] text-slate-500 mt-0.5">
-                Formal training: {analytics.formalTrainingRate}%
-              </div>
-            </div>
+      {activeTab === 'offloading' && (() => {
+        const profileSource = participants.length > 0 ? participants : [];
+        const totalProfiles = profileSource.length;
+        const countBy = (extractor: (p: typeof profileSource[number]) => string) => {
+          const map = new Map<string, number>();
+          profileSource.forEach(p => {
+            const label = extractor(p) || 'Not specified';
+            map.set(label, (map.get(label) || 0) + 1);
+          });
+          return Array.from(map.entries())
+            .sort((a, b) => b[1] - a[1])
+            .map(([label, count]) => ({
+              label,
+              count,
+              pct: totalProfiles > 0 ? Math.round((count / totalProfiles) * 100) : 0
+            }));
+        };
 
-            <div className="p-4 rounded-xl bg-white border border-slate-200">
-              <span className="text-[10px] font-mono font-bold text-slate-500 uppercase block">
-                Q10 · Last 10 Cases Consulted
-              </span>
-              <div className="text-2xl font-mono font-bold text-slate-900 mt-1 tabular-nums">
-                {analytics.meanCasesConsultedOutOf10} / 10
-              </div>
-              <div className="text-[11px] text-slate-500 mt-0.5">
-                Mean cases among active users
-              </div>
-            </div>
+        const designationDist = countBy(p =>
+          p.designation === 'Other' && p.designationOther ? `Other (${p.designationOther})` : p.designation
+        );
+        const specialtyDist = countBy(p =>
+          p.specialty === 'Other' && p.specialtyOther ? `Other (${p.specialtyOther})` : p.specialty
+        );
+        const yearsDist = countBy(p => p.yearsSinceMbbsBracket);
+        const hospitalDist = countBy(p =>
+          p.institutionType === 'Other' && p.institutionOther
+            ? `Other (${p.institutionOther})`
+            : p.institutionType
+        );
+        const trainingDist = countBy(p => (p.formalGenAiTraining ? 'Yes' : 'No'));
 
-            <div className="p-4 rounded-xl bg-white border border-slate-200">
-              <span className="text-[10px] font-mono font-bold text-rose-700 uppercase block">
-                Q7 · Patient Info Entered
-              </span>
-              <div className="text-2xl font-mono font-bold text-rose-700 mt-1 tabular-nums">
-                {analytics.patientInfoEnteredRate}%
-              </div>
-              <div className="text-[11px] text-slate-500 mt-0.5">
-                Entered clinical data into public GenAI
-              </div>
-            </div>
-
-            <div className="p-4 rounded-xl bg-white border border-slate-200">
-              <span className="text-[10px] font-mono font-bold text-teal-700 uppercase block">
-                Q11 · Guideline Verification
-              </span>
-              <div className="text-2xl font-mono font-bold text-teal-700 mt-1 tabular-nums">
-                {analytics.alwaysOrOftenVerifyRate}%
-              </div>
-              <div className="text-[11px] text-slate-500 mt-0.5">
-                Verify answers Often / Very often
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="p-5 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-3">
-              <h3 className="text-sm font-bold text-slate-900">
-                Q8 · Work-Related Task Offloading Frequency (1 = Never to 5 = Very often)
-              </h3>
-              <div className="space-y-3 pt-2 text-xs">
-                {analytics.taskFrequencyAverages.map(item => (
-                  <div key={item.task} className="space-y-1">
-                    <div className="flex justify-between text-slate-700">
-                      <span>{item.task}</span>
-                      <span className="font-mono font-bold text-slate-900 tabular-nums">
-                        {item.meanScore} / 5 ({item.oftenOrVeryOftenPct}% Often+)
-                      </span>
-                    </div>
-                    <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                      <div
-                        className="bg-teal-600 h-2 rounded-full"
-                        style={{ width: `${(item.meanScore / 5) * 100}%` }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-6">
-              <div className="p-5 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-3">
-                <h3 className="text-sm font-bold text-slate-900">
-                  Q9 · Stage of Clinical Reasoning When GenAI Is Consulted
-                </h3>
-                {analytics.consultationStageBreakdown.length === 0 ? (
-                  <p className="text-xs text-slate-500">No active GenAI user responses yet.</p>
-                ) : (
-                  <div className="space-y-2.5 pt-1 text-xs">
-                    {analytics.consultationStageBreakdown.map(row => (
-                      <div key={row.stage} className="space-y-1">
-                        <div className="flex justify-between text-slate-700 gap-2">
-                          <span>{row.stage}</span>
-                          <span className="font-mono font-bold text-slate-900 shrink-0 tabular-nums">
-                            {row.count} ({row.percentage}%)
-                          </span>
-                        </div>
-                        <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                          <div
-                            className="bg-slate-900 h-2 rounded-full"
-                            style={{ width: `${row.percentage}%` }}
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+        return (
+          <div className="space-y-6">
+            {/* Section I: Respondent Profile Cohort Distribution (Q1-Q5) */}
+            <div className="p-5 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-slate-200">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">
+                    Section I: Respondent Profile Cohort Summary (Q1–Q5)
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Distribution of enrolled respondents across designation, specialty, years since MBBS, hospital type, and formal GenAI training (N = {totalProfiles}).
+                  </p>
+                </div>
               </div>
 
-              <div className="p-5 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-3">
-                <h3 className="text-sm font-bold text-slate-900">
-                  Q12 · Institutional Written GenAI Policy Awareness
-                </h3>
-                <div className="grid grid-cols-3 gap-3 pt-1">
-                  {analytics.institutionalPolicyBreakdown.map(item => (
+              {totalProfiles === 0 ? (
+                <p className="text-xs text-slate-500">No respondent profiles recorded yet.</p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4 text-xs">
+                  {[
+                    { title: 'Q1 · Designation', rows: designationDist },
+                    { title: 'Q2 · Specialty', rows: specialtyDist },
+                    { title: 'Q3 · Years since MBBS', rows: yearsDist },
+                    { title: 'Q4 · Type of Hospital', rows: hospitalDist },
+                    { title: 'Q5 · Formal GenAI Training', rows: trainingDist }
+                  ].map(group => (
                     <div
-                      key={item.status}
-                      className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-center"
+                      key={group.title}
+                      className="p-3.5 rounded-lg bg-slate-50 border border-slate-200/80 space-y-2"
                     >
-                      <div className="text-xs font-semibold text-slate-700">{item.status}</div>
-                      <div className="text-lg font-mono font-bold text-slate-900 mt-0.5 tabular-nums">
-                        {item.percentage}%
+                      <div className="font-mono text-[11px] font-bold text-slate-800 uppercase">
+                        {group.title}
                       </div>
-                      <div className="text-[11px] font-mono text-slate-500">n = {item.count}</div>
+                      <div className="space-y-1.5">
+                        {group.rows.map(r => (
+                          <div key={r.label} className="flex items-center justify-between gap-2">
+                            <span className="text-slate-700 truncate" title={r.label}>
+                              {r.label}
+                            </span>
+                            <span className="font-mono font-semibold text-slate-900 tabular-nums shrink-0">
+                              {r.count} ({r.pct}%)
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="p-4 rounded-xl bg-white border border-slate-200">
+                <span className="text-[10px] font-mono font-bold text-slate-500 uppercase block">
+                  Q6 · 3-Month Clinical GenAI Use
+                </span>
+                <div className="text-2xl font-mono font-bold text-slate-900 mt-1 tabular-nums">
+                  {analytics.genAiAdoptionRate}%
+                </div>
+                <div className="text-[11px] text-slate-500 mt-0.5">
+                  Formal training (Q5): {analytics.formalTrainingRate}%
+                </div>
+              </div>
+
+              <div className="p-4 rounded-xl bg-white border border-slate-200">
+                <span className="text-[10px] font-mono font-bold text-slate-500 uppercase block">
+                  Q15 · Last 10 Cases Consulted
+                </span>
+                <div className="text-2xl font-mono font-bold text-slate-900 mt-1 tabular-nums">
+                  {analytics.meanCasesConsultedOutOf10} / 10
+                </div>
+                <div className="text-[11px] text-slate-500 mt-0.5">
+                  Mean cases among active users
+                </div>
+              </div>
+
+              <div className="p-4 rounded-xl bg-white border border-slate-200">
+                <span className="text-[10px] font-mono font-bold text-rose-700 uppercase block">
+                  Q12 · Patient Info Entered
+                </span>
+                <div className="text-2xl font-mono font-bold text-rose-700 mt-1 tabular-nums">
+                  {analytics.patientInfoEnteredRate}%
+                </div>
+                <div className="text-[11px] text-slate-500 mt-0.5">
+                  Entered clinical data into public GenAI
+                </div>
+              </div>
+
+              <div className="p-4 rounded-xl bg-white border border-slate-200">
+                <span className="text-[10px] font-mono font-bold text-teal-700 uppercase block">
+                  Q16 · Guideline Verification
+                </span>
+                <div className="text-2xl font-mono font-bold text-teal-700 mt-1 tabular-nums">
+                  {analytics.alwaysOrOftenVerifyRate}%
+                </div>
+                <div className="text-[11px] text-slate-500 mt-0.5">
+                  Verify answers Often / Very often
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="p-5 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-3">
+                <h3 className="text-sm font-bold text-slate-900">
+                  Q13 · Work-Related Task Offloading Frequency (1 = Never to 5 = Very often)
+                </h3>
+                <div className="space-y-3 pt-2 text-xs">
+                  {analytics.taskFrequencyAverages.map(item => (
+                    <div key={item.task} className="space-y-1">
+                      <div className="flex justify-between text-slate-700">
+                        <span>{item.task}</span>
+                        <span className="font-mono font-bold text-slate-900 tabular-nums">
+                          {item.meanScore} / 5 ({item.oftenOrVeryOftenPct}% Often+)
+                        </span>
+                      </div>
+                      <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                        <div
+                          className="bg-teal-600 h-2 rounded-full"
+                          style={{ width: `${(item.meanScore / 5) * 100}%` }}
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>
               </div>
-            </div>
-          </div>
 
-          <QuestionnaireStatusTable participants={participants} questionnaires={questionnaires} />
-        </div>
-      )}
+              <div className="space-y-6">
+                <div className="p-5 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-3">
+                  <h3 className="text-sm font-bold text-slate-900">
+                    Q14 · Stage of Clinical Reasoning When GenAI Is Consulted
+                  </h3>
+                  {analytics.consultationStageBreakdown.length === 0 ? (
+                    <p className="text-xs text-slate-500">No active GenAI user responses yet.</p>
+                  ) : (
+                    <div className="space-y-2.5 pt-1 text-xs">
+                      {analytics.consultationStageBreakdown.map(row => (
+                        <div key={row.stage} className="space-y-1">
+                          <div className="flex justify-between text-slate-700 gap-2">
+                            <span>{row.stage}</span>
+                            <span className="font-mono font-bold text-slate-900 shrink-0 tabular-nums">
+                              {row.count} ({row.percentage}%)
+                            </span>
+                          </div>
+                          <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                            <div
+                              className="bg-slate-900 h-2 rounded-full"
+                              style={{ width: `${row.percentage}%` }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="p-5 rounded-xl bg-white border border-slate-200 shadow-2xs space-y-3">
+                  <h3 className="text-sm font-bold text-slate-900">
+                    Q17 · Institutional Written GenAI Policy Awareness
+                  </h3>
+                  <div className="grid grid-cols-3 gap-3 pt-1">
+                    {analytics.institutionalPolicyBreakdown.map(item => (
+                      <div
+                        key={item.status}
+                        className="p-3 rounded-lg bg-slate-50 border border-slate-200 text-center"
+                      >
+                        <div className="text-xs font-semibold text-slate-700">{item.status}</div>
+                        <div className="text-lg font-mono font-bold text-slate-900 mt-0.5 tabular-nums">
+                          {item.percentage}%
+                        </div>
+                        <div className="text-[11px] font-mono text-slate-500">n = {item.count}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <QuestionnaireStatusTable participants={participants} questionnaires={questionnaires} />
+          </div>
+        );
+      })()}
 
       {/* ==================================================== */}
       {/* TAB: CDSS & FOLLOW-UP EVENTS */}
@@ -1242,6 +1370,7 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
             aiInteractions={aiInteractions}
             followupEvents={followupEvents}
             cases={cases}
+            isPiOrDemo={isPiOrDemo}
           />
         </div>
       )}
@@ -1782,22 +1911,60 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
               </div>
 
               {editingCase.goldStandardDiagnosis && (
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    Gold Standard Diagnosis (Restricted Answer Key)
-                  </label>
-                  <input
-                    type="text"
-                    disabled={!isDemoMode}
-                    value={editingCase.goldStandardDiagnosis}
-                    onChange={e =>
-                      handleUpdateDemoCase({
-                        ...editingCase,
-                        goldStandardDiagnosis: e.target.value
-                      })
-                    }
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 font-semibold text-teal-800 disabled:bg-slate-50"
-                  />
+                <div className="space-y-3">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Gold Standard Diagnosis (Restricted Answer Key)
+                    </label>
+                    <input
+                      type="text"
+                      disabled={!isDemoMode}
+                      value={editingCase.goldStandardDiagnosis}
+                      onChange={e =>
+                        handleUpdateDemoCase({
+                          ...editingCase,
+                          goldStandardDiagnosis: e.target.value
+                        })
+                      }
+                      className="w-full px-3 py-2 rounded-lg border border-slate-300 font-semibold text-teal-800 disabled:bg-slate-50"
+                    />
+                  </div>
+
+                  {editingCase.mcqOptions && editingCase.mcqOptions.length > 0 && (
+                    <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 space-y-2">
+                      <div className="font-semibold text-slate-800">
+                        Canonical MCQ Options &amp; Authoritative Option IDs (Shuffled Per Participant in CDSS)
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {getCanonicalCdssOptions(editingCase.mcqOptions).map(opt => {
+                          const goldId = resolveGoldStandardOptionId(editingCase);
+                          const isGold = goldId === opt.optionId;
+                          return (
+                            <div
+                              key={opt.optionId}
+                              className={`p-2 rounded border flex items-center justify-between gap-2 ${
+                                isGold
+                                  ? 'bg-emerald-50 border-emerald-300 text-emerald-950 font-semibold'
+                                  : 'bg-white border-slate-200 text-slate-700'
+                              }`}
+                            >
+                              <div className="min-w-0">
+                                <span className="font-mono text-[10px] text-slate-500 mr-1.5">
+                                  [{opt.optionId}]
+                                </span>
+                                <span>{opt.text}</span>
+                              </div>
+                              {isGold && (
+                                <span className="font-mono text-[10px] font-bold text-emerald-800 shrink-0">
+                                  GOLD KEY
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -1893,7 +2060,7 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
                   <span>Questionnaires ({questionnaires.length})</span>
                 </div>
                 <p className="text-[11px] text-slate-600">
-                  Section I demographics + Section II GenAI exposure &amp; Q8 task-offloading matrix.
+                  Section I Respondent Profile (Q1–Q5) + Section II GenAI exposure &amp; Q13 task-offloading matrix (Q6–Q17).
                 </p>
               </div>
               <button

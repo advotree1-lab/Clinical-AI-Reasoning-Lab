@@ -116,33 +116,33 @@ export const Stage4Questionnaire: React.FC<Stage4QuestionnaireProps> = ({
   const isLockedInLive = !isDemoMode && Boolean(existingResponse);
   const [localError, setLocalError] = useState<string | null>(null);
 
-  // SECTION I: RESPONDENT PROFILE
-  const [designation, setDesignation] = useState<ParticipantDesignation>(
-    registrationDraft?.designation ?? existingResponse?.designation ?? participant?.designation ?? 'Junior Resident'
+  // SECTION I: RESPONDENT PROFILE (Q1 - Q5)
+  const [designation, setDesignation] = useState<ParticipantDesignation | ''>(
+    registrationDraft?.designation ?? existingResponse?.designation ?? participant?.designation ?? ''
   );
   const [designationOther, setDesignationOther] = useState(
     registrationDraft?.designationOther ?? existingResponse?.designationOther ?? participant?.designationOther ?? ''
   );
-  const [specialty, setSpecialty] = useState<ClinicalSpecialty>(
-    registrationDraft?.specialty ?? existingResponse?.specialty ?? participant?.specialty ?? 'General Medicine'
+  const [specialty, setSpecialty] = useState<ClinicalSpecialty | ''>(
+    registrationDraft?.specialty ?? existingResponse?.specialty ?? participant?.specialty ?? ''
   );
   const [specialtyOther, setSpecialtyOther] = useState(
     registrationDraft?.specialtyOther ?? existingResponse?.specialtyOther ?? participant?.specialtyOther ?? ''
   );
-  const [yearsSinceMbbsBracket, setYearsSinceMbbsBracket] = useState<YearsSinceMbbsBracket>(
-    registrationDraft?.yearsSinceMbbsBracket ?? existingResponse?.yearsSinceMbbsBracket ?? participant?.yearsSinceMbbsBracket ?? '1–5 years'
+  const [yearsSinceMbbsBracket, setYearsSinceMbbsBracket] = useState<YearsSinceMbbsBracket | ''>(
+    registrationDraft?.yearsSinceMbbsBracket ?? existingResponse?.yearsSinceMbbsBracket ?? participant?.yearsSinceMbbsBracket ?? ''
   );
-  const [hospitalType, setHospitalType] = useState<InstitutionType>(
-    registrationDraft?.hospitalType ?? existingResponse?.hospitalType ?? participant?.institutionType ?? 'Teaching hospital'
+  const [hospitalType, setHospitalType] = useState<InstitutionType | ''>(
+    registrationDraft?.hospitalType ?? existingResponse?.hospitalType ?? participant?.institutionType ?? ''
   );
   const [hospitalTypeOther, setHospitalTypeOther] = useState(
     registrationDraft?.hospitalTypeOther ?? existingResponse?.hospitalTypeOther ?? participant?.institutionOther ?? ''
   );
-  const [formalGenAiTraining, setFormalGenAiTraining] = useState<boolean>(
-    registrationDraft?.formalGenAiTraining ?? existingResponse?.formalGenAiTraining ?? participant?.formalGenAiTraining ?? false
+  const [formalGenAiTraining, setFormalGenAiTraining] = useState<boolean | null>(
+    registrationDraft?.formalGenAiTraining ?? existingResponse?.formalGenAiTraining ?? participant?.formalGenAiTraining ?? null
   );
 
-  // SECTION II: GENAI EXPOSURE (Q1 - Q12)
+  // SECTION II: GENAI EXPOSURE & COGNITIVE OFFLOADING (Q6 - Q17)
   const [usedGenAiLast3Months, setUsedGenAiLast3Months] = useState<boolean>(
     existingResponse ? existingResponse.usedGenAiLast3Months : true
   );
@@ -195,6 +195,10 @@ export const Stage4Questionnaire: React.FC<Stage4QuestionnaireProps> = ({
     existingResponse?.institutionalPolicy ?? 'Not sure'
   );
 
+  React.useEffect(() => {
+    setLocalError(null);
+  }, [activeSection]);
+
   const toggleTool = (tool: string) => {
     if (toolsUsed.includes(tool)) {
       setToolsUsed(toolsUsed.filter(t => t !== tool));
@@ -229,14 +233,35 @@ export const Stage4Questionnaire: React.FC<Stage4QuestionnaireProps> = ({
     setInstitutionalPolicy('No');
   };
 
-  const effectiveDesignation = registrationDraft?.designation ?? designation;
+  const handleAutoFillRegistration = () => {
+    setLocalError(null);
+    setDesignation('Junior Resident');
+    setDesignationOther('');
+    setSpecialty('General Medicine');
+    setSpecialtyOther('');
+    setYearsSinceMbbsBracket('1–5 years');
+    setHospitalType('Teaching hospital');
+    setHospitalTypeOther('');
+    setFormalGenAiTraining(false);
+  };
+
+  const effectiveDesignation: ParticipantDesignation =
+    registrationDraft?.designation || (designation as ParticipantDesignation) || 'Junior Resident';
   const effectiveDesignationOther = registrationDraft?.designationOther ?? designationOther;
-  const effectiveSpecialty = registrationDraft?.specialty ?? specialty;
+  const effectiveSpecialty: ClinicalSpecialty =
+    registrationDraft?.specialty || (specialty as ClinicalSpecialty) || 'General Medicine';
   const effectiveSpecialtyOther = registrationDraft?.specialtyOther ?? specialtyOther;
-  const effectiveYears = registrationDraft?.yearsSinceMbbsBracket ?? yearsSinceMbbsBracket;
-  const effectiveHospital = registrationDraft?.hospitalType ?? hospitalType;
+  const effectiveYears: YearsSinceMbbsBracket =
+    registrationDraft?.yearsSinceMbbsBracket || (yearsSinceMbbsBracket as YearsSinceMbbsBracket) || '1–5 years';
+  const effectiveHospital: InstitutionType =
+    registrationDraft?.hospitalType || (hospitalType as InstitutionType) || 'Teaching hospital';
   const effectiveHospitalOther = registrationDraft?.hospitalTypeOther ?? hospitalTypeOther;
-  const effectiveTraining = registrationDraft?.formalGenAiTraining ?? formalGenAiTraining;
+  const effectiveTraining: boolean =
+    registrationDraft?.formalGenAiTraining ?? (formalGenAiTraining ?? false);
+
+  const hasSavedRegistrationProfile = Boolean(
+    registrationDraft || existingResponse || participant || (designation && specialty && yearsSinceMbbsBracket && hospitalType && formalGenAiTraining !== null)
+  );
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -248,20 +273,39 @@ export const Stage4Questionnaire: React.FC<Stage4QuestionnaireProps> = ({
         onContinueNext?.();
         return;
       }
-      if (!isDemoMode) {
-        if (designation === 'Other' && !designationOther.trim()) {
-          setLocalError('Please specify your designation before continuing.');
-          return;
-        }
-        if (specialty === 'Other' && !specialtyOther.trim()) {
-          setLocalError('Please specify your clinical specialty before continuing.');
-          return;
-        }
-        if (hospitalType === 'Other' && !hospitalTypeOther.trim()) {
-          setLocalError('Please specify your hospital or institution type before continuing.');
-          return;
-        }
+      if (!designation) {
+        setLocalError('Please select Q1 (Designation) before continuing.');
+        return;
       }
+      if (designation === 'Other' && !designationOther.trim()) {
+        setLocalError('Please specify your designation before continuing.');
+        return;
+      }
+      if (!specialty) {
+        setLocalError('Please select Q2 (Specialty) before continuing.');
+        return;
+      }
+      if (specialty === 'Other' && !specialtyOther.trim()) {
+        setLocalError('Please specify your clinical specialty before continuing.');
+        return;
+      }
+      if (!yearsSinceMbbsBracket) {
+        setLocalError('Please select Q3 (Years since MBBS completion) before continuing.');
+        return;
+      }
+      if (!hospitalType) {
+        setLocalError('Please select Q4 (Type of hospital) before continuing.');
+        return;
+      }
+      if (hospitalType === 'Other' && !hospitalTypeOther.trim()) {
+        setLocalError('Please specify your type of hospital before continuing.');
+        return;
+      }
+      if (formalGenAiTraining === null) {
+        setLocalError('Please answer Q5 (Formal GenAI training) before continuing.');
+        return;
+      }
+
       onConfirmRegistration?.({
         designation,
         designationOther: designationOther.trim(),
@@ -277,6 +321,11 @@ export const Stage4Questionnaire: React.FC<Stage4QuestionnaireProps> = ({
 
     if (isLockedInLive) {
       onContinueNext?.();
+      return;
+    }
+
+    if (!hasSavedRegistrationProfile) {
+      setLocalError('Please complete Section I (Respondent Profile Q1–Q5) first.');
       return;
     }
 
@@ -357,9 +406,18 @@ export const Stage4Questionnaire: React.FC<Stage4QuestionnaireProps> = ({
                 Subject:{' '}
                 <span className="font-mono font-semibold text-slate-800">
                   {participant?.code ?? 'Assigned on questionnaire submission'}
-                </span>{' '}
-                · {effectiveDesignation === 'Other' && effectiveDesignationOther ? effectiveDesignationOther : effectiveDesignation} (
-                {effectiveSpecialty === 'Other' && effectiveSpecialtyOther ? effectiveSpecialtyOther : effectiveSpecialty})
+                </span>
+                {hasSavedRegistrationProfile
+                  ? ` · ${
+                      effectiveDesignation === 'Other' && effectiveDesignationOther
+                        ? effectiveDesignationOther
+                        : effectiveDesignation
+                    } (${
+                      effectiveSpecialty === 'Other' && effectiveSpecialtyOther
+                        ? effectiveSpecialtyOther
+                        : effectiveSpecialty
+                    })`
+                  : ' · Respondent Profile Pending'}
               </span>
               {!isDemoMode && !participant && referralValidation?.isValid && referralValidation.researcherCode && (
                 <span className="font-mono text-[11px] font-semibold text-emerald-700">
@@ -369,14 +427,20 @@ export const Stage4Questionnaire: React.FC<Stage4QuestionnaireProps> = ({
             </div>
           </div>
 
-          {isDemoMode && activeSection === 'questionnaire' && !isLockedInLive && (
+          {isDemoMode && !isLockedInLive && (
             <button
               type="button"
-              onClick={handleAutoFillSurvey}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded border border-slate-200 transition-colors shrink-0 self-start sm:self-auto"
-              title="Auto-fill representative questionnaire responses"
+              onClick={
+                activeSection === 'registration' ? handleAutoFillRegistration : handleAutoFillSurvey
+              }
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded border border-slate-200 transition-colors shrink-0 self-start sm:self-auto cursor-pointer"
+              title={
+                activeSection === 'registration'
+                  ? 'Auto-fill respondent profile responses'
+                  : 'Auto-fill representative questionnaire responses'
+              }
             >
-              <span>Auto-Fill Survey</span>
+              <span>{activeSection === 'registration' ? 'Auto-Fill Profile' : 'Auto-Fill Survey'}</span>
             </button>
           )}
         </div>
@@ -431,15 +495,15 @@ export const Stage4Questionnaire: React.FC<Stage4QuestionnaireProps> = ({
           <div className="p-5 sm:p-6 rounded bg-slate-50/70 border border-slate-200 space-y-5">
             <div className="pb-2 border-b border-slate-200 flex items-center justify-between">
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 font-mono">
-                Section I: Respondent Profile
+                SECTION I: RESPONDENT PROFILE
               </h3>
-              <span className="text-[10px] font-mono text-slate-500">5 ITEMS</span>
+              <span className="text-[10px] font-mono text-slate-500">Q1–Q5 · ALL REQUIRED</span>
             </div>
 
             {/* Q1. Designation */}
             <div>
               <label className="block text-xs font-semibold text-slate-800 mb-2">
-                1. Designation:
+                1. Designation <span className="text-rose-600">*</span>
               </label>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                 {DESIGNATION_OPTIONS.map(opt => (
@@ -455,7 +519,10 @@ export const Stage4Questionnaire: React.FC<Stage4QuestionnaireProps> = ({
                       type="radio"
                       name="sec1-designation"
                       checked={designation === opt}
-                      onChange={() => setDesignation(opt)}
+                      onChange={() => {
+                        setLocalError(null);
+                        setDesignation(opt);
+                      }}
                       className="text-slate-900 focus:ring-slate-900"
                     />
                     <span>{opt}</span>
@@ -466,7 +533,10 @@ export const Stage4Questionnaire: React.FC<Stage4QuestionnaireProps> = ({
                 <input
                   type="text"
                   value={designationOther}
-                  onChange={(e) => setDesignationOther(e.target.value)}
+                  onChange={(e) => {
+                    setLocalError(null);
+                    setDesignationOther(e.target.value);
+                  }}
                   placeholder="Specify designation..."
                   className="mt-2 w-full sm:w-1/2 px-3 py-2 rounded border border-slate-300 text-xs text-slate-800 bg-white"
                 />
@@ -476,7 +546,7 @@ export const Stage4Questionnaire: React.FC<Stage4QuestionnaireProps> = ({
             {/* Q2. Specialty */}
             <div>
               <label className="block text-xs font-semibold text-slate-800 mb-2">
-                2. Specialty:
+                2. Specialty <span className="text-rose-600">*</span>
               </label>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                 {SPECIALTY_OPTIONS.map(opt => (
@@ -492,7 +562,10 @@ export const Stage4Questionnaire: React.FC<Stage4QuestionnaireProps> = ({
                       type="radio"
                       name="sec1-specialty"
                       checked={specialty === opt}
-                      onChange={() => setSpecialty(opt)}
+                      onChange={() => {
+                        setLocalError(null);
+                        setSpecialty(opt);
+                      }}
                       className="text-slate-900 focus:ring-slate-900"
                     />
                     <span>{opt}</span>
@@ -503,7 +576,10 @@ export const Stage4Questionnaire: React.FC<Stage4QuestionnaireProps> = ({
                 <input
                   type="text"
                   value={specialtyOther}
-                  onChange={(e) => setSpecialtyOther(e.target.value)}
+                  onChange={(e) => {
+                    setLocalError(null);
+                    setSpecialtyOther(e.target.value);
+                  }}
                   placeholder="Specify specialty..."
                   className="mt-2 w-full sm:w-1/2 px-3 py-2 rounded border border-slate-300 text-xs text-slate-800 bg-white"
                 />
@@ -513,7 +589,7 @@ export const Stage4Questionnaire: React.FC<Stage4QuestionnaireProps> = ({
             {/* Q3. Years since MBBS completion */}
             <div>
               <label className="block text-xs font-semibold text-slate-800 mb-2">
-                3. Years since MBBS completion:
+                3. Years since MBBS completion <span className="text-rose-600">*</span>
               </label>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {MBBS_BRACKETS.map(opt => (
@@ -529,7 +605,10 @@ export const Stage4Questionnaire: React.FC<Stage4QuestionnaireProps> = ({
                       type="radio"
                       name="sec1-mbbs"
                       checked={yearsSinceMbbsBracket === opt}
-                      onChange={() => setYearsSinceMbbsBracket(opt)}
+                      onChange={() => {
+                        setLocalError(null);
+                        setYearsSinceMbbsBracket(opt);
+                      }}
                       className="text-slate-900 focus:ring-slate-900"
                     />
                     <span>{opt}</span>
@@ -541,7 +620,7 @@ export const Stage4Questionnaire: React.FC<Stage4QuestionnaireProps> = ({
             {/* Q4. Type of hospital */}
             <div>
               <label className="block text-xs font-semibold text-slate-800 mb-2">
-                4. Type of hospital:
+                4. Type of hospital <span className="text-rose-600">*</span>
               </label>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {HOSPITAL_TYPES.map(opt => (
@@ -557,7 +636,10 @@ export const Stage4Questionnaire: React.FC<Stage4QuestionnaireProps> = ({
                       type="radio"
                       name="sec1-hospital"
                       checked={hospitalType === opt}
-                      onChange={() => setHospitalType(opt)}
+                      onChange={() => {
+                        setLocalError(null);
+                        setHospitalType(opt);
+                      }}
                       className="text-slate-900 focus:ring-slate-900"
                     />
                     <span>{opt}</span>
@@ -568,7 +650,10 @@ export const Stage4Questionnaire: React.FC<Stage4QuestionnaireProps> = ({
                 <input
                   type="text"
                   value={hospitalTypeOther}
-                  onChange={(e) => setHospitalTypeOther(e.target.value)}
+                  onChange={(e) => {
+                    setLocalError(null);
+                    setHospitalTypeOther(e.target.value);
+                  }}
                   placeholder="Specify type of hospital..."
                   className="mt-2 w-full sm:w-1/2 px-3 py-2 rounded border border-slate-300 text-xs text-slate-800 bg-white"
                 />
@@ -578,7 +663,7 @@ export const Stage4Questionnaire: React.FC<Stage4QuestionnaireProps> = ({
             {/* Q5. Formal training */}
             <div>
               <label className="block text-xs font-semibold text-slate-800 mb-2">
-                5. Have you received any formal training regarding the use of GenAI in healthcare?
+                5. Have you received any formal training regarding the use of GenAI in healthcare? <span className="text-rose-600">*</span>
               </label>
               <div className="flex gap-6">
                 <label className="flex items-center gap-2 text-xs font-medium text-slate-800 cursor-pointer">
@@ -586,7 +671,10 @@ export const Stage4Questionnaire: React.FC<Stage4QuestionnaireProps> = ({
                     type="radio"
                     name="sec1-training"
                     checked={formalGenAiTraining === true}
-                    onChange={() => setFormalGenAiTraining(true)}
+                    onChange={() => {
+                      setLocalError(null);
+                      setFormalGenAiTraining(true);
+                    }}
                     className="text-slate-900 focus:ring-slate-900"
                   />
                   <span>Yes</span>
@@ -596,7 +684,10 @@ export const Stage4Questionnaire: React.FC<Stage4QuestionnaireProps> = ({
                     type="radio"
                     name="sec1-training"
                     checked={formalGenAiTraining === false}
-                    onChange={() => setFormalGenAiTraining(false)}
+                    onChange={() => {
+                      setLocalError(null);
+                      setFormalGenAiTraining(false);
+                    }}
                     className="text-slate-900 focus:ring-slate-900"
                   />
                   <span>No</span>
@@ -607,32 +698,85 @@ export const Stage4Questionnaire: React.FC<Stage4QuestionnaireProps> = ({
           )}
 
           {activeSection === 'questionnaire' && (
-          /* ==================================================== */
-          /* SECTION II: GENAI EXPOSURE */
-          /* ==================================================== */
+          <div className="space-y-6">
+            {/* Recorded SECTION I Summary Banner */}
+            <div className="p-4 rounded bg-slate-50 border border-slate-200 space-y-2.5">
+              <div className="flex items-center justify-between gap-2 border-b border-slate-200 pb-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-900 font-mono">
+                  SECTION I: RESPONDENT PROFILE (Q1–Q5 Recorded)
+                </span>
+                {!isLockedInLive && (
+                  <button
+                    type="button"
+                    onClick={onBack}
+                    className="text-[11px] font-semibold text-teal-700 hover:text-teal-900 underline cursor-pointer"
+                  >
+                    Edit Profile (Stage 4)
+                  </button>
+                )}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5 text-xs">
+                <div>
+                  <span className="text-[10px] font-mono uppercase text-slate-500 block">Q1. Designation</span>
+                  <span className="font-semibold text-slate-900">
+                    {effectiveDesignation === 'Other' && effectiveDesignationOther
+                      ? effectiveDesignationOther
+                      : effectiveDesignation}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-mono uppercase text-slate-500 block">Q2. Specialty</span>
+                  <span className="font-semibold text-slate-900">
+                    {effectiveSpecialty === 'Other' && effectiveSpecialtyOther
+                      ? effectiveSpecialtyOther
+                      : effectiveSpecialty}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-mono uppercase text-slate-500 block">Q3. Years MBBS</span>
+                  <span className="font-semibold text-slate-900">{effectiveYears}</span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-mono uppercase text-slate-500 block">Q4. Hospital Type</span>
+                  <span className="font-semibold text-slate-900">
+                    {effectiveHospital === 'Other' && effectiveHospitalOther
+                      ? effectiveHospitalOther
+                      : effectiveHospital}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-[10px] font-mono uppercase text-slate-500 block">Q5. GenAI Training</span>
+                  <span className="font-semibold text-slate-900">{effectiveTraining ? 'Yes' : 'No'}</span>
+                </div>
+              </div>
+            </div>
+
+          {/* ==================================================== */}
+          {/* SECTION II: GENAI EXPOSURE & COGNITIVE OFFLOADING (Q6 - Q17) */}
+          {/* ==================================================== */}
           <div className="p-5 sm:p-6 rounded bg-slate-50/70 border border-slate-200 space-y-6">
             <div className="pb-2 border-b border-slate-200 flex items-center justify-between">
               <div>
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900 font-mono">
-                  Section II: GenAI Exposure
+                  Section II: GenAI Exposure &amp; Cognitive Offloading
                 </h3>
                 <p className="text-[11px] text-slate-500 mt-0.5">
                   Answer based on your work-related use during the past 3 months.
                 </p>
               </div>
-              <span className="text-[10px] font-mono text-slate-500">12 ITEMS</span>
+              <span className="text-[10px] font-mono text-slate-500">Q6–Q17 · 12 ITEMS</span>
             </div>
 
-            {/* Q1. Used GenAI in past 3 months */}
+            {/* Q6. Used GenAI in past 3 months */}
             <div className="p-4 rounded bg-white border border-slate-200 space-y-2.5">
               <label className="block text-xs font-semibold text-slate-900">
-                1. In the past 3 months, have you used any GenAI tool for a work-related clinical purpose?
+                6. In the past 3 months, have you used any GenAI tool for a work-related clinical purpose?
               </label>
               <div className="flex gap-6">
                 <label className="flex items-center gap-2 text-xs font-medium text-slate-800 cursor-pointer">
                   <input
                     type="radio"
-                    name="sec2-q1"
+                    name="sec2-q6"
                     checked={usedGenAiLast3Months === true}
                     onChange={() => setUsedGenAiLast3Months(true)}
                     className="text-slate-900 focus:ring-slate-900"
@@ -642,7 +786,7 @@ export const Stage4Questionnaire: React.FC<Stage4QuestionnaireProps> = ({
                 <label className="flex items-center gap-2 text-xs font-medium text-slate-800 cursor-pointer">
                   <input
                     type="radio"
-                    name="sec2-q1"
+                    name="sec2-q6"
                     checked={usedGenAiLast3Months === false}
                     onChange={() => setUsedGenAiLast3Months(false)}
                     className="text-slate-900 focus:ring-slate-900"
@@ -657,14 +801,14 @@ export const Stage4Questionnaire: React.FC<Stage4QuestionnaireProps> = ({
 
             {!usedGenAiLast3Months ? (
               <div className="p-4 rounded bg-amber-50/70 border border-amber-200 text-xs text-amber-950 leading-relaxed">
-                <strong>Skip Logic Applied:</strong> Because you selected <strong>No</strong> for Question 1, Questions 2–12 are skipped. Click below to proceed directly to the clinical vignette section.
+                <strong>Skip Logic Applied:</strong> Because you selected <strong>No</strong> for Question 6, Questions 7–17 are skipped. Click below to proceed directly to the CDSS &amp; clinical vignette section.
               </div>
             ) : (
               <div className="space-y-6">
-                {/* Q2. First use duration */}
+                {/* Q7. First use duration */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-800 mb-2">
-                    2. How long ago did you first use GenAI for work-related purposes?
+                    7. How long ago did you first use GenAI for work-related purposes?
                   </label>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {([
@@ -689,10 +833,10 @@ export const Stage4Questionnaire: React.FC<Stage4QuestionnaireProps> = ({
                   </div>
                 </div>
 
-                {/* Q3. Frequency of use during past 3 months */}
+                {/* Q8. Frequency of use during past 3 months */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-800 mb-2">
-                    3. Frequency of use during the past 3 months:
+                    8. Frequency of use during the past 3 months:
                   </label>
                   <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-2">
                     {([
@@ -718,10 +862,10 @@ export const Stage4Questionnaire: React.FC<Stage4QuestionnaireProps> = ({
                   </div>
                 </div>
 
-                {/* Q4. Total time spent per day */}
+                {/* Q9. Total time spent per day */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-800 mb-2">
-                    4. Total time spent per day when using GenAI for work:
+                    9. Total time spent per day when using GenAI for work:
                   </label>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {([
@@ -746,10 +890,10 @@ export const Stage4Questionnaire: React.FC<Stage4QuestionnaireProps> = ({
                   </div>
                 </div>
 
-                {/* Q5. Which GenAI tools */}
+                {/* Q10. Which GenAI tools */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-800 mb-2">
-                    5. Which GenAI tools have you used? (Select all that apply)
+                    10. Which GenAI tools have you used? (Select all that apply)
                   </label>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {[
@@ -797,10 +941,10 @@ export const Stage4Questionnaire: React.FC<Stage4QuestionnaireProps> = ({
                   )}
                 </div>
 
-                {/* Q6. Access method */}
+                {/* Q11. Access method */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-800 mb-2">
-                    6. How do you usually access GenAI tools for work?
+                    11. How do you usually access GenAI tools for work?
                   </label>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {([
@@ -825,10 +969,10 @@ export const Stage4Questionnaire: React.FC<Stage4QuestionnaireProps> = ({
                   </div>
                 </div>
 
-                {/* Q7. Entered patient-related information */}
+                {/* Q12. Entered patient-related information */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-800 mb-2">
-                    7. Have you entered patient-related information (even without patient name or identifiers) into a publicly available GenAI tool?
+                    12. Have you entered patient-related information (even without patient name or identifiers) into a publicly available GenAI tool?
                   </label>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {([
@@ -853,10 +997,10 @@ export const Stage4Questionnaire: React.FC<Stage4QuestionnaireProps> = ({
                   </div>
                 </div>
 
-                {/* Q8. Task Frequency Matrix */}
+                {/* Q13. Task Frequency Matrix */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-800 mb-2">
-                    8. During the past 3 months, how often have you used GenAI for each of the following work-related tasks?
+                    13. During the past 3 months, how often have you used GenAI for each of the following work-related tasks?
                   </label>
                   <div className="bg-white rounded border border-slate-200 overflow-x-auto">
                     <table className="w-full text-xs border-collapse">
@@ -898,10 +1042,10 @@ export const Stage4Questionnaire: React.FC<Stage4QuestionnaireProps> = ({
                   </div>
                 </div>
 
-                {/* Q9. Stage during clinical reasoning task */}
+                {/* Q14. Stage during clinical reasoning task (Cognitive Offloading 1) */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-800 mb-2">
-                    9. At what stage during a clinical reasoning task do you most often consult GenAI?
+                    14. At what stage during a clinical reasoning task do you most often consult GenAI?
                   </label>
                   <div className="space-y-1.5">
                     {([
@@ -921,7 +1065,7 @@ export const Stage4Questionnaire: React.FC<Stage4QuestionnaireProps> = ({
                       >
                         <input
                           type="radio"
-                          name="sec2-q9"
+                          name="sec2-q14"
                           checked={reasoningConsultationStage === opt}
                           onChange={() => setReasoningConsultationStage(opt)}
                           className="text-slate-900 focus:ring-slate-900"
@@ -932,11 +1076,11 @@ export const Stage4Questionnaire: React.FC<Stage4QuestionnaireProps> = ({
                   </div>
                 </div>
 
-                {/* Q10. Last 10 clinical cases consulted count */}
+                {/* Q15. Last 10 clinical cases consulted count (Cognitive Offloading 2) */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <label className="text-xs font-semibold text-slate-800">
-                      10. Out of your last 10 clinical cases where you were deciding diagnosis, investigations, or management, in how many did you consult a GenAI tool?
+                      15. Out of your last 10 clinical cases where you were deciding diagnosis, investigations, or management, in how many did you consult a GenAI tool?
                     </label>
                     <span className="font-mono text-xs font-bold text-slate-900 shrink-0 ml-3">
                       {last10CasesConsultedCount} / 10
@@ -960,10 +1104,10 @@ export const Stage4Questionnaire: React.FC<Stage4QuestionnaireProps> = ({
                   </div>
                 </div>
 
-                {/* Q11. Verification frequency */}
+                {/* Q16. Verification frequency (Cognitive Offloading 3) */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-800 mb-2">
-                    11. How often do you verify GenAI-generated answers against a clinical guideline, reference source, or qualified colleague?
+                    16. How often do you verify GenAI-generated answers against a clinical guideline, reference source, or qualified colleague?
                   </label>
                   <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                     {TASK_FREQ_OPTIONS.map(opt => (
@@ -983,10 +1127,10 @@ export const Stage4Questionnaire: React.FC<Stage4QuestionnaireProps> = ({
                   </div>
                 </div>
 
-                {/* Q12. Institutional written policy */}
+                {/* Q17. Institutional written policy (Cognitive Offloading 4) */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-800 mb-2">
-                    12. Does your institution have a written policy regarding the use of GenAI in clinical work?
+                    17. Does your institution have a written policy regarding the use of GenAI in clinical work?
                   </label>
                   <div className="grid grid-cols-3 gap-2 sm:w-1/2">
                     {(['Yes', 'No', 'Not sure'] as InstitutionalPolicyStatus[]).map(opt => (
@@ -1007,6 +1151,7 @@ export const Stage4Questionnaire: React.FC<Stage4QuestionnaireProps> = ({
                 </div>
               </div>
             )}
+          </div>
           </div>
           )}
           </fieldset>
