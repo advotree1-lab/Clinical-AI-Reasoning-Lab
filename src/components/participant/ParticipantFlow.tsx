@@ -13,6 +13,7 @@ import {
 } from '../../types';
 import { researchStore } from '../../services/researchStore';
 import { buildDisplayedCdssOptions } from '../../utils/cdssOptions';
+import { buildDisplayedVignetteOptions } from '../../utils/vignetteOptions';
 import { Stage1Welcome } from './Stage1Welcome';
 import { Stage2Eligibility } from './Stage2Eligibility';
 import { Stage2Consent } from './Stage2Consent';
@@ -426,13 +427,17 @@ export const ParticipantFlow: React.FC<ParticipantFlowProps> = ({
       const postRecords: VignetteAnswerRecord[] = postAiCases.map(c => {
         const existing = restoredVignetteAnswers.find(a => a.caseId === c.id);
         if (existing) return existing;
+        const displayedOrder = buildDisplayedVignetteOptions(p.id, c.id, c.mcqOptions, c.caseNumber);
+        const chosenOpt = displayedOrder[0];
         return {
           id: `post-${p.id}-${c.id}`,
           participantId: p.id,
           caseId: c.id,
           stage: 'post_ai',
           isDemo: true,
-          mostLikelyDiagnosis: c.mcqOptions[0] || 'Other',
+          mostLikelyDiagnosis: chosenOpt?.text || c.mcqOptions[0] || '',
+          selectedOptionId: chosenOpt?.optionId || 'opt_1',
+          displayedOptionOrder: displayedOrder,
           differential1: 'Alternative acute etiology',
           differential2: 'Secondary systemic condition',
           redFlags: 'Hemodynamic instability and urgent clinical danger indicators',
@@ -517,24 +522,30 @@ export const ParticipantFlow: React.FC<ParticipantFlowProps> = ({
         completedAt: nowIso
       };
     });
-    const postRecords: VignetteAnswerRecord[] = postAiCases.map(c => ({
-      id: `post-${p.id}-${c.id}`,
-      participantId: p.id,
-      caseId: c.id,
-      stage: 'post_ai',
-      isDemo: true,
-      mostLikelyDiagnosis: c.mcqOptions[0] || 'Other',
-      differential1: 'Alternative acute etiology',
-      differential2: 'Secondary systemic condition',
-      redFlags: 'Critical clinical danger indicators',
-      nextStep: 'Immediate targeted management and diagnostic confirmation',
-      confidence: 4,
-      firstDisplayedAt: nowIso,
-      lastOpenedAt: nowIso,
-      activeSeconds: 0,
-      wallClockSeconds: 0,
-      submittedAt: nowIso
-    }));
+    const postRecords: VignetteAnswerRecord[] = postAiCases.map(c => {
+      const displayedOrder = buildDisplayedVignetteOptions(p.id, c.id, c.mcqOptions, c.caseNumber);
+      const chosenOpt = displayedOrder[0];
+      return {
+        id: `post-${p.id}-${c.id}`,
+        participantId: p.id,
+        caseId: c.id,
+        stage: 'post_ai',
+        isDemo: true,
+        mostLikelyDiagnosis: chosenOpt?.text || c.mcqOptions[0] || '',
+        selectedOptionId: chosenOpt?.optionId || 'opt_1',
+        displayedOptionOrder: displayedOrder,
+        differential1: 'Alternative acute etiology',
+        differential2: 'Secondary systemic condition',
+        redFlags: 'Critical clinical danger indicators',
+        nextStep: 'Immediate targeted management and diagnostic confirmation',
+        confidence: 4,
+        firstDisplayedAt: nowIso,
+        lastOpenedAt: nowIso,
+        activeSeconds: 0,
+        wallClockSeconds: 0,
+        submittedAt: nowIso
+      };
+    });
 
     setEligibilityConfirmed(true);
     setConsentConfirmed(true);
@@ -1209,8 +1220,10 @@ export const ParticipantFlow: React.FC<ParticipantFlowProps> = ({
             onOpenCase={
               isDemoMode
                 ? undefined
-                : (caseId) =>
-                    researchStore.openLiveCaseSession(currentParticipant.id, caseId).then(() => undefined)
+                : (caseId, displayedOptionOrder) =>
+                    researchStore
+                      .openLiveCaseSession(currentParticipant.id, caseId, displayedOptionOrder)
+                      .then(() => undefined)
             }
             onHeartbeatTimer={
               isDemoMode
@@ -1230,6 +1243,8 @@ export const ParticipantFlow: React.FC<ParticipantFlowProps> = ({
                   stage: 'post_ai',
                   isDemo: true,
                   mostLikelyDiagnosis: input.mostLikelyDiagnosis,
+                  selectedOptionId: input.selectedOptionId,
+                  displayedOptionOrder: input.displayedOptionOrder,
                   differential1: input.differential1,
                   differential2: input.differential2,
                   redFlags: input.redFlags,

@@ -99,7 +99,8 @@ class ResearchStore {
               ? {
                   ...stored,
                   investigations: baseline.investigations,
-                  clinicalImages: baseline.clinicalImages
+                  clinicalImages: baseline.clinicalImages,
+                  mcqOptions: baseline.mcqOptions
                 }
               : stored;
           });

@@ -369,6 +369,10 @@ CREATE TABLE IF NOT EXISTS public.vignette_answers (
     UNIQUE (participant_id, case_id)
 );
 
+ALTER TABLE public.vignette_answers
+    ADD COLUMN IF NOT EXISTS selected_option_id TEXT,
+    ADD COLUMN IF NOT EXISTS displayed_option_order JSONB;
+
 CREATE TABLE IF NOT EXISTS public.assessor_scores (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     vignette_answer_id UUID NOT NULL REFERENCES public.vignette_answers(id) ON DELETE CASCADE,
@@ -1744,6 +1748,8 @@ REVOKE ALL ON FUNCTION public.complete_cdss_stage(UUID) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.complete_cdss_stage(UUID) TO authenticated;
 
 -- 6.9 submit_vignette_answer
+DROP FUNCTION IF EXISTS public.submit_vignette_answer(UUID, VARCHAR, TEXT, TEXT, TEXT, TEXT, TEXT, INT);
+
 CREATE OR REPLACE FUNCTION public.submit_vignette_answer(
     p_participant_id UUID,
     p_case_id VARCHAR(64),
@@ -1752,7 +1758,9 @@ CREATE OR REPLACE FUNCTION public.submit_vignette_answer(
     p_differential_2 TEXT,
     p_red_flags TEXT,
     p_next_step TEXT,
-    p_confidence INT
+    p_confidence INT,
+    p_selected_option_id TEXT DEFAULT NULL,
+    p_displayed_option_order JSONB DEFAULT NULL
 )
 RETURNS UUID
 LANGUAGE plpgsql
@@ -1770,6 +1778,8 @@ DECLARE
     v_last TIMESTAMPTZ;
     v_active INT;
     v_wall INT;
+    v_selected_opt_id TEXT := NULLIF(BTRIM(COALESCE(p_selected_option_id, '')), '');
+    v_effective_order JSONB;
 BEGIN
     IF v_uid IS NULL THEN
         RAISE EXCEPTION 'Authentication required.';
@@ -1825,17 +1835,20 @@ BEGIN
     WHERE participant_id = p_participant_id AND case_id = p_case_id
     FOR UPDATE;
 
+    v_effective_order := COALESCE(p_displayed_option_order, v_timer.displayed_option_order);
+
     IF NOT FOUND THEN
         INSERT INTO public.case_session_timers (
-            participant_id, case_id, stage, first_displayed_at, last_opened_at, last_heartbeat_at, active_seconds, open_count, submitted_at
+            participant_id, case_id, stage, first_displayed_at, last_opened_at, last_heartbeat_at, active_seconds, open_count, submitted_at, displayed_option_order
         )
         VALUES (
-            p_participant_id, p_case_id, 'post_ai', v_now, v_now, v_now, 0, 1, v_now
+            p_participant_id, p_case_id, 'post_ai', v_now, v_now, v_now, 0, 1, v_now, p_displayed_option_order
         )
         RETURNING * INTO v_timer;
     ELSE
         UPDATE public.case_session_timers
-        SET submitted_at = COALESCE(submitted_at, v_now)
+        SET submitted_at = COALESCE(submitted_at, v_now),
+            displayed_option_order = COALESCE(displayed_option_order, p_displayed_option_order)
         WHERE id = v_timer.id
         RETURNING * INTO v_timer;
     END IF;
@@ -1851,6 +1864,8 @@ BEGIN
         stage,
         is_demo,
         most_likely_diagnosis,
+        selected_option_id,
+        displayed_option_order,
         differential_1,
         differential_2,
         red_flags,
@@ -1869,6 +1884,8 @@ BEGIN
         'post_ai',
         false,
         BTRIM(p_most_likely_diagnosis),
+        v_selected_opt_id,
+        v_effective_order,
         BTRIM(p_differential_1),
         BTRIM(p_differential_2),
         BTRIM(p_red_flags),
@@ -1895,8 +1912,8 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.submit_vignette_answer(UUID, VARCHAR, TEXT, TEXT, TEXT, TEXT, TEXT, INT) FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.submit_vignette_answer(UUID, VARCHAR, TEXT, TEXT, TEXT, TEXT, TEXT, INT) TO authenticated;
+REVOKE ALL ON FUNCTION public.submit_vignette_answer(UUID, VARCHAR, TEXT, TEXT, TEXT, TEXT, TEXT, INT, TEXT, JSONB) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.submit_vignette_answer(UUID, VARCHAR, TEXT, TEXT, TEXT, TEXT, TEXT, INT, TEXT, JSONB) TO authenticated;
 
 -- 6.10 complete_vignette_stage
 CREATE OR REPLACE FUNCTION public.complete_vignette_stage(p_participant_id UUID)
@@ -2075,6 +2092,135 @@ $$;
 
 REVOKE ALL ON FUNCTION public.get_researcher_operational_participants() FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.get_researcher_operational_participants() TO authenticated;
+
+-- Vignette answer-key comparison view for active PI & Researcher team members
+-- (Excludes participant demographics, questionnaire answers, and CDSS misleading metadata)
+DROP FUNCTION IF EXISTS public.get_researcher_vignette_monitoring();
+
+CREATE OR REPLACE FUNCTION public.get_researcher_vignette_monitoring()
+RETURNS TABLE (
+    vignette_answer_id UUID,
+    participant_id UUID,
+    case_id VARCHAR(64),
+    most_likely_diagnosis TEXT,
+    selected_option_id TEXT,
+    displayed_option_order JSONB,
+    confidence INT,
+    first_displayed_at TIMESTAMPTZ,
+    last_opened_at TIMESTAMPTZ,
+    submitted_at TIMESTAMPTZ,
+    active_seconds INT,
+    wall_clock_seconds INT,
+    scoring_status TEXT,
+    final_resolved_score NUMERIC(4, 2),
+    pi_adjudicated_score NUMERIC(4, 2),
+    gold_standard_diagnosis TEXT,
+    acceptable_alternatives TEXT[]
+)
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+    v_uid UUID := auth.uid();
+    v_member public.research_team_members;
+BEGIN
+    IF v_uid IS NULL OR COALESCE((auth.jwt() ->> 'is_anonymous')::BOOLEAN, false) THEN
+        RAISE EXCEPTION 'Authenticated research team credentials required.';
+    END IF;
+
+    SELECT * INTO v_member
+    FROM public.research_team_members
+    WHERE auth_user_id = v_uid
+      AND is_active = true
+      AND role IN ('pi', 'researcher')
+    LIMIT 1;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Active Principal Investigator or Researcher access required.';
+    END IF;
+
+    RETURN QUERY
+    SELECT
+        va.id,
+        va.participant_id,
+        va.case_id,
+        va.most_likely_diagnosis,
+        va.selected_option_id,
+        va.displayed_option_order,
+        va.confidence,
+        va.first_displayed_at,
+        va.last_opened_at,
+        va.submitted_at,
+        va.active_seconds,
+        va.wall_clock_seconds,
+        va.scoring_status,
+        va.final_resolved_score,
+        va.pi_adjudicated_score,
+        ak.gold_standard_diagnosis,
+        ak.acceptable_alternatives
+    FROM public.vignette_answers va
+    JOIN public.participants p ON p.id = va.participant_id
+    JOIN public.clinical_cases cc ON cc.id = va.case_id
+    JOIN public.clinical_case_answer_keys ak ON ak.case_id = cc.id
+    WHERE cc.stage = 'post_ai'
+      AND (v_member.role = 'pi' OR p.recruited_by = v_member.id)
+    ORDER BY va.submitted_at DESC;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.get_researcher_vignette_monitoring() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.get_researcher_vignette_monitoring() TO authenticated;
+
+-- Post-AI vignette answer keys only (strictly excludes CDSS misleading keys) for PI & Researcher
+DROP FUNCTION IF EXISTS public.get_researcher_vignette_keys();
+
+CREATE OR REPLACE FUNCTION public.get_researcher_vignette_keys()
+RETURNS TABLE (
+    case_id VARCHAR(64),
+    gold_standard_diagnosis TEXT,
+    acceptable_alternatives TEXT[]
+)
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+    v_uid UUID := auth.uid();
+    v_member public.research_team_members;
+BEGIN
+    IF v_uid IS NULL OR COALESCE((auth.jwt() ->> 'is_anonymous')::BOOLEAN, false) THEN
+        RAISE EXCEPTION 'Authenticated research team credentials required.';
+    END IF;
+
+    SELECT * INTO v_member
+    FROM public.research_team_members
+    WHERE auth_user_id = v_uid
+      AND is_active = true
+      AND role IN ('pi', 'researcher')
+    LIMIT 1;
+
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Active Principal Investigator or Researcher access required.';
+    END IF;
+
+    RETURN QUERY
+    SELECT
+        cc.id,
+        ak.gold_standard_diagnosis,
+        ak.acceptable_alternatives
+    FROM public.clinical_cases cc
+    JOIN public.clinical_case_answer_keys ak ON ak.case_id = cc.id
+    WHERE cc.stage = 'post_ai'
+      AND cc.is_published = true
+    ORDER BY cc.case_number ASC;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.get_researcher_vignette_keys() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.get_researcher_vignette_keys() TO authenticated;
 
 -- Server-enforced Assessor Slot Scoring (Assessor 1 cannot overwrite Assessor 2 & vice versa)
 CREATE OR REPLACE FUNCTION public.submit_assessor_score(
@@ -2797,10 +2943,9 @@ INSERT INTO public.clinical_cases (
     ]$sql$::jsonb,
     ARRAY[
       $sql$Pyogenic Brain Abscess (Left Frontal Lobe, Odontogenic Source) with Raised Intracranial Pressure$sql$,
-      $sql$Acute Left Middle Cerebral Artery Ischaemic Stroke$sql$,
-      $sql$Glioblastoma Multiforme (High-Grade Primary Brain Tumour)$sql$,
-      $sql$Uncomplicated Acute Bacterial Meningitis Without Mass Effect$sql$,
-      $sql$Other$sql$
+      $sql$Necrotic High-Grade Glioma (Glioblastoma) with Tumour-Associated Fever / Necrosis and Perilesional Oedema$sql$,
+      $sql$Acute Bacterial Meningitis Complicated by Focal Cerebritis / Early Venous Sinus Thrombosis and Raised ICP$sql$,
+      $sql$Suppurative Intracranial Mass (Subdural Empyema vs. Left Frontal Abscess) with Impending Herniation$sql$
     ],
     true, true
 )
@@ -2868,10 +3013,9 @@ INSERT INTO public.clinical_cases (
     ]$sql$::jsonb,
     ARRAY[
       $sql$Right-Sided Tension Pneumothorax (with Obstructive Shock and Respiratory Acidosis)$sql$,
-      $sql$Life-Threatening Status Asthmaticus Unresponsive to Bronchodilators$sql$,
-      $sql$Massive Right-Sided Pleural Effusion$sql$,
-      $sql$Acute Massive Pulmonary Embolism$sql$,
-      $sql$Other$sql$
+      $sql$Severe Acute Asthma Exacerbation / Barotrauma-Induced Tension Pneumothorax with Decompensated Respiratory Acidosis$sql$,
+      $sql$Acute Massive Pulmonary Embolism with Obstructive Shock and Bronchospasm / Hypoxaemia$sql$,
+      $sql$Status Asthmaticus Complicated by Severe Dynamic Hyperinflation and Circulatory Collapse$sql$
     ],
     true, true
 )
@@ -2947,10 +3091,9 @@ INSERT INTO public.clinical_cases (
     '[]'::jsonb,
     ARRAY[
       $sql$Myxoedema Coma Precipitated by Lower Respiratory Tract Infection / Pneumonia$sql$,
-      $sql$Primary Septic Shock with Euthyroid Sick Syndrome$sql$,
-      $sql$Syndrome of Inappropriate Antidiuretic Hormone Secretion (SIADH) Alone$sql$,
-      $sql$Acute Pericardial Tamponade Without Endocrine Dysfunction$sql$,
-      $sql$Other$sql$
+      $sql$Severe Pneumonia with Septic Shock, Hypercapnic Respiratory Failure, and Decompensated Hypothyroidism$sql$,
+      $sql$Hypothyroid Pericardial Effusion / Tamponade Physiology with Hypoventilation and Sepsis$sql$,
+      $sql$Decompensated Hypothyroidism with Severe Hypo-Osmolar Hyponatremia and Hypoglycaemic Encephalopathy$sql$
     ],
     true, true
 )
@@ -3026,10 +3169,9 @@ INSERT INTO public.clinical_cases (
     '[]'::jsonb,
     ARRAY[
       $sql$Thyroid Storm with Thyrotoxic Cardiomyopathy, Cardiogenic Shock (Beta-Blocker-Induced Collapse), and Multiorgan Dysfunction$sql$,
-      $sql$Acute Ascending Cholangitis with Septic Shock and Stress Hyperthyroxinaemia$sql$,
-      $sql$Phaeochromocytoma Crisis Without Thyroid Disease$sql$,
-      $sql$Acute Viral Myocarditis with Benign Subclinical Hyperthyroidism$sql$,
-      $sql$Other$sql$
+      $sql$Septic Shock with Thyrotoxicosis / Precipitated Thyroid Storm and Acute Congestive Hepatopathy$sql$,
+      $sql$Decompensated Thyrotoxic Atrial Fibrillation with Tachycardia-Induced / Thyrotoxic Cardiomyopathy and Cardiogenic Shock$sql$,
+      $sql$Acute Hepatic / Biliary Sepsis with Stress-Induced Cardiomyopathy and Uncontrolled Hyperthyroidism$sql$
     ],
     true, true
 )
@@ -3102,10 +3244,9 @@ INSERT INTO public.clinical_cases (
     '[]'::jsonb,
     ARRAY[
       $sql$Severe Hypovolemic Shock Progressing to Intrinsic AKI (Ischaemic Acute Tubular Necrosis) with Fluid Overload, Refractory Acidosis and Hyperkalemia$sql$,
-      $sql$Uncomplicated Prerenal Azotemia Requiring Continued Aggressive Crystalloid Boluses$sql$,
-      $sql$Isolated Hyperosmolar Hyperglycaemic State Without Renal Parenchymal Injury$sql$,
-      $sql$Acute Post-Renal Obstructive Uropathy Alone$sql$,
-      $sql$Other$sql$
+      $sql$Hypovolemic / Septic Gastrointestinal Shock with Hypernatremic Dehydration and Persistent Prerenal Oliguria$sql$,
+      $sql$Acute-on-Chronic / Severe Intrinsic AKI Complicated by Iatrogenic Volume Overload, Hyperkalemia (5.8 mEq/L), and High-Anion/Lactic Acidosis$sql$,
+      $sql$Decompensated Gastrointestinal Shock with Resuscitation-Associated Pulmonary Oedema and Mixed Metabolic Acidosis$sql$
     ],
     true, true
 )

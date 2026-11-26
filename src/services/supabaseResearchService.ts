@@ -43,6 +43,7 @@ import {
   YearsSinceMbbsBracket,
   ClinicalReasoningConsultationStage,
 } from '../types';
+import { PARTICIPANT_DEMO_CASES } from '../data/participantCases';
 import { isSupabaseConfigured, requireSupabaseClient, supabaseConfigError } from './supabaseClient';
 
 export interface EnrollParticipantInput {
@@ -107,6 +108,8 @@ export interface SubmitVignetteAnswerInput {
   redFlags: string;
   nextStep: string;
   confidence: number;
+  selectedOptionId?: string;
+  displayedOptionOrder?: CdssOptionOrderItem[];
 }
 
 export interface CaseTimerOpenResult {
@@ -257,6 +260,8 @@ interface VignetteAnswerRow {
   stage: 'post_ai';
   is_demo: boolean;
   most_likely_diagnosis: string;
+  selected_option_id?: string | null;
+  displayed_option_order?: CdssOptionOrderItem[] | null;
   differential_1: string;
   differential_2: string;
   red_flags: string;
@@ -270,6 +275,26 @@ interface VignetteAnswerRow {
   scoring_status: VignetteScoringStatus;
   final_resolved_score: number | null;
   pi_adjudicated_score: number | null;
+}
+
+interface ResearcherVignetteMonitoringRow {
+  vignette_answer_id: string;
+  participant_id: string;
+  case_id: string;
+  most_likely_diagnosis: string;
+  selected_option_id: string | null;
+  displayed_option_order: CdssOptionOrderItem[] | null;
+  confidence: number;
+  first_displayed_at: string;
+  last_opened_at: string;
+  submitted_at: string;
+  active_seconds: number;
+  wall_clock_seconds: number;
+  scoring_status: VignetteScoringStatus;
+  final_resolved_score: number | null;
+  pi_adjudicated_score: number | null;
+  gold_standard_diagnosis: string;
+  acceptable_alternatives: string[] | null;
 }
 
 interface ResearchTeamMemberRow {
@@ -381,6 +406,17 @@ const AI_INTERACTION_SELECT_LEGACY =
 const AI_INTERACTION_SELECT_WITH_OPTIONS =
   'id, participant_id, case_id, is_demo, initial_diagnosis, initial_justification, initial_confidence, initial_submitted_at, ai_agreement, final_diagnosis, selected_option_id, displayed_option_order, switched_diagnosis, reason_for_decision, final_confidence, will_verify, verification_targets, first_displayed_at, last_opened_at, submitted_at, active_seconds, wall_clock_seconds, completed_at';
 
+const VIGNETTE_ANSWER_SELECT_LEGACY =
+  'id, participant_id, case_id, stage, is_demo, most_likely_diagnosis, differential_1, differential_2, red_flags, next_step, confidence, first_displayed_at, last_opened_at, submitted_at, active_seconds, wall_clock_seconds, scoring_status, final_resolved_score, pi_adjudicated_score';
+
+const VIGNETTE_ANSWER_SELECT_WITH_OPTIONS =
+  'id, participant_id, case_id, stage, is_demo, most_likely_diagnosis, selected_option_id, displayed_option_order, differential_1, differential_2, red_flags, next_step, confidence, first_displayed_at, last_opened_at, submitted_at, active_seconds, wall_clock_seconds, scoring_status, final_resolved_score, pi_adjudicated_score';
+
+const UPDATED_POST_CASE_IDS = new Set(['post-02', 'post-03', 'post-04', 'post-05', 'post-06']);
+const UPDATED_POST_MCQ_BY_ID = new Map(
+  PARTICIPANT_DEMO_CASES.filter(c => UPDATED_POST_CASE_IDS.has(c.id)).map(c => [c.id, c.mcqOptions])
+);
+
 function isSchemaCompatError(error: { code?: string; message?: string } | null | undefined): boolean {
   if (!error) return false;
   return (
@@ -430,10 +466,14 @@ function normalizeCdssCasePresentation<T extends ParticipantClinicalCase>(c: T):
         )
       : c.investigations;
 
+  const updatedPostOptions = UPDATED_POST_MCQ_BY_ID.get(c.id);
+  const normalizedMcqOptions = updatedPostOptions ? [...updatedPostOptions] : c.mcqOptions;
+
   return {
     ...c,
     investigations: cleanedInvestigations,
     clinicalImages: cleanedImages,
+    mcqOptions: normalizedMcqOptions,
   };
 }
 
@@ -619,6 +659,8 @@ function mapVignetteAnswerRow(row: VignetteAnswerRow): VignetteAnswerRecord {
     stage: row.stage,
     isDemo: row.is_demo,
     mostLikelyDiagnosis: row.most_likely_diagnosis,
+    selectedOptionId: row.selected_option_id ?? undefined,
+    displayedOptionOrder: row.displayed_option_order ?? undefined,
     differential1: row.differential_1,
     differential2: row.differential_2,
     redFlags: row.red_flags,
@@ -869,9 +911,7 @@ export const supabaseResearchService = {
         .order('clicked_at', { ascending: true }),
       client
         .from('vignette_answers')
-        .select(
-          'id, participant_id, case_id, stage, is_demo, most_likely_diagnosis, differential_1, differential_2, red_flags, next_step, confidence, first_displayed_at, last_opened_at, submitted_at, active_seconds, wall_clock_seconds, scoring_status, final_resolved_score, pi_adjudicated_score'
-        )
+        .select(VIGNETTE_ANSWER_SELECT_WITH_OPTIONS)
         .eq('participant_id', participant.id),
       client
         .from('case_session_timers')
@@ -890,10 +930,21 @@ export const supabaseResearchService = {
       finalAiError = legacyAiRes.error;
     }
 
+    let finalVigData = (vigRes.data || []) as VignetteAnswerRow[];
+    let finalVigError = vigRes.error;
+    if (vigRes.error && isSchemaCompatError(vigRes.error)) {
+      const legacyVigRes = await client
+        .from('vignette_answers')
+        .select(VIGNETTE_ANSWER_SELECT_LEGACY)
+        .eq('participant_id', participant.id);
+      finalVigData = (legacyVigRes.data || []) as VignetteAnswerRow[];
+      finalVigError = legacyVigRes.error;
+    }
+
     if (qRes.error) throw new Error('Unable to restore saved questionnaire responses. Please refresh the page.');
     if (finalAiError) throw new Error('Unable to restore clinical simulation records. Please refresh the page.');
     if (followRes.error) throw new Error('Unable to restore simulation prompt history. Please refresh the page.');
-    if (vigRes.error) throw new Error('Unable to restore clinical vignette answers. Please refresh the page.');
+    if (finalVigError) throw new Error('Unable to restore clinical vignette answers. Please refresh the page.');
     if (timerRes.error) throw new Error('Unable to restore case timing state. Please refresh the page.');
 
     // Log advisory session_resumed telemetry non-blockingly
@@ -909,7 +960,7 @@ export const supabaseResearchService = {
       questionnaire: qRes.data ? mapQuestionnaireRow(qRes.data as QuestionnaireRow) : null,
       aiInteractions: finalAiData.map(mapAiInteractionRow),
       followupEvents: ((followRes.data || []) as FollowupEventRow[]).map(mapFollowupRow),
-      vignetteAnswers: ((vigRes.data || []) as VignetteAnswerRow[]).map(mapVignetteAnswerRow),
+      vignetteAnswers: finalVigData.map(mapVignetteAnswerRow),
       caseTimers: ((timerRes.data || []) as CaseSessionTimerRow[]).map(mapCaseTimerRow),
     };
   },
@@ -1140,7 +1191,7 @@ export const supabaseResearchService = {
 
   async submitVignetteAnswer(input: SubmitVignetteAnswerInput): Promise<VignetteAnswerRecord> {
     const client = requireSupabaseClient();
-    const { data: answerId, error } = await client.rpc('submit_vignette_answer', {
+    let { data: answerId, error } = await client.rpc('submit_vignette_answer', {
       p_participant_id: input.participantId,
       p_case_id: input.caseId,
       p_most_likely_diagnosis: input.mostLikelyDiagnosis,
@@ -1149,25 +1200,53 @@ export const supabaseResearchService = {
       p_red_flags: input.redFlags,
       p_next_step: input.nextStep,
       p_confidence: input.confidence,
+      p_selected_option_id: input.selectedOptionId ?? null,
+      p_displayed_option_order: input.displayedOptionOrder ?? null,
     });
 
-    if (error) {
-      throw new Error('Unable to save this clinical vignette response. Please verify all fields are complete.');
+    if (error && isSchemaCompatError(error)) {
+      const retry = await client.rpc('submit_vignette_answer', {
+        p_participant_id: input.participantId,
+        p_case_id: input.caseId,
+        p_most_likely_diagnosis: input.mostLikelyDiagnosis,
+        p_differential_1: input.differential1,
+        p_differential_2: input.differential2,
+        p_red_flags: input.redFlags,
+        p_next_step: input.nextStep,
+        p_confidence: input.confidence,
+      });
+      answerId = retry.data;
+      error = retry.error;
     }
 
-    const { data: row, error: fetchError } = await client
+    if (error) {
+      throw new Error(error.message || 'Unable to save this clinical vignette response. Please verify all fields are complete.');
+    }
+
+    const initialFetch = await client
       .from('vignette_answers')
-      .select(
-        'id, participant_id, case_id, stage, is_demo, most_likely_diagnosis, differential_1, differential_2, red_flags, next_step, confidence, first_displayed_at, last_opened_at, submitted_at, active_seconds, wall_clock_seconds, scoring_status, final_resolved_score, pi_adjudicated_score'
-      )
+      .select(VIGNETTE_ANSWER_SELECT_WITH_OPTIONS)
       .eq('id', answerId)
       .single();
+
+    let row = initialFetch.data as VignetteAnswerRow | null;
+    let fetchError = initialFetch.error;
+
+    if (fetchError && isSchemaCompatError(fetchError)) {
+      const legacyFetch = await client
+        .from('vignette_answers')
+        .select(VIGNETTE_ANSWER_SELECT_LEGACY)
+        .eq('id', answerId)
+        .single();
+      row = legacyFetch.data as VignetteAnswerRow | null;
+      fetchError = legacyFetch.error;
+    }
 
     if (fetchError || !row) {
       throw new Error('Your vignette response was saved, but could not be refreshed. Please reload the page.');
     }
 
-    return mapVignetteAnswerRow(row as VignetteAnswerRow);
+    return mapVignetteAnswerRow(row);
   },
 
   async completeVignetteStage(participantId: string): Promise<string> {
@@ -1400,6 +1479,103 @@ export const supabaseResearchService = {
     );
 
     if (member.role === 'researcher') {
+      const [vigMonitoringRes, vigKeysRes] = await Promise.all([
+        client.rpc('get_researcher_vignette_monitoring'),
+        client.rpc('get_researcher_vignette_keys'),
+      ]);
+
+      const monitoringRows =
+        vigMonitoringRes.error && isSchemaCompatError(vigMonitoringRes.error)
+          ? []
+          : ((vigMonitoringRes.data || []) as ResearcherVignetteMonitoringRow[]);
+
+      if (vigMonitoringRes.error && !isSchemaCompatError(vigMonitoringRes.error)) {
+        throw new Error('Unable to load vignette monitoring data. Please refresh and try again.');
+      }
+
+      const keyRows =
+        vigKeysRes.error && isSchemaCompatError(vigKeysRes.error)
+          ? []
+          : ((vigKeysRes.data || []) as {
+              case_id: string;
+              gold_standard_diagnosis: string;
+              acceptable_alternatives: string[] | null;
+            }[]);
+
+      if (vigKeysRes.error && !isSchemaCompatError(vigKeysRes.error)) {
+        throw new Error('Unable to load vignette answer keys. Please refresh and try again.');
+      }
+
+      const postKeyByCaseId = new Map<
+        string,
+        { goldStandardDiagnosis: string; acceptableAlternativeDiagnoses: string[] }
+      >();
+      keyRows.forEach(k => {
+        if (k.gold_standard_diagnosis) {
+          postKeyByCaseId.set(k.case_id, {
+            goldStandardDiagnosis: k.gold_standard_diagnosis,
+            acceptableAlternativeDiagnoses: k.acceptable_alternatives ?? [],
+          });
+        }
+      });
+      monitoringRows.forEach(r => {
+        if (!postKeyByCaseId.has(r.case_id) && r.gold_standard_diagnosis) {
+          postKeyByCaseId.set(r.case_id, {
+            goldStandardDiagnosis: r.gold_standard_diagnosis,
+            acceptableAlternativeDiagnoses: r.acceptable_alternatives ?? [],
+          });
+        }
+      });
+
+      const vignetteAnswers: VignetteAnswerRecord[] = monitoringRows.map(r => ({
+        id: r.vignette_answer_id,
+        participantId: r.participant_id,
+        caseId: r.case_id,
+        stage: 'post_ai',
+        isDemo: false,
+        mostLikelyDiagnosis: r.most_likely_diagnosis,
+        selectedOptionId: r.selected_option_id ?? undefined,
+        displayedOptionOrder: r.displayed_option_order ?? undefined,
+        differential1: '',
+        differential2: '',
+        redFlags: '',
+        nextStep: '',
+        confidence: r.confidence,
+        scoringStatus: r.scoring_status,
+        finalResolvedScore: r.final_resolved_score ?? undefined,
+        piAdjudicatedScore: r.pi_adjudicated_score,
+        firstDisplayedAt: r.first_displayed_at,
+        lastOpenedAt: r.last_opened_at,
+        activeSeconds: r.active_seconds,
+        wallClockSeconds: r.wall_clock_seconds,
+        submittedAt: r.submitted_at,
+      }));
+
+      // Only enrich post_ai clinicalCases with vignette answer keys; keep ai_simulation keys masked
+      const researcherCases: ClinicalCase[] = participantCases.map(pc => {
+        const postKey = pc.stage === 'post_ai' ? postKeyByCaseId.get(pc.id) : undefined;
+        return {
+          ...pc,
+          goldStandardDiagnosis: postKey?.goldStandardDiagnosis ?? '',
+          acceptableAlternativeDiagnoses: postKey?.acceptableAlternativeDiagnoses ?? [],
+          differentialDiagnosisKeys: [],
+          redFlagKeys: [],
+          nextManagementStepKey: '',
+          rubric: {
+            primaryDiagnosisCriteria: '',
+            differentialCriteria: '',
+            redFlagsCriteria: '',
+            nextStepCriteria: '',
+          },
+          aiStimulus: pc.aiStimulus
+            ? {
+                ...pc.aiStimulus,
+                isMisleading: false,
+              }
+            : undefined,
+        };
+      });
+
       return {
         member,
         operationalParticipants,
@@ -1408,11 +1584,11 @@ export const supabaseResearchService = {
         aiInteractions: [],
         aiEvaluations: [],
         followupEvents: [],
-        vignetteAnswers: [],
+        vignetteAnswers,
         assessorScores: [],
         teamMembers: [member],
         recruitmentLinks,
-        clinicalCases: [],
+        clinicalCases: researcherCases,
         participantCases,
         researchEvents: [],
         caseTimers: [],
@@ -1420,13 +1596,11 @@ export const supabaseResearchService = {
     }
 
     // Both 'assessor' and 'pi' can read clinical_case_answer_keys, vignette_answers, and permitted assessor_scores
-    const [keysRes, vigRes, scoresRes] = await Promise.all([
+    const [keysRes, initialVigRes, scoresRes] = await Promise.all([
       client.from('clinical_case_answer_keys').select('*'),
       client
         .from('vignette_answers')
-        .select(
-          'id, participant_id, case_id, stage, is_demo, most_likely_diagnosis, differential_1, differential_2, red_flags, next_step, confidence, first_displayed_at, last_opened_at, submitted_at, active_seconds, wall_clock_seconds, scoring_status, final_resolved_score, pi_adjudicated_score'
-        )
+        .select(VIGNETTE_ANSWER_SELECT_WITH_OPTIONS)
         .order('submitted_at', { ascending: false }),
       client
         .from('assessor_scores')
@@ -1434,10 +1608,21 @@ export const supabaseResearchService = {
         .order('scored_at', { ascending: false }),
     ]);
 
+    let vigData = (initialVigRes.data || []) as VignetteAnswerRow[];
+    let vigError = initialVigRes.error;
+    if (vigError && isSchemaCompatError(vigError)) {
+      const legacyVigRes = await client
+        .from('vignette_answers')
+        .select(VIGNETTE_ANSWER_SELECT_LEGACY)
+        .order('submitted_at', { ascending: false });
+      vigData = (legacyVigRes.data || []) as VignetteAnswerRow[];
+      vigError = legacyVigRes.error;
+    }
+
     if (keysRes.error) {
       throw new Error('Unable to load evaluation answer keys. Please refresh and try again.');
     }
-    if (vigRes.error) {
+    if (vigError) {
       throw new Error('Unable to load vignette responses. Please refresh and try again.');
     }
     if (scoresRes.error) {
@@ -1483,7 +1668,7 @@ export const supabaseResearchService = {
     });
 
     if (member.role === 'assessor') {
-      const vignetteAnswers = ((vigRes.data || []) as VignetteAnswerRow[]).map(row => {
+      const vignetteAnswers = vigData.map(row => {
         const mapped = mapVignetteAnswerRow(row);
         const sc = scoresByVignette.get(mapped.id);
         return {
@@ -1568,7 +1753,7 @@ export const supabaseResearchService = {
         : mapped;
     });
 
-    const vignetteAnswers = ((vigRes.data || []) as VignetteAnswerRow[]).map(row => {
+    const vignetteAnswers = vigData.map(row => {
       const mapped = mapVignetteAnswerRow(row);
       const sc = scoresByVignette.get(mapped.id);
       const s1Name = sc?.s1 ? teamById.get(sc.s1.assessorId)?.fullName || 'Assessor 1' : 'Assessor 1';

@@ -522,10 +522,9 @@ export const INITIAL_CLINICAL_CASES: ClinicalCase[] = [
     ],
     mcqOptions: [
       'Pyogenic Brain Abscess (Left Frontal Lobe, Odontogenic Source) with Raised Intracranial Pressure',
-      'Acute Left Middle Cerebral Artery Ischaemic Stroke',
-      'Glioblastoma Multiforme (High-Grade Primary Brain Tumour)',
-      'Uncomplicated Acute Bacterial Meningitis Without Mass Effect',
-      'Other'
+      'Necrotic High-Grade Glioma (Glioblastoma) with Tumour-Associated Fever / Necrosis and Perilesional Oedema',
+      'Acute Bacterial Meningitis Complicated by Focal Cerebritis / Early Venous Sinus Thrombosis and Raised ICP',
+      'Suppurative Intracranial Mass (Subdural Empyema vs. Left Frontal Abscess) with Impending Herniation'
     ],
     goldStandardDiagnosis: 'Pyogenic Brain Abscess (Left Frontal Lobe, Odontogenic Source) with Raised Intracranial Pressure',
     acceptableAlternativeDiagnoses: [
@@ -582,10 +581,9 @@ export const INITIAL_CLINICAL_CASES: ClinicalCase[] = [
     ],
     mcqOptions: [
       'Right-Sided Tension Pneumothorax (with Obstructive Shock and Respiratory Acidosis)',
-      'Life-Threatening Status Asthmaticus Unresponsive to Bronchodilators',
-      'Massive Right-Sided Pleural Effusion',
-      'Acute Massive Pulmonary Embolism',
-      'Other'
+      'Severe Acute Asthma Exacerbation / Barotrauma-Induced Tension Pneumothorax with Decompensated Respiratory Acidosis',
+      'Acute Massive Pulmonary Embolism with Obstructive Shock and Bronchospasm / Hypoxaemia',
+      'Status Asthmaticus Complicated by Severe Dynamic Hyperinflation and Circulatory Collapse'
     ],
     goldStandardDiagnosis: 'Right-Sided Tension Pneumothorax (with Obstructive Shock and Respiratory Acidosis)',
     acceptableAlternativeDiagnoses: [
@@ -644,10 +642,9 @@ export const INITIAL_CLINICAL_CASES: ClinicalCase[] = [
     ],
     mcqOptions: [
       'Myxoedema Coma Precipitated by Lower Respiratory Tract Infection / Pneumonia',
-      'Primary Septic Shock with Euthyroid Sick Syndrome',
-      'Syndrome of Inappropriate Antidiuretic Hormone Secretion (SIADH) Alone',
-      'Acute Pericardial Tamponade Without Endocrine Dysfunction',
-      'Other'
+      'Severe Pneumonia with Septic Shock, Hypercapnic Respiratory Failure, and Decompensated Hypothyroidism',
+      'Hypothyroid Pericardial Effusion / Tamponade Physiology with Hypoventilation and Sepsis',
+      'Decompensated Hypothyroidism with Severe Hypo-Osmolar Hyponatremia and Hypoglycaemic Encephalopathy'
     ],
     goldStandardDiagnosis: 'Myxoedema Coma Precipitated by Lower Respiratory Tract Infection / Pneumonia',
     acceptableAlternativeDiagnoses: [
@@ -706,10 +703,9 @@ export const INITIAL_CLINICAL_CASES: ClinicalCase[] = [
     ],
     mcqOptions: [
       'Thyroid Storm with Thyrotoxic Cardiomyopathy, Cardiogenic Shock (Beta-Blocker-Induced Collapse), and Multiorgan Dysfunction',
-      'Acute Ascending Cholangitis with Septic Shock and Stress Hyperthyroxinaemia',
-      'Phaeochromocytoma Crisis Without Thyroid Disease',
-      'Acute Viral Myocarditis with Benign Subclinical Hyperthyroidism',
-      'Other'
+      'Septic Shock with Thyrotoxicosis / Precipitated Thyroid Storm and Acute Congestive Hepatopathy',
+      'Decompensated Thyrotoxic Atrial Fibrillation with Tachycardia-Induced / Thyrotoxic Cardiomyopathy and Cardiogenic Shock',
+      'Acute Hepatic / Biliary Sepsis with Stress-Induced Cardiomyopathy and Uncontrolled Hyperthyroidism'
     ],
     goldStandardDiagnosis: 'Thyroid Storm with Thyrotoxic Cardiomyopathy, Cardiogenic Shock (Beta-Blocker-Induced Collapse), and Multiorgan Dysfunction',
     acceptableAlternativeDiagnoses: [
@@ -765,10 +761,9 @@ export const INITIAL_CLINICAL_CASES: ClinicalCase[] = [
     ],
     mcqOptions: [
       'Severe Hypovolemic Shock Progressing to Intrinsic AKI (Ischaemic Acute Tubular Necrosis) with Fluid Overload, Refractory Acidosis and Hyperkalemia',
-      'Uncomplicated Prerenal Azotemia Requiring Continued Aggressive Crystalloid Boluses',
-      'Isolated Hyperosmolar Hyperglycaemic State Without Renal Parenchymal Injury',
-      'Acute Post-Renal Obstructive Uropathy Alone',
-      'Other'
+      'Hypovolemic / Septic Gastrointestinal Shock with Hypernatremic Dehydration and Persistent Prerenal Oliguria',
+      'Acute-on-Chronic / Severe Intrinsic AKI Complicated by Iatrogenic Volume Overload, Hyperkalemia (5.8 mEq/L), and High-Anion/Lactic Acidosis',
+      'Decompensated Gastrointestinal Shock with Resuscitation-Associated Pulmonary Oedema and Mixed Metabolic Acidosis'
     ],
     goldStandardDiagnosis: 'Severe Hypovolemic Shock Progressing to Intrinsic AKI (Ischaemic Acute Tubular Necrosis) with Fluid Overload, Refractory Acidosis and Hyperkalemia',
     acceptableAlternativeDiagnoses: [

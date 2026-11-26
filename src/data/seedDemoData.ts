@@ -22,6 +22,10 @@ import {
   resolveOptionIdFromDiagnosis,
   evaluateMatchedGoldStandard
 } from '../utils/cdssOptions';
+import {
+  buildDisplayedVignetteOptions,
+  getCanonicalVignetteOptions
+} from '../utils/vignetteOptions';
 
 interface SeedDataResult {
   participants: Participant[];
@@ -317,13 +321,24 @@ export function generateSeedDemoData(): SeedDataResult {
       const a2Next = rand() < 0.89 ? nextMark : (nextMark === 1 ? 0.5 : 0.5);
       const a2Total = a2Primary + a2Diff + a2Red + a2Next;
 
+      const displayedOptionOrder = buildDisplayedVignetteOptions(
+        participantId,
+        pCase.id,
+        pCase.mcqOptions,
+        pCase.caseNumber
+      );
+      const canonical = getCanonicalVignetteOptions(pCase.mcqOptions);
+      const chosenOpt = primaryMark === 1 ? canonical[0] : (canonical[1] || canonical[0]);
+
       const vAnswer: VignetteAnswerRecord = {
         id: `demo-post-${participantId}-${pCase.id}`,
         participantId,
         caseId: pCase.id,
         stage: 'post_ai',
         isDemo: true,
-        mostLikelyDiagnosis: primaryMark === 1 ? pCase.goldStandardDiagnosis : pCase.mcqOptions[1],
+        mostLikelyDiagnosis: chosenOpt ? chosenOpt.text : pCase.goldStandardDiagnosis,
+        selectedOptionId: chosenOpt?.optionId,
+        displayedOptionOrder,
         differential1: pCase.differentialDiagnosisKeys[0],
         differential2: pCase.differentialDiagnosisKeys[1],
         redFlags: pCase.redFlagKeys[0] + '; ' + pCase.redFlagKeys[1],

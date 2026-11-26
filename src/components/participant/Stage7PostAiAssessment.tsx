@@ -4,18 +4,24 @@ import {
   ParticipantClinicalCase,
   Participant,
   VignetteAnswerRecord,
+  CdssOptionOrderItem,
   ResearchEventType
 } from '../../types';
 import { SubmitVignetteAnswerInput } from '../../services/supabaseResearchService';
 import { ClinicalImageGallery } from '../common/ClinicalImageGallery';
 import { useCaseActiveTimer } from '../../hooks/useCaseActiveTimer';
+import {
+  buildDisplayedVignetteOptions,
+  resolveVignetteOptionIdFromDiagnosis,
+  shouldShuffleVignetteOptions
+} from '../../utils/vignetteOptions';
 
 interface Stage7PostAiAssessmentProps {
   cases: ParticipantClinicalCase[];
   participant: Participant;
   isDemoMode: boolean;
   initialAnswers?: VignetteAnswerRecord[];
-  onOpenCase?: (caseId: string) => Promise<void> | void;
+  onOpenCase?: (caseId: string, displayedOptionOrder?: CdssOptionOrderItem[]) => Promise<void> | void;
   onHeartbeatTimer?: (caseId: string, deltaSeconds: number) => Promise<void> | void;
   onSubmitCase?: (input: SubmitVignetteAnswerInput) => Promise<VignetteAnswerRecord | void>;
   onComplete: (answers: VignetteAnswerRecord[]) => void | Promise<void>;
@@ -27,6 +33,7 @@ interface Stage7PostAiAssessmentProps {
 }
 
 interface VignetteFormState {
+  selectedOptionId: string;
   mostLikelyDiagnosis: string;
   customOtherDiagnosis: string;
   differential1: string;
@@ -68,9 +75,28 @@ export const Stage7PostAiAssessment: React.FC<Stage7PostAiAssessmentProps> = ({
     initialAnswers.forEach(ans => {
       const matchedCase = cases.find(c => c.id === ans.caseId);
       const isOptionMatch = matchedCase?.mcqOptions.includes(ans.mostLikelyDiagnosis);
+      const hasOtherOption = matchedCase?.mcqOptions.some(
+        opt => opt.trim().toLowerCase() === 'other'
+      );
+      const resolvedOptionId =
+        ans.selectedOptionId ||
+        resolveVignetteOptionIdFromDiagnosis(
+          matchedCase?.mcqOptions || [],
+          ans.mostLikelyDiagnosis
+        );
+
       map[ans.caseId] = {
-        mostLikelyDiagnosis: isOptionMatch ? ans.mostLikelyDiagnosis : 'Other',
-        customOtherDiagnosis: isOptionMatch ? '' : ans.mostLikelyDiagnosis,
+        selectedOptionId: resolvedOptionId,
+        mostLikelyDiagnosis: isOptionMatch
+          ? ans.mostLikelyDiagnosis
+          : hasOtherOption
+          ? 'Other'
+          : ans.mostLikelyDiagnosis,
+        customOtherDiagnosis: isOptionMatch
+          ? ''
+          : hasOtherOption
+          ? ans.mostLikelyDiagnosis
+          : '',
         differential1: ans.differential1,
         differential2: ans.differential2,
         redFlags: ans.redFlags,
@@ -93,11 +119,26 @@ export const Stage7PostAiAssessment: React.FC<Stage7PostAiAssessmentProps> = ({
   const maxUnlockedIndex =
     firstUnsubmittedIndex === -1 ? Math.max(0, cases.length - 1) : firstUnsubmittedIndex;
 
+  const handleOpenCaseWithOrder = onOpenCase
+    ? (caseId: string) => {
+        const targetCase = cases.find(c => c.id === caseId);
+        const order = targetCase
+          ? buildDisplayedVignetteOptions(
+              participant.id,
+              targetCase.id,
+              targetCase.mcqOptions,
+              targetCase.caseNumber
+            )
+          : undefined;
+        return onOpenCase(caseId, order);
+      }
+    : undefined;
+
   const { flushCurrent, getLocalTiming } = useCaseActiveTimer({
     caseId: currentCase?.id,
     isLocked: isCurrentSubmittedLocked,
     isDemoMode,
-    onOpenCase,
+    onOpenCase: handleOpenCaseWithOrder,
     onHeartbeatTimer,
     onLogEvent
   });
@@ -114,7 +155,23 @@ export const Stage7PostAiAssessment: React.FC<Stage7PostAiAssessmentProps> = ({
     );
   }
 
+  const isShuffledCurrent = shouldShuffleVignetteOptions(currentCase.id, currentCase.caseNumber);
+
+  const displayedOptions: CdssOptionOrderItem[] =
+    currentSubmittedRecord?.displayedOptionOrder &&
+    currentSubmittedRecord.displayedOptionOrder.length > 0
+      ? currentSubmittedRecord.displayedOptionOrder
+      : buildDisplayedVignetteOptions(
+          participant.id,
+          currentCase.id,
+          currentCase.mcqOptions,
+          currentCase.caseNumber
+        );
+
+  const hasOtherOption = displayedOptions.some(opt => opt.isOther);
+
   const currentAnswer: VignetteFormState = answers[currentCase.id] || {
+    selectedOptionId: '',
     mostLikelyDiagnosis: '',
     customOtherDiagnosis: '',
     differential1: '',
@@ -139,11 +196,32 @@ export const Stage7PostAiAssessment: React.FC<Stage7PostAiAssessmentProps> = ({
     }));
   };
 
+  const selectMcqOption = (opt: CdssOptionOrderItem) => {
+    if (isCurrentSubmittedLocked) return;
+    setErrorMessage(null);
+    setAnswers(prev => {
+      const existing = prev[currentCase.id] || currentAnswer;
+      return {
+        ...prev,
+        [currentCase.id]: {
+          ...existing,
+          selectedOptionId: opt.optionId,
+          mostLikelyDiagnosis: opt.text,
+          customOtherDiagnosis: opt.isOther ? existing.customOtherDiagnosis : ''
+        }
+      };
+    });
+  };
+
   const validateCurrent = (a: VignetteFormState): string | null => {
-    if (!a.mostLikelyDiagnosis.trim()) {
+    if (!a.mostLikelyDiagnosis.trim() && !a.selectedOptionId) {
       return 'Please select your most likely primary diagnosis.';
     }
-    if (a.mostLikelyDiagnosis === 'Other' && !a.customOtherDiagnosis.trim()) {
+    if (
+      hasOtherOption &&
+      (a.selectedOptionId === 'opt_other' || a.mostLikelyDiagnosis === 'Other') &&
+      !a.customOtherDiagnosis.trim()
+    ) {
       return 'Please specify your alternative primary diagnosis.';
     }
     if (!a.differential1.trim() || !a.differential2.trim()) {
@@ -164,7 +242,7 @@ export const Stage7PostAiAssessment: React.FC<Stage7PostAiAssessmentProps> = ({
     const canVisit = Boolean(submittedAnswers[targetCase.id]) || idx <= maxUnlockedIndex;
     if (!canVisit) {
       setErrorMessage(
-        `Vignette Case ${idx + 1} is locked until Case ${maxUnlockedIndex + 1} is completed.`
+        `Vignette ${idx + 1} is locked until Vignette ${maxUnlockedIndex + 1} is completed.`
       );
       return;
     }
@@ -174,9 +252,16 @@ export const Stage7PostAiAssessment: React.FC<Stage7PostAiAssessmentProps> = ({
   };
 
   const resolveDiagnosis = (a: VignetteFormState) =>
-    a.mostLikelyDiagnosis === 'Other' && a.customOtherDiagnosis.trim()
+    hasOtherOption &&
+    (a.selectedOptionId === 'opt_other' || a.mostLikelyDiagnosis === 'Other') &&
+    a.customOtherDiagnosis.trim()
       ? a.customOtherDiagnosis.trim()
       : a.mostLikelyDiagnosis;
+
+  const resolveOptionIdForSave = (a: VignetteFormState): string => {
+    if (a.selectedOptionId) return a.selectedOptionId;
+    return resolveVignetteOptionIdFromDiagnosis(currentCase.mcqOptions, a.mostLikelyDiagnosis);
+  };
 
   const handleSubmitCurrentCase = async (): Promise<Record<string, VignetteAnswerRecord> | null> => {
     const validationErr = validateCurrent(currentAnswer);
@@ -189,6 +274,8 @@ export const Stage7PostAiAssessment: React.FC<Stage7PostAiAssessmentProps> = ({
     setIsSubmittingCase(true);
     try {
       await flushCurrent();
+      const resolvedDiagnosis = resolveDiagnosis(currentAnswer);
+      const resolvedOptId = resolveOptionIdForSave(currentAnswer);
 
       if (isDemoMode) {
         const timing = getLocalTiming(currentCase.id);
@@ -198,7 +285,9 @@ export const Stage7PostAiAssessment: React.FC<Stage7PostAiAssessmentProps> = ({
           caseId: currentCase.id,
           stage: 'post_ai',
           isDemo: true,
-          mostLikelyDiagnosis: resolveDiagnosis(currentAnswer),
+          mostLikelyDiagnosis: resolvedDiagnosis,
+          selectedOptionId: resolvedOptId || undefined,
+          displayedOptionOrder: displayedOptions,
           differential1: currentAnswer.differential1.trim(),
           differential2: currentAnswer.differential2.trim(),
           redFlags: currentAnswer.redFlags.trim(),
@@ -215,6 +304,8 @@ export const Stage7PostAiAssessment: React.FC<Stage7PostAiAssessmentProps> = ({
             participantId: participant.id,
             caseId: currentCase.id,
             mostLikelyDiagnosis: demoAnswer.mostLikelyDiagnosis,
+            selectedOptionId: resolvedOptId || undefined,
+            displayedOptionOrder: displayedOptions,
             differential1: demoAnswer.differential1,
             differential2: demoAnswer.differential2,
             redFlags: demoAnswer.redFlags,
@@ -230,7 +321,9 @@ export const Stage7PostAiAssessment: React.FC<Stage7PostAiAssessmentProps> = ({
       const input: SubmitVignetteAnswerInput = {
         participantId: participant.id,
         caseId: currentCase.id,
-        mostLikelyDiagnosis: resolveDiagnosis(currentAnswer),
+        mostLikelyDiagnosis: resolvedDiagnosis,
+        selectedOptionId: resolvedOptId || undefined,
+        displayedOptionOrder: displayedOptions,
         differential1: currentAnswer.differential1.trim(),
         differential2: currentAnswer.differential2.trim(),
         redFlags: currentAnswer.redFlags.trim(),
@@ -326,14 +419,14 @@ export const Stage7PostAiAssessment: React.FC<Stage7PostAiAssessmentProps> = ({
               <span>UNAIDED CLINICAL VIGNETTES</span>
             </div>
             <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
-              Vignette Case {currentCaseIndex + 1} of {cases.length}: {currentCase.domain}
+              Vignette {currentCaseIndex + 1}
             </h2>
           </div>
 
           {/* Sequential Case Stepper */}
           <div className="flex items-center gap-1.5 self-start sm:self-auto flex-wrap">
             <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 mr-1">
-              Cases ({Object.keys(submittedAnswers).length}/{cases.length}):
+              Vignettes ({Object.keys(submittedAnswers).length}/{cases.length}):
             </span>
             {cases.map((c, i) => {
               const isSubmitted = Boolean(submittedAnswers[c.id]);
@@ -346,10 +439,10 @@ export const Stage7PostAiAssessment: React.FC<Stage7PostAiAssessmentProps> = ({
                   onClick={() => void handleSelectCase(i)}
                   title={
                     isSubmitted
-                      ? `Vignette Case ${i + 1} submitted (locked read-only)`
+                      ? `Vignette ${i + 1} submitted (locked read-only)`
                       : isLockedFuture
-                      ? `Vignette Case ${i + 1} locked until Case ${maxUnlockedIndex + 1} is submitted`
-                      : `Vignette Case ${i + 1} (current)`
+                      ? `Vignette ${i + 1} locked until Vignette ${maxUnlockedIndex + 1} is submitted`
+                      : `Vignette ${i + 1} (current)`
                   }
                   className={`w-8 h-8 rounded text-xs font-mono font-bold flex items-center justify-center transition-colors ${
                     isLockedFuture ? 'cursor-not-allowed opacity-55' : 'cursor-pointer'
@@ -468,10 +561,12 @@ export const Stage7PostAiAssessment: React.FC<Stage7PostAiAssessmentProps> = ({
                 <button
                   type="button"
                   onClick={() => {
+                    const defaultOpt = displayedOptions[0];
                     setAnswers(prev => ({
                       ...prev,
                       [currentCase.id]: {
-                        mostLikelyDiagnosis: currentCase.mcqOptions[0] || 'Other',
+                        selectedOptionId: defaultOpt?.optionId || 'opt_1',
+                        mostLikelyDiagnosis: defaultOpt?.text || currentCase.mcqOptions[0] || '',
                         customOtherDiagnosis: '',
                         differential1: 'Alternative acute etiology',
                         differential2: 'Secondary systemic condition',
@@ -515,31 +610,43 @@ export const Stage7PostAiAssessment: React.FC<Stage7PostAiAssessmentProps> = ({
                 1. Most Likely Primary Diagnosis
               </label>
               <div className="space-y-1.5">
-                {currentCase.mcqOptions.map(opt => (
-                  <label
-                    key={opt}
-                    className={`flex items-center gap-3 p-2.5 rounded border transition-colors text-xs ${
-                      isCurrentSubmittedLocked ? 'cursor-default opacity-85' : 'cursor-pointer'
-                    } ${
-                      currentAnswer.mostLikelyDiagnosis === opt
-                        ? 'border-slate-900 bg-slate-50 font-semibold text-slate-900'
-                        : 'border-slate-200 hover:bg-slate-50 text-slate-700'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name={`post-mcq-${currentCase.id}`}
-                      disabled={isCurrentSubmittedLocked}
-                      checked={currentAnswer.mostLikelyDiagnosis === opt}
-                      onChange={() => updateCurrentAnswer('mostLikelyDiagnosis', opt)}
-                      className="text-slate-900 focus:ring-slate-900"
-                    />
-                    <span>{opt}</span>
-                  </label>
-                ))}
+                {displayedOptions.map(opt => {
+                  const isSelected = currentAnswer.selectedOptionId
+                    ? currentAnswer.selectedOptionId === opt.optionId
+                    : currentAnswer.mostLikelyDiagnosis === opt.text;
+                  return (
+                    <label
+                      key={opt.optionId}
+                      className={`flex items-center gap-3 p-2.5 rounded border transition-colors text-xs ${
+                        isCurrentSubmittedLocked ? 'cursor-default opacity-85' : 'cursor-pointer'
+                      } ${
+                        isSelected
+                          ? 'border-slate-900 bg-slate-50 font-semibold text-slate-900'
+                          : 'border-slate-200 hover:bg-slate-50 text-slate-700'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name={`post-mcq-${currentCase.id}`}
+                        disabled={isCurrentSubmittedLocked}
+                        checked={isSelected}
+                        onChange={() => selectMcqOption(opt)}
+                        className="text-slate-900 focus:ring-slate-900"
+                      />
+                      {isShuffledCurrent && (
+                        <span className="font-mono font-bold text-slate-500 w-4 shrink-0">
+                          {opt.label}.
+                        </span>
+                      )}
+                      <span>{opt.text}</span>
+                    </label>
+                  );
+                })}
               </div>
 
-              {currentAnswer.mostLikelyDiagnosis === 'Other' && (
+              {hasOtherOption &&
+                (currentAnswer.selectedOptionId === 'opt_other' ||
+                  currentAnswer.mostLikelyDiagnosis === 'Other') && (
                 <div className="mt-2.5">
                   <input
                     type="text"

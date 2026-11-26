@@ -41,6 +41,7 @@ import {
   QuestionnaireStatusTable,
   AiRecordsAndFollowupsPanel
 } from './RecordsTablesPanel';
+import { VignetteAnswerKeyPanel } from './VignetteAnswerKeyPanel';
 import {
   evaluateMatchedGoldStandard,
   getCanonicalCdssOptions,
@@ -48,6 +49,12 @@ import {
   resolveGoldStandardOptionId,
   resolveOptionIdFromDiagnosis
 } from '../../utils/cdssOptions';
+import {
+  getCanonicalVignetteOptions,
+  resolveVignetteComparisonView,
+  resolveVignetteGoldStandardOptionId,
+  shouldShuffleVignetteOptions
+} from '../../utils/vignetteOptions';
 
 export type ResearcherTabId =
   | 'overview'
@@ -55,6 +62,7 @@ export type ResearcherTabId =
   | 'recruitment'
   | 'offloading'
   | 'automation_bias'
+  | 'vignette_keys'
   | 'manual_scoring'
   | 'cases'
   | 'export'
@@ -93,6 +101,7 @@ function getAvailableTabsForRole(
       { id: 'recruitment', label: 'Recruitment & Team' },
       { id: 'offloading', label: 'Questionnaires' },
       { id: 'automation_bias', label: 'CDSS & Follow-ups' },
+      { id: 'vignette_keys', label: 'Vignette Answer Keys' },
       { id: 'manual_scoring', label: 'Vignettes & Scoring' },
       { id: 'cases', label: 'Cases & Rubrics' },
       { id: 'export', label: 'CSV & SPSS Export' },
@@ -105,6 +114,7 @@ function getAvailableTabsForRole(
       { id: 'overview', label: 'Recruitment Overview' },
       { id: 'participants', label: 'Enrolled Participants' },
       { id: 'recruitment', label: 'Recruitment Links & Target' },
+      { id: 'vignette_keys', label: 'Vignette Answer Review' },
       { id: 'cases', label: 'Published Stimuli' }
     ];
   }
@@ -593,27 +603,44 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
   };
 
   const handleExportPostAiVignettes = () => {
-    const rows = vignetteAnswers.map(v => ({
-      vignette_id: v.id,
-      participant_id: v.participantId,
-      case_id: v.caseId,
-      stage: v.stage,
-      most_likely_diagnosis: v.mostLikelyDiagnosis,
-      differential_1: v.differential1,
-      differential_2: v.differential2,
-      red_flags: v.redFlags,
-      next_step: v.nextStep,
-      confidence: v.confidence,
-      assessor1_score: v.assessor1Score?.totalScore ?? null,
-      assessor2_score: v.assessor2Score?.totalScore ?? null,
-      pi_adjudicated_score: v.piAdjudicatedScore ?? null,
-      final_resolved_score: v.finalResolvedScore ?? null,
-      scoring_status: v.scoringStatus ?? '',
-      active_seconds: v.activeSeconds ?? '',
-      wall_clock_seconds: v.wallClockSeconds ?? '',
-      is_demo: v.isDemo ? 1 : 0,
-      submitted_at: v.submittedAt
-    }));
+    const caseById = new Map(cases.map(c => [c.id, c]));
+    const rows = vignetteAnswers.map(v => {
+      const c = caseById.get(v.caseId);
+      const comparison = resolveVignetteComparisonView(v, c);
+      return {
+        vignette_id: v.id,
+        participant_id: v.participantId,
+        case_id: v.caseId,
+        case_number: c?.caseNumber ?? '',
+        domain: c?.domain ?? '',
+        stage: v.stage,
+        most_likely_diagnosis: v.mostLikelyDiagnosis,
+        selected_option_id: comparison.selectedOptionId ?? '',
+        selected_option_letter: comparison.selectedOptionLabel ?? '',
+        gold_standard_option_id: comparison.goldOptionId ?? '',
+        gold_standard_diagnosis: comparison.goldText,
+        matched_gold_standard: comparison.goldText ? (comparison.isCorrect ? 1 : 0) : '',
+        is_legacy_order: comparison.isLegacyRecord ? 1 : 0,
+        displayed_option_order:
+          comparison.displayedOrder.length > 0
+            ? comparison.displayedOrder.map(o => `${o.label}:${o.optionId}`).join(' | ')
+            : '',
+        differential_1: v.differential1,
+        differential_2: v.differential2,
+        red_flags: v.redFlags,
+        next_step: v.nextStep,
+        confidence: v.confidence,
+        assessor1_score: v.assessor1Score?.totalScore ?? null,
+        assessor2_score: v.assessor2Score?.totalScore ?? null,
+        pi_adjudicated_score: v.piAdjudicatedScore ?? null,
+        final_resolved_score: v.finalResolvedScore ?? null,
+        scoring_status: v.scoringStatus ?? '',
+        active_seconds: v.activeSeconds ?? '',
+        wall_clock_seconds: v.wallClockSeconds ?? '',
+        is_demo: v.isDemo ? 1 : 0,
+        submitted_at: v.submittedAt
+      };
+    });
     exportToCsv(`carl_vignette_cases_${isDemoMode ? 'demo' : 'research'}.csv`, rows);
   };
 
@@ -1376,6 +1403,19 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
       )}
 
       {/* ==================================================== */}
+      {/* TAB: VIGNETTE ANSWER KEYS & COMPARISON */}
+      {/* ==================================================== */}
+      {activeTab === 'vignette_keys' && (isPiOrDemo || teamMember?.role === 'researcher') && (
+        <VignetteAnswerKeyPanel
+          participants={participants}
+          operationalParticipants={operationalParticipants}
+          vignetteAnswers={vignetteAnswers}
+          cases={cases}
+          isPiOrDemo={isPiOrDemo}
+        />
+      )}
+
+      {/* ==================================================== */}
       {/* TAB: VIGNETTES & DUAL-ASSESSOR SCORING CONSOLE */}
       {/* ==================================================== */}
       {activeTab === 'manual_scoring' && (
@@ -1423,9 +1463,16 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={analytics.postAiCaseMeans}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis dataKey="domain" tick={{ fontSize: 11 }} />
+                    <XAxis
+                      dataKey="caseNumber"
+                      tickFormatter={val => `Vignette ${val}`}
+                      tick={{ fontSize: 11 }}
+                    />
                     <YAxis domain={[0, 4]} tick={{ fontSize: 11 }} />
-                    <Tooltip formatter={val => [`${val} / 4.0`, 'Mean Score']} />
+                    <Tooltip
+                      labelFormatter={val => `Vignette ${val}`}
+                      formatter={val => [`${val} / 4.0`, 'Mean Score']}
+                    />
                     <Bar dataKey="meanScore" fill="#0D9488" radius={[4, 4, 0, 0]} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -1507,7 +1554,7 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
                         : v.scoringStatus || 'pending';
                     return (
                       <option key={v.id} value={v.id}>
-                        {pCode} · Case {c?.caseNumber ?? '?'} ({c?.domain}) — {statusLabel}
+                        {pCode} · Vignette {c?.caseNumber ?? '?'} — {statusLabel}
                       </option>
                     );
                   })}
@@ -1547,7 +1594,7 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
                       Participant Vignette Answer
                     </span>
                     <span className="font-mono text-slate-600">
-                      {currentScoringParticipantCode} · Case {currentScoringCase.caseNumber}
+                      {currentScoringParticipantCode} · Vignette {currentScoringCase.caseNumber}
                     </span>
                   </div>
 
@@ -1555,9 +1602,50 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
                     <span className="font-semibold text-slate-700 block mb-0.5">
                       Primary Diagnosis Submitted:
                     </span>
-                    <p className="p-2.5 rounded-lg bg-white border border-slate-200 font-medium text-slate-900">
-                      {currentScoringVignette.mostLikelyDiagnosis}
-                    </p>
+                    <div className="p-2.5 rounded-lg bg-white border border-slate-200 space-y-1.5">
+                      {isPiOrDemo && (() => {
+                        const comparison = resolveVignetteComparisonView(
+                          currentScoringVignette,
+                          currentScoringCase
+                        );
+                        return (
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {comparison.isLegacyRecord ? (
+                              <span className="font-mono text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-50 border border-amber-200 text-amber-800">
+                                Legacy Pre-Shuffle Record
+                              </span>
+                            ) : (
+                              <>
+                                {comparison.selectedOptionLabel && (
+                                  <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-800">
+                                    Option {comparison.selectedOptionLabel}
+                                  </span>
+                                )}
+                                {comparison.selectedOptionId && (
+                                  <span className="font-mono text-[10px] text-slate-500">
+                                    [{comparison.selectedOptionId}]
+                                  </span>
+                                )}
+                              </>
+                            )}
+                            {comparison.goldText && (
+                              <span
+                                className={`font-mono text-[10px] font-bold px-1.5 py-0.5 rounded border ${
+                                  comparison.isCorrect
+                                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                    : 'bg-rose-50 text-rose-800 border-rose-200'
+                                }`}
+                              >
+                                {comparison.isCorrect ? 'Correct' : 'Incorrect'}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })()}
+                      <p className="font-medium text-slate-900">
+                        {currentScoringVignette.mostLikelyDiagnosis}
+                      </p>
+                    </div>
                   </div>
 
                   <div>
@@ -1854,8 +1942,9 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
             >
               {cases.map(c => (
                 <option key={c.id} value={c.id}>
-                  [{c.stage === 'ai_simulation' ? 'CDSS' : 'VIGNETTE'}] Case {c.caseNumber}:{' '}
-                  {c.domain} — {c.title}
+                  {c.stage === 'ai_simulation'
+                    ? `[CDSS] Case ${c.caseNumber}: ${c.domain} — ${c.title}`
+                    : `[VIGNETTE] Vignette ${c.caseNumber}`}
                 </option>
               ))}
             </select>
@@ -1933,11 +2022,21 @@ export const ResearcherDashboard: React.FC<ResearcherDashboardProps> = ({
                   {editingCase.mcqOptions && editingCase.mcqOptions.length > 0 && (
                     <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200 space-y-2">
                       <div className="font-semibold text-slate-800">
-                        Canonical MCQ Options &amp; Authoritative Option IDs (Shuffled Per Participant in CDSS)
+                        {editingCase.stage === 'ai_simulation'
+                          ? 'Canonical MCQ Options & Authoritative Option IDs (Shuffled Per Participant in CDSS)'
+                          : shouldShuffleVignetteOptions(editingCase.id, editingCase.caseNumber)
+                          ? 'Canonical MCQ Options & Authoritative Option IDs (Shuffled Per Participant in Vignettes 2–6)'
+                          : 'Canonical MCQ Options & Authoritative Option IDs (Fixed Canonical Order in Vignette 1)'}
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                        {getCanonicalCdssOptions(editingCase.mcqOptions).map(opt => {
-                          const goldId = resolveGoldStandardOptionId(editingCase);
+                        {(editingCase.stage === 'ai_simulation'
+                          ? getCanonicalCdssOptions(editingCase.mcqOptions)
+                          : getCanonicalVignetteOptions(editingCase.mcqOptions)
+                        ).map(opt => {
+                          const goldId =
+                            editingCase.stage === 'ai_simulation'
+                              ? resolveGoldStandardOptionId(editingCase)
+                              : resolveVignetteGoldStandardOptionId(editingCase);
                           const isGold = goldId === opt.optionId;
                           return (
                             <div

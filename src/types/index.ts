@@ -359,6 +359,8 @@ export interface VignetteAnswerRecord {
   stage: 'post_ai';
   isDemo: boolean;
   mostLikelyDiagnosis: string;
+  selectedOptionId?: string;
+  displayedOptionOrder?: CdssOptionOrderItem[];
   differential1: string;
   differential2: string;
   redFlags: string;
